@@ -1,0 +1,11 @@
+[Unit]
+Description=Margin PostgreSQL verified local backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/margin
+ExecStart=/opt/margin/scripts/backup-production.sh
+UMask=0077
+Nice=10

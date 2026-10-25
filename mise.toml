@@ -1,0 +1,8 @@
+[tools]
+node = "26.11.1"
+pnpm = "12.11.2"
+go = "1.27.3"
+
+[tasks.dev]
+description = "Run PostgreSQL, Go, and Vite for local development"
+run = "node scripts/dev.mjs"

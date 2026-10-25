@@ -1,0 +1,200 @@
+[
+  {
+    "Title": "The Creative Act",
+    "Author": "Rick Rubin",
+    "Kind": "book",
+    "Status": "active",
+    "Unit": "pages",
+    "CoverURL": "https://covers.openlibrary.org/b/isbn/9780593652886-L.jpg",
+    "Description": "A field guide to noticing, making, and trusting the work.",
+    "Progress": 154,
+    "Total": 432,
+    "Favorite": true,
+    "Tags": [
+      "creativity",
+      "slow reading"
+    ],
+    "Ordinal": 1
+  },
+  {
+    "Title": "Designing Data-Intensive Applications",
+    "Author": "Martin Kleppmann",
+    "Kind": "book",
+    "Status": "active",
+    "Unit": "pages",
+    "CoverURL": "https://covers.openlibrary.org/b/isbn/9781449373320-L.jpg",
+    "Description": "The ideas behind reliable, scalable systems. One chapter at a time.",
+    "Progress": 136,
+    "Total": 616,
+    "Favorite": true,
+    "Tags": [
+      "engineering",
+      "systems"
+    ],
+    "Ordinal": 2
+  },
+  {
+    "Title": "Frieren: Beyond Journey’s End",
+    "Author": "Kanehito Yamada & Tsukasa Abe",
+    "Kind": "anime",
+    "Status": "active",
+    "Unit": "episodes",
+    "Description": "An unhurried journey through memory, friendship, and the years between adventures.",
+    "Progress": 9,
+    "Total": 28,
+    "Favorite": false,
+    "Tags": [
+      "fantasy",
+      "quiet evenings"
+    ],
+    "Ordinal": 3
+  },
+  {
+    "Title": "Hollow Knight",
+    "Author": "Team Cherry",
+    "Kind": "game",
+    "Status": "active",
+    "Unit": "hours",
+    "URL": "https://www.hollowknight.com/",
+    "Description": "Getting happily lost beneath Hallownest. Still avoiding the Soul Master.",
+    "Progress": 18,
+    "Total": 40,
+    "Favorite": false,
+    "Tags": [
+      "exploration",
+      "indie"
+    ],
+    "Ordinal": 4
+  },
+  {
+    "Title": "Dune",
+    "Author": "Frank Herbert",
+    "Kind": "book",
+    "Status": "later",
+    "Unit": "pages",
+    "CoverURL": "https://covers.openlibrary.org/b/isbn/9780441172719-L.jpg",
+    "Description": "Desert worlds, uneasy power, and a very long reading weekend.",
+    "Total": 688,
+    "Favorite": false,
+    "Tags": [
+      "science fiction"
+    ],
+    "Ordinal": 5
+  },
+  {
+    "Title": "A Philosophy of Software Design",
+    "Author": "John Ousterhout",
+    "Kind": "book",
+    "Status": "later",
+    "Unit": "pages",
+    "CoverURL": "https://covers.openlibrary.org/b/isbn/9781732102200-L.jpg",
+    "Description": "A short book on reducing complexity and designing deeper modules.",
+    "Total": 196,
+    "Favorite": false,
+    "Tags": [
+      "engineering",
+      "craft"
+    ],
+    "Ordinal": 6
+  },
+  {
+    "Title": "Arrival",
+    "Author": "Denis Villeneuve",
+    "Kind": "movie",
+    "Status": "completed",
+    "Unit": "minutes",
+    "Description": "Language as a way of seeing time. A film to sit with afterward.",
+    "Notes": "Rewatch after reading Story of Your Life.",
+    "Total": 116,
+    "Rating": 5,
+    "Favorite": true,
+    "Tags": [
+      "science fiction",
+      "language"
+    ],
+    "Progress": 116,
+    "Ordinal": 7
+  },
+  {
+    "Title": "Attention Is All You Need",
+    "Author": "Ashish Vaswani et al.",
+    "Kind": "paper",
+    "Status": "completed",
+    "Unit": "pages",
+    "URL": "https://arxiv.org/abs/1706.03762",
+    "Description": "The Transformer paper. Keep the architecture diagram close by.",
+    "Total": 11,
+    "Rating": 5,
+    "Favorite": false,
+    "Tags": [
+      "machine learning",
+      "foundations"
+    ],
+    "Progress": 11,
+    "Ordinal": 8
+  },
+  {
+    "Title": "A Visual Introduction to Machine Learning",
+    "Author": "R2D3",
+    "Kind": "article",
+    "Status": "later",
+    "Unit": "%",
+    "URL": "https://www.r2d3.us/visual-intro-to-machine-learning-part-1/",
+    "Description": "Decision trees explained through a patient, visual walkthrough.",
+    "Total": 100,
+    "Favorite": false,
+    "Tags": [
+      "machine learning",
+      "visual thinking"
+    ],
+    "Ordinal": 9
+  },
+  {
+    "Title": "Perfect Days",
+    "Author": "Wim Wenders",
+    "Kind": "movie",
+    "Status": "later",
+    "Unit": "minutes",
+    "Description": "Small rituals, cassette tapes, and the texture of an ordinary day.",
+    "Total": 124,
+    "Favorite": false,
+    "Tags": [
+      "quiet evenings",
+      "cinema"
+    ],
+    "Ordinal": 10
+  },
+  {
+    "Title": "Look Back",
+    "Author": "Tatsuki Fujimoto",
+    "Kind": "manga",
+    "Status": "completed",
+    "Unit": "pages",
+    "Description": "A small, moving story about drawing and the people who change your work.",
+    "Total": 144,
+    "Rating": 5,
+    "Favorite": false,
+    "Tags": [
+      "creativity",
+      "friendship"
+    ],
+    "Progress": 144,
+    "Ordinal": 11
+  },
+  {
+    "Title": "The Art of Noticing",
+    "Author": "Rob Walker",
+    "Kind": "book",
+    "Status": "later",
+    "Unit": "pages",
+    "CoverURL": "https://covers.openlibrary.org/b/isbn/9780525521242-L.jpg",
+    "Description": "Tiny exercises for paying better attention to the world nearby.",
+    "Total": 256,
+    "Favorite": false,
+    "Tags": [
+      "creativity",
+      "attention"
+    ],
+    "Ordinal": 12
+  }
+]

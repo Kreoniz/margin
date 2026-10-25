@@ -1,0 +1,1001 @@
+/* Keep the published design system intact. Its optional Tailwind adapter maps
+   utilities to the same semantic tokens used by the React components. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "unlikely-ui/tailwind.css";
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@font-face {
+  font-family: Inter;
+  src: url("/fonts/InterVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@theme inline {
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --color-u-soft: var(--u-line-soft);
+  --color-u-well: var(--u-well);
+  --color-u-accent-soft: var(--u-accent-soft);
+  --color-u-accent-text: var(--u-accent-text);
+  --color-u-success: var(--u-success);
+  --color-u-warning: var(--u-warning);
+  --color-u-warning-soft: var(--u-warning-soft);
+  --color-u-warning-border: var(--u-warning-border);
+  --color-u-focus: var(--u-focus);
+  --shadow-u-panel: var(--u-shadow-lg);
+  --ease-u-standard: var(--u-ease-standard);
+  --animate-margin-reveal: margin-reveal 220ms var(--u-ease-standard) both;
+  --animate-margin-pulse: margin-pulse 1.5s ease-in-out infinite;
+}
+
+/* Keep the border foundation below DS component rules. This gives Tailwind's
+   directional borders zero-width remaining edges without resetting controls. */
+@layer ui-base {
+  *,
+  *::before,
+  *::after {
+    @apply border-0 border-solid;
+  }
+}
+
+/* Full Preflight is omitted: Unlikely UI owns its component resets. */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    @apply box-border;
+  }
+  html {
+    @apply bg-[#292d28] font-sans;
+    color-scheme: dark;
+  }
+  html[data-appearance="light"] {
+    @apply bg-[#f7f4eb];
+    color-scheme: light;
+  }
+  body {
+    @apply m-0 text-sm;
+  }
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+  button {
+    @apply cursor-pointer text-inherit touch-manipulation;
+  }
+  button:disabled {
+    @apply cursor-not-allowed;
+  }
+  a {
+    @apply text-inherit underline-offset-4;
+  }
+  h1,
+  h2,
+  h3,
+  p {
+    @apply m-0;
+  }
+  svg {
+    @apply shrink-0 align-middle;
+  }
+  button:focus-visible,
+  a:focus-visible,
+  summary:focus-visible {
+    @apply outline-2 outline-offset-4 outline-u-focus;
+  }
+  ::selection {
+    @apply bg-u-accent-soft text-u-accent-text;
+  }
+}
+
+@layer components {
+  .u-theme {
+    @apply font-sans leading-normal;
+  }
+  .app-theme {
+    @apply min-h-dvh bg-u-canvas text-u-ink;
+  }
+
+  .u-button {
+    @apply text-xs;
+  }
+  .u-button-label {
+    @apply inline-flex items-center justify-center gap-1.5;
+  }
+  .u-button[data-variant="primary"] {
+    @apply text-u-accent-ink;
+  }
+  .u-button[data-variant="danger"] {
+    @apply text-u-danger;
+  }
+  .u-text-control {
+    @apply text-sm;
+  }
+  .u-select-trigger {
+    @apply min-w-28 gap-3 border-u-soft text-xs;
+  }
+  .u-select-item {
+    @apply text-xs;
+  }
+  .quiet {
+    @apply text-xs text-u-muted;
+  }
+  .text-link {
+    @apply inline-flex items-center gap-1.5 text-xs text-u-muted no-underline hover:text-u-ink hover:underline;
+  }
+
+  .brand-button,
+  .brand-link {
+    @apply inline-flex items-center border-0 bg-transparent p-0 no-underline;
+  }
+  .logo {
+    @apply inline-flex items-center gap-1.5 leading-none text-u-ink;
+  }
+  .logo > span {
+    @apply text-[31px] font-[640] tracking-[-1.7px];
+  }
+  .logo-dot {
+    @apply text-u-accent-text;
+  }
+  .logo-small > span {
+    @apply text-[23px] tracking-[-1.1px];
+  }
+  .logo-small > svg {
+    @apply h-[26px] w-[23px];
+  }
+  .app-header {
+    @apply sticky top-0 z-10 border-b border-solid border-u-soft bg-u-canvas;
+  }
+  .header-inner {
+    @apply mx-auto flex h-14 max-w-6xl items-center gap-7 px-8;
+  }
+  .main-nav {
+    @apply flex gap-1;
+  }
+  .main-nav > button {
+    @apply inline-flex min-h-[34px] items-center gap-1.5 rounded-md border border-solid border-transparent bg-transparent px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-u-muted transition-colors duration-150 hover:bg-u-well;
+  }
+  .main-nav > button[aria-current="page"] {
+    @apply border-u-accent-border/20 bg-u-accent-soft font-semibold text-u-accent-text;
+  }
+  .new-dot {
+    @apply ml-0.5 size-[5px] rounded-full bg-u-accent-text;
+  }
+  .header-actions {
+    @apply ml-auto flex items-center gap-1.5;
+  }
+  .header-actions > .u-button:first-child {
+    @apply h-[34px] min-h-[34px] px-3;
+  }
+  .header-actions > .u-button:last-child {
+    @apply size-[34px] min-h-[34px] min-w-[34px] text-u-muted;
+  }
+  .content {
+    @apply mx-auto min-h-[calc(100dvh-57px)] max-w-[1088px] px-8 pt-9 pb-7 outline-none;
+  }
+  .page-heading {
+    @apply mb-6 flex animate-margin-reveal items-center justify-between gap-5;
+  }
+  .page-heading h1 {
+    @apply text-[31px] leading-tight font-[570] tracking-[-1.2px];
+  }
+  .page-heading h1 > span {
+    @apply text-u-accent-text;
+  }
+  .page-heading p {
+    @apply mt-2 text-xs leading-relaxed text-u-muted;
+  }
+  .discovery-controls {
+    @apply flex items-center gap-1.5;
+  }
+  .discovery-controls .u-button {
+    @apply h-9 min-h-9 text-xs;
+  }
+  .list-toolbar {
+    @apply mb-4 flex items-center gap-3;
+  }
+  .search-box {
+    @apply relative flex min-w-40 max-w-[430px] flex-1 items-center;
+  }
+  .search-box > svg {
+    @apply pointer-events-none absolute left-3 text-u-muted;
+  }
+  .search-box > .u-text-control {
+    @apply min-h-10 w-full border-u-soft bg-u-surface pr-16 pl-9 text-xs shadow-none;
+  }
+  .search-box > kbd {
+    @apply pointer-events-none absolute right-3 rounded border border-solid border-u-soft px-1 font-sans text-[10px] leading-[17px] text-u-muted;
+  }
+  .toolbar-filters {
+    @apply ml-auto flex max-w-1/2 gap-2;
+  }
+  .toolbar-filters > .u-select-trigger {
+    @apply h-9 min-h-9 max-w-44 bg-transparent text-xs;
+  }
+  .list-tabs-row {
+    @apply flex items-center justify-between gap-4 border-b border-solid border-u-soft;
+  }
+  .list-tabs {
+    @apply flex gap-6 overflow-x-auto [scrollbar-width:none];
+  }
+  .list-tabs > button {
+    @apply relative min-h-10 border-0 bg-transparent pt-2 pb-3 text-xs whitespace-nowrap text-u-muted transition-colors duration-100;
+  }
+  .list-tabs > button[aria-pressed="true"] {
+    @apply font-semibold text-u-ink;
+  }
+  .list-tabs > button[aria-pressed="true"]::after {
+    @apply absolute inset-x-0 -bottom-px h-0.5 bg-u-accent-text content-[''];
+  }
+  .result-count {
+    @apply pb-1 text-[11px] whitespace-nowrap text-u-muted;
+  }
+  .media-list {
+    @apply w-full;
+  }
+  .media-row {
+    @apply flex min-h-20 items-center gap-4 border-b border-solid border-u-soft px-0.5 py-3.5;
+  }
+  .media-row > .u-choice {
+    @apply min-h-10 min-w-8 justify-center;
+  }
+  .media-row > .u-choice > .u-choice-box {
+    @apply size-[19px] rounded-full border-u-line bg-u-surface transition duration-150;
+  }
+  .media-row > .u-choice:active > .u-choice-box {
+    @apply scale-90;
+  }
+  .media-row > .u-choice[data-checked] > .u-choice-box {
+    @apply border-u-accent-border bg-u-accent text-u-accent-ink;
+  }
+  .mini-cover {
+    @apply relative grid h-[43px] w-8 min-w-8 place-items-center overflow-hidden rounded bg-u-well text-u-muted;
+  }
+  .mini-cover > img {
+    @apply absolute inset-0 size-full object-cover transition-opacity duration-150;
+  }
+  .mini-paper,
+  .mini-article {
+    @apply bg-[color-mix(in_srgb,var(--u-category-3)_35%,var(--u-surface))] text-u-accent-text;
+  }
+  .mini-video,
+  .mini-movie {
+    @apply bg-[color-mix(in_srgb,var(--u-category-2)_30%,var(--u-surface))];
+  }
+  .row-content,
+  .article-content {
+    @apply min-w-0 flex-1;
+  }
+  .item-title {
+    @apply border-0 bg-transparent p-0 text-left text-sm leading-relaxed font-[550] tracking-[-0.2px] wrap-anywhere text-u-ink no-underline hover:underline hover:decoration-u-line;
+  }
+  .item-title > svg {
+    @apply ml-1.5 text-u-muted opacity-55;
+  }
+  .item-done .item-title {
+    @apply text-u-muted;
+  }
+  .item-meta {
+    @apply mt-1 flex flex-wrap items-center gap-2 text-[11px] leading-relaxed text-u-muted;
+  }
+  .item-meta > span {
+    @apply max-w-full truncate;
+  }
+  .inline-tag {
+    @apply rounded border-0 bg-u-well px-1.5 py-0.5 text-[10px] leading-normal text-u-muted hover:bg-u-accent-soft hover:text-u-accent-text;
+  }
+  .type-label {
+    @apply ml-3 inline-flex items-center gap-1 text-[10px] whitespace-nowrap text-u-muted;
+  }
+  .media-row > .u-button {
+    @apply size-9 min-h-9 min-w-9 text-u-muted;
+  }
+  :is(.media-row, .article-row)[data-keyboard-active="true"] {
+    @apply bg-u-accent-soft/35 outline-2 -outline-offset-2 outline-u-focus;
+  }
+  .public-marker {
+    @apply inline-flex items-center text-u-accent-text;
+  }
+  .empty-state {
+    @apply flex flex-col items-center px-4 py-16 text-center;
+  }
+  .empty-icon {
+    @apply mb-4 grid size-14 -rotate-5 place-items-center rounded-2xl border border-solid border-u-soft bg-u-well text-u-accent-text;
+  }
+  .empty-state h2 {
+    @apply text-xl leading-snug font-[530] tracking-tight;
+  }
+  .empty-state p {
+    @apply mt-2 mb-5 max-w-[355px] text-xs leading-loose text-u-muted;
+  }
+  .empty-state > .u-button {
+    @apply h-9 min-h-9 text-xs;
+  }
+  .page-footer {
+    @apply flex flex-wrap items-center justify-center gap-1.5 pt-7 text-[10px] text-u-muted;
+  }
+  .page-footer > svg {
+    @apply text-u-accent-text;
+  }
+  .show-more {
+    @apply flex justify-center pt-6;
+  }
+  .loading-list {
+    @apply pt-2.5;
+  }
+  .loading-row {
+    @apply relative h-[70px] border-b border-solid border-u-soft;
+  }
+  .loading-row::before {
+    @apply absolute top-[22px] left-16 h-3 w-2/5 animate-margin-pulse rounded bg-u-well content-[''];
+  }
+  .skip-link {
+    @apply fixed -top-20 left-5 z-[300] rounded-md bg-u-accent px-4 py-3 text-u-accent-ink focus:top-2.5;
+  }
+  .notice {
+    @apply my-3 rounded-md border border-solid border-u-soft px-3 py-2 text-xs leading-relaxed wrap-anywhere;
+  }
+  .notice.error {
+    @apply border-u-danger-border bg-u-danger-soft text-u-danger;
+  }
+  .notice.warning {
+    @apply border-u-warning-border/50 bg-u-warning-soft text-u-warning;
+  }
+  .notice > .u-button {
+    @apply mt-1.5 flex;
+  }
+  .connection-notice {
+    @apply mt-0 mb-5 flex items-center justify-between gap-4;
+  }
+  .connection-notice > .u-button {
+    @apply m-0 shrink-0;
+  }
+
+  .source-mark {
+    @apply grid size-[30px] min-w-[30px] place-items-center rounded-md border border-solid border-u-soft bg-u-well font-serif text-base font-semibold text-u-accent-text uppercase;
+  }
+  .source-mark-logo {
+    @apply bg-[#fcfaf5];
+  }
+  .source-mark-logo > img {
+    @apply block size-[21px] object-contain;
+  }
+  .source-mark[data-brand="openai"] > img {
+    @apply size-7;
+  }
+  .article-row {
+    @apply grid grid-cols-[30px_minmax(0,1fr)_36px] gap-4 border-b border-solid border-u-soft px-0.5 py-5;
+  }
+  .article-row > .source-mark {
+    @apply mt-0.5;
+  }
+  .article-meta {
+    @apply mb-1 flex flex-wrap items-center gap-1.5 text-[10px] leading-relaxed text-u-muted;
+  }
+  .article-meta > span:first-child {
+    @apply font-medium text-u-ink;
+  }
+  .article-row .item-title {
+    @apply max-w-full text-[15px] leading-relaxed font-[550];
+  }
+  .article-description {
+    @apply mt-1.5 line-clamp-2 max-w-[740px] text-xs leading-relaxed wrap-anywhere text-u-muted;
+  }
+  .article-actions {
+    @apply mt-3 flex items-center gap-1.5;
+  }
+  .article-actions > .u-button {
+    @apply h-8 min-h-8 px-2.5 text-[11px];
+  }
+  .article-actions > .u-button[data-variant="secondary"] {
+    @apply border-u-soft;
+  }
+  .article-row > .u-button {
+    @apply mt-1.5 size-9 min-h-9 min-w-9 text-u-muted;
+  }
+  .saved-label {
+    @apply flex min-h-8 items-center gap-1.5 text-[11px] text-u-accent-text;
+  }
+
+  /* Compact shared dialog hooks also support the parent's Editor. */
+  .app-modal {
+    @apply w-[520px] max-w-[calc(100vw-32px)] max-h-[calc(100svh-32px)] overflow-y-auto rounded-xl border-u-soft bg-u-surface p-5 text-u-ink shadow-u-panel;
+    inline-size: 520px;
+    max-block-size: calc(100svh - 32px);
+    transition:
+      opacity 160ms var(--u-ease-standard),
+      transform 200ms var(--u-ease-standard);
+  }
+  .app-modal[data-ending-style] {
+    @apply pointer-events-none duration-120;
+  }
+  .u-dialog-backdrop {
+    transition: opacity 160ms var(--u-ease-standard);
+  }
+  .modal-header {
+    @apply mb-4 flex items-start justify-between gap-3;
+  }
+  .modal-header .u-overlay-title {
+    @apply text-xl leading-tight font-semibold tracking-tight;
+  }
+  .modal-header .u-overlay-description {
+    @apply mt-1 mb-0 text-xs leading-relaxed text-u-muted;
+  }
+  .modal-header > .u-button {
+    @apply -mt-1 -mr-1 size-8 min-h-8 min-w-8 shrink-0 text-u-muted;
+  }
+  .form-field {
+    @apply grid min-w-0 gap-1;
+  }
+  .form-field > .u-field-label {
+    @apply text-xs leading-normal font-medium;
+  }
+  .form-field > .u-field-description {
+    @apply text-[11px] leading-normal text-u-muted;
+  }
+  .form-field .u-text-control {
+    @apply min-h-9 w-full border-u-soft bg-u-raised text-sm shadow-none;
+  }
+  .form-field .u-select-trigger {
+    @apply min-h-9 w-full justify-between bg-u-raised text-xs;
+  }
+  .form-field .u-textarea {
+    @apply min-h-16 resize-y py-2 text-sm leading-relaxed;
+  }
+  .form-grid {
+    @apply grid grid-cols-2 gap-3;
+  }
+  .editor-options {
+    @apply my-3;
+  }
+  .editor-title {
+    @apply mt-3 grid gap-3 first:mt-0;
+  }
+  .fetch-state {
+    @apply mt-2 flex items-center gap-1.5 text-[11px] text-u-muted;
+  }
+  .visibility-hint {
+    @apply -mt-1 mb-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-u-accent-text;
+  }
+  .visibility-hint > svg {
+    @apply mt-0.5;
+  }
+  .extra-details {
+    @apply mt-3 mb-2 border-t border-solid border-u-soft pt-1;
+  }
+  .extra-details > summary,
+  .integration-recipe > summary {
+    @apply flex min-h-8 cursor-pointer list-none items-center justify-between gap-2 text-xs text-u-muted;
+  }
+  .extra-details > summary::-webkit-details-marker,
+  .integration-recipe > summary::-webkit-details-marker,
+  .settings-disclosure > summary::-webkit-details-marker {
+    @apply hidden;
+  }
+  .extra-details[open] > summary > svg,
+  .integration-recipe[open] > summary > svg,
+  .settings-disclosure[open] > summary > svg {
+    @apply rotate-180;
+  }
+  .details-fields {
+    @apply mt-2 grid gap-3;
+  }
+  .modal-footer {
+    @apply mt-4 flex items-center justify-between gap-2 border-t border-solid border-u-soft pt-3;
+  }
+  .modal-footer > div {
+    @apply flex items-center gap-1;
+  }
+  .modal-footer .u-button {
+    @apply h-9 min-h-9 text-xs;
+  }
+  .modal-footer .quiet {
+    @apply inline-flex items-center gap-1 text-[11px];
+  }
+  .delete-confirm {
+    @apply my-2 flex flex-wrap items-center justify-end gap-1.5 rounded-md border border-solid border-u-danger-border/40 bg-u-danger-soft p-2.5 text-xs text-u-danger;
+  }
+  .delete-confirm > p {
+    @apply mb-0.5 w-full leading-relaxed;
+  }
+
+  .sources-modal {
+    @apply w-[640px];
+    inline-size: 640px;
+  }
+  .source-add {
+    @apply flex items-end gap-2 border-b border-solid border-u-soft pb-3;
+  }
+  .source-add > .form-field {
+    @apply flex-1;
+  }
+  .source-add > .u-button {
+    @apply h-9 min-h-9;
+  }
+  .source-row {
+    @apply border-b border-solid border-u-soft py-3;
+  }
+  .source-heading {
+    @apply flex items-center gap-2;
+  }
+  .source-heading > div {
+    @apply min-w-0 flex-1;
+  }
+  .source-heading h3 {
+    @apply truncate text-[13px] leading-snug font-semibold;
+  }
+  .source-heading > div > a {
+    @apply inline-flex max-w-full items-center gap-1 text-[11px] leading-normal no-underline hover:underline;
+  }
+  .source-heading > .u-button {
+    @apply size-8 min-h-8 min-w-8 text-u-muted;
+  }
+  .source-format {
+    @apply rounded bg-u-well px-1.5 py-0.5 text-[10px] whitespace-nowrap text-u-muted;
+  }
+  .source-options {
+    @apply mt-2 mb-1 ml-[38px] grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1;
+  }
+  .source-auto-save {
+    @apply flex min-h-8 min-w-0 cursor-pointer items-center gap-1.5 text-xs leading-normal;
+  }
+  .source-auto-save > .u-choice {
+    @apply shrink-0;
+  }
+  .source-options .u-choice-box {
+    @apply size-4;
+  }
+  .source-options > .u-select-trigger {
+    @apply h-8 min-h-8 min-w-32 bg-u-raised px-2 text-xs;
+  }
+  .source-status {
+    @apply ml-[38px] flex flex-wrap items-center gap-1 text-[11px] leading-normal text-u-muted;
+  }
+  .source-dot {
+    @apply mr-0.5 size-1 shrink-0 rounded-full bg-u-success;
+  }
+  .source-dot.paused {
+    @apply bg-u-muted;
+  }
+  .source-error {
+    @apply mb-0 flex items-start gap-1.5 text-[11px];
+  }
+  .source-error > svg {
+    @apply mt-0.5;
+  }
+  .panel-footnote {
+    @apply mt-3 text-[11px] leading-relaxed text-u-muted;
+  }
+
+  .keyboard-help {
+    @apply w-[620px];
+    inline-size: 620px;
+  }
+  .settings-modal {
+    @apply w-[480px];
+    inline-size: 480px;
+  }
+  .settings-disclosure {
+    @apply border-t border-solid border-u-soft;
+  }
+  .settings-disclosure > summary {
+    @apply flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-xs font-medium;
+  }
+  .settings-disclosure > summary > span {
+    @apply flex min-w-0 items-center gap-2;
+  }
+  .settings-disclosure > summary > span > svg {
+    @apply text-u-muted;
+  }
+  .settings-disclosure > summary > svg {
+    @apply text-u-muted transition-transform duration-150;
+  }
+  .settings-detail {
+    @apply grid gap-2 pb-3 text-xs leading-relaxed;
+  }
+  .settings-detail > p {
+    @apply text-u-muted;
+  }
+  .settings-modal .u-button[data-size="sm"] {
+    @apply h-8 min-h-8 text-xs;
+  }
+  .button-row {
+    @apply flex flex-wrap items-center gap-1.5;
+  }
+  .token-result {
+    @apply mt-1 rounded-md bg-u-well p-2.5;
+  }
+  .token-result > label {
+    @apply mb-1.5 block text-[11px] leading-normal font-medium;
+  }
+  .token-copy {
+    @apply flex items-center gap-1.5;
+  }
+  .token-copy > .u-text-control {
+    @apply min-w-0 flex-1 border-u-soft bg-u-raised font-mono text-xs;
+  }
+  .token-copy > .u-button {
+    @apply size-8 min-h-8 min-w-8 shrink-0;
+  }
+  .token-result > .quiet {
+    @apply mt-1.5 text-[11px];
+  }
+  .integration-recipe {
+    @apply text-xs;
+  }
+  .integration-recipe p {
+    @apply my-1.5 text-[11px] leading-relaxed text-u-muted;
+  }
+  .integration-recipe code {
+    @apply block bg-u-well px-2 py-1 font-mono text-[10px] leading-relaxed wrap-anywhere;
+  }
+  .integration-recipe pre {
+    @apply my-1.5 overflow-auto rounded bg-u-well p-2 text-[11px];
+  }
+  .shortcut-list {
+    @apply my-2 grid grid-cols-3 gap-2 text-[11px];
+  }
+  .shortcut-list > div {
+    @apply flex flex-col gap-1;
+  }
+  .shortcut-list dt {
+    @apply text-u-muted;
+  }
+  .shortcut-list dd {
+    @apply m-0;
+  }
+  .shortcut-list kbd {
+    @apply inline-flex rounded border border-solid border-u-soft bg-u-well px-1.5 py-0.5 font-sans text-[10px] text-u-muted;
+  }
+  .single-key-option {
+    @apply flex min-h-8 cursor-pointer items-center gap-1.5 text-xs;
+  }
+  .single-key-option > .u-choice {
+    @apply shrink-0;
+  }
+  .sample-list {
+    @apply m-0 max-h-40 list-none overflow-y-auto p-0 text-xs leading-relaxed;
+  }
+  .sample-list > li {
+    @apply border-b border-solid border-u-soft py-1;
+  }
+
+  .initial-state {
+    @apply flex min-h-dvh flex-col items-center justify-center gap-6 p-7;
+  }
+  .initial-state > p {
+    @apply text-sm text-u-muted;
+  }
+  .access-page {
+    @apply mx-auto max-w-[490px] px-7 pt-14 pb-10;
+  }
+  .access-page > .brand-link {
+    @apply mb-10 flex justify-center;
+  }
+  .access-card {
+    @apply animate-margin-reveal rounded-xl border border-solid border-u-soft bg-u-surface p-7;
+  }
+  .access-symbol {
+    @apply mb-5 grid size-13 -rotate-4 place-items-center rounded-xl border border-solid border-u-accent-border/25 bg-u-accent-soft text-u-accent-text;
+  }
+  .access-card h1 {
+    @apply text-3xl leading-tight font-[550] tracking-tight;
+  }
+  .access-card > p {
+    @apply mt-3 mb-6 text-xs leading-loose text-u-muted;
+  }
+  .access-card form {
+    @apply grid gap-4;
+  }
+  .access-card form > .u-button {
+    @apply mt-1 h-11 w-full text-sm;
+  }
+  .access-card > .text-link {
+    @apply mt-5 text-[11px];
+  }
+  .access-footer {
+    @apply mt-6 text-center text-[11px] leading-relaxed text-u-muted;
+  }
+  .shared-label {
+    @apply flex items-center gap-1.5 text-xs text-u-muted;
+  }
+  .shared-page .header-inner > .u-button {
+    @apply ml-auto text-xs;
+  }
+  .public-search {
+    @apply mb-5 max-w-[480px];
+  }
+  .shared-list .media-row {
+    @apply items-start py-5;
+  }
+  .shared-list .mini-cover {
+    @apply mt-1;
+  }
+  .shared-status {
+    @apply mt-1 min-w-20 text-right text-[10px] whitespace-nowrap text-u-muted;
+  }
+  .shared-description {
+    @apply mt-2 text-xs leading-relaxed wrap-anywhere whitespace-pre-wrap text-u-muted;
+  }
+  .shared-tags {
+    @apply mt-1.5 text-[10px] leading-relaxed text-u-muted;
+  }
+  .spin {
+    @apply animate-spin;
+  }
+
+  @media (max-width: 760px) {
+    .header-inner {
+      @apply gap-4 px-5;
+    }
+    .owner-shell .logo-small > span {
+      @apply hidden;
+    }
+    .content {
+      @apply px-6 pt-7;
+    }
+    .main-nav > button {
+      @apply px-2;
+    }
+    .page-heading h1 {
+      @apply text-[29px];
+    }
+    .type-label {
+      @apply ml-0 text-[9px];
+    }
+    .media-row {
+      @apply gap-3;
+    }
+    .item-title {
+      @apply text-[13px];
+    }
+    .item-meta {
+      @apply text-[10px];
+    }
+    .toolbar-filters {
+      @apply max-w-[55%];
+    }
+    .toolbar-filters > .u-select-trigger {
+      @apply min-w-24 max-w-36 text-[11px];
+    }
+  }
+  @media (max-width: 560px) {
+    .header-inner {
+      @apply h-[54px] gap-2 px-3;
+    }
+    .owner-shell .logo-small > svg {
+      @apply h-[25px] w-[22px];
+    }
+    .header-actions {
+      @apply gap-0.5;
+    }
+    .header-actions > .u-button:first-child {
+      @apply size-[34px] min-w-[34px] p-0;
+    }
+    .header-actions > .u-button:first-child .u-button-label > span {
+      @apply hidden;
+    }
+    .main-nav {
+      @apply gap-0.5;
+    }
+    .main-nav > button {
+      @apply min-h-[38px] px-1.5 py-2 text-[11px];
+    }
+    .main-nav > button > svg {
+      @apply hidden;
+    }
+    .main-nav .new-dot {
+      @apply ml-0 size-1;
+    }
+    .content {
+      @apply min-h-[calc(100dvh-55px)] px-5 pt-6;
+    }
+    .page-heading {
+      @apply mb-5 flex-wrap items-start gap-3;
+    }
+    .page-heading p {
+      @apply max-w-[300px] text-[11px];
+    }
+    .discovery-controls .u-button {
+      @apply h-[34px] min-h-[34px] px-2.5 text-[11px];
+    }
+    .list-toolbar {
+      @apply mb-3 flex-wrap gap-2.5;
+    }
+    .search-box {
+      @apply w-full max-w-none basis-full;
+    }
+    .search-box > .u-text-control {
+      @apply text-base;
+    }
+    .search-box > kbd {
+      @apply hidden;
+    }
+    .toolbar-filters {
+      @apply m-0 w-full max-w-full;
+    }
+    .toolbar-filters > .u-select-trigger {
+      @apply h-9 min-h-9 min-w-28 max-w-1/2;
+    }
+    .list-tabs > button {
+      @apply min-h-11 text-[11px];
+    }
+    .result-count {
+      @apply text-[10px];
+    }
+    .media-row {
+      @apply min-h-20 gap-2.5 px-0 py-3;
+    }
+    .media-row > .u-choice {
+      @apply min-w-[27px];
+    }
+    .media-row > .u-choice > .u-choice-box {
+      @apply size-[18px];
+    }
+    .mini-cover {
+      @apply h-[37px] w-[27px] min-w-[27px];
+    }
+    .mini-cover > svg {
+      @apply size-[17px];
+    }
+    .item-meta {
+      @apply mt-0.5 gap-1;
+    }
+    .item-meta .inline-tag,
+    .media-row > .type-label {
+      @apply hidden;
+    }
+    .media-row > .u-button {
+      @apply -mr-1 h-10 min-h-10 w-8 min-w-8 p-1;
+    }
+    .public-marker > svg {
+      @apply size-[13px];
+    }
+    .empty-state {
+      @apply px-2 py-14;
+    }
+    .empty-state p {
+      @apply max-w-[290px] text-xs;
+    }
+    .page-footer {
+      @apply pt-6 text-[9px];
+    }
+    .article-row {
+      @apply grid-cols-[25px_minmax(0,1fr)_28px] gap-2.5 px-0 py-5;
+    }
+    .article-row > .source-mark {
+      @apply mt-1 size-[25px] min-w-[25px] text-[13px];
+    }
+    .article-row .item-title {
+      @apply text-sm;
+    }
+    .article-description {
+      @apply text-xs;
+    }
+    .article-actions {
+      @apply mt-2 gap-1;
+    }
+    .article-actions > .u-button {
+      @apply h-9 min-h-9 px-2 text-[11px];
+    }
+    .article-row > .u-button {
+      @apply -mr-1 h-9 min-h-9 w-8 min-w-8 p-1;
+    }
+    .app-modal {
+      @apply max-w-[calc(100vw-20px)] max-h-[calc(100svh-24px)] rounded-lg p-4;
+      max-block-size: calc(100svh - 24px);
+    }
+    .modal-header {
+      @apply mb-3;
+    }
+    .form-field .u-text-control,
+    .form-field .u-textarea {
+      @apply text-base;
+    }
+    .form-field .u-select-trigger {
+      @apply gap-1 px-2 text-xs;
+    }
+    .form-grid {
+      @apply gap-2;
+    }
+    .modal-footer {
+      @apply gap-1.5;
+    }
+    .modal-footer .u-button {
+      @apply px-2.5;
+    }
+    .modal-footer .quiet {
+      @apply text-[10px];
+    }
+    .connection-notice {
+      @apply flex-wrap gap-1.5;
+    }
+    .source-add > .u-button {
+      @apply px-2.5;
+    }
+    .source-heading {
+      @apply gap-1.5;
+    }
+    .source-heading h3 {
+      @apply text-xs;
+    }
+    .source-format {
+      @apply hidden;
+    }
+    .source-options {
+      @apply ml-0 gap-x-2;
+    }
+    .source-auto-save {
+      @apply text-[11px];
+    }
+    .source-options > .u-select-trigger {
+      @apply min-w-[116px] gap-1.5 text-[11px];
+    }
+    .source-status {
+      @apply ml-0 text-[10px];
+    }
+    .access-page {
+      @apply max-w-[410px] px-5 pt-9 pb-7;
+    }
+    .access-page > .brand-link {
+      @apply mb-7;
+    }
+    .access-card {
+      @apply rounded-lg px-6 py-6;
+    }
+    .access-card h1 {
+      @apply text-[27px];
+    }
+    .access-footer {
+      @apply mx-auto max-w-[260px] text-[10px];
+    }
+    .shared-page .header-inner {
+      @apply gap-3 px-5;
+    }
+    .shared-label {
+      @apply hidden;
+    }
+    .shared-status {
+      @apply min-w-[60px] text-[9px];
+    }
+    .shared-list .media-row {
+      @apply gap-3 py-4;
+    }
+  }
+  @media (max-width: 360px) {
+    .source-options {
+      @apply grid-cols-1;
+    }
+    .source-options > .u-select-trigger {
+      @apply w-full;
+    }
+  }
+}
+
+@keyframes margin-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes margin-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

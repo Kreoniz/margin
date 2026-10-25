@@ -1,0 +1,5 @@
+# Only PostgreSQL is needed when running Go and Vite locally.
+services:
+  db:
+    ports:
+      - "127.0.0.1:55439:5432"

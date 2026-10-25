@@ -1,0 +1,37 @@
+name: margin
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: margin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+      POSTGRES_DB: margin
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U margin -d margin"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://margin:${POSTGRES_PASSWORD}@db:5432/margin?sslmode=disable
+      APP_PASSWORD: ${APP_PASSWORD:-}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8787}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+volumes:
+  postgres_data:
+networks:
+  default:
+    driver_opts:
+      # Fits the verified VPN uplink; isolated to Margin's bridge network.
+      com.docker.network.driver.mtu: "${DOCKER_MTU:-1376}"

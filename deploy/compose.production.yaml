@@ -1,0 +1,83 @@
+name: margin
+services:
+  db:
+    image: ${POSTGRES_IMAGE:?Set a digest-pinned PostgreSQL 18 image}
+    command:
+      [
+        postgres,
+        -c,
+        max_connections=30,
+        -c,
+        shared_buffers=32MB,
+        -c,
+        work_mem=2MB,
+        -c,
+        maintenance_work_mem=32MB,
+      ]
+    environment:
+      POSTGRES_USER: margin_admin
+      POSTGRES_DB: margin
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_admin_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    secrets: [db_admin_password, db_app_password]
+    volumes:
+      - database:/var/lib/postgresql
+      - ./init-db.sh:/docker-entrypoint-initdb.d/10-margin.sh:ro
+    networks: [data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U margin_admin -d margin]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 256m
+    cpus: 0.75
+    pids_limit: 100
+    shm_size: 64m
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: json-file
+      options: { max-size: 5m, max-file: "2" }
+    restart: unless-stopped
+  app:
+    image: ${MARGIN_IMAGE:?Set an immutable release image tag}
+    environment:
+      DATABASE_URL_FILE: /run/secrets/database_url
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:?Set only the verified HTTPS proxy peer IP/32 or /128}
+    secrets: [database_url]
+    networks:
+      data:
+      edge:
+        aliases: [margin-app]
+    depends_on:
+      db: { condition: service_healthy }
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 192m
+    cpus: 0.75
+    pids_limit: 64
+    healthcheck:
+      test: [CMD, /margin, --healthcheck]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: { max-size: 5m, max-file: "2" }
+    restart: unless-stopped
+secrets:
+  db_admin_password:
+    file: ${SECRET_DIRECTORY:?Set an absolute secret directory}/db_admin_password
+  db_app_password:
+    file: ${SECRET_DIRECTORY}/db_app_password
+  database_url:
+    file: ${SECRET_DIRECTORY}/database_url
+volumes:
+  database:
+networks:
+  data:
+    internal: true
+  edge:
+    external: true
+    name: ${EDGE_NETWORK:?Set the existing HTTPS proxy network}

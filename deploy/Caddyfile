@@ -1,0 +1,26 @@
+# Add this site to your existing Caddyfile. Replace the example hostname only.
+# Configure/restore the owner before opening ingress. Do not publish app/DB ports.
+margin.example.com {
+    encode zstd gzip
+    request_body {
+        max_size 256KB
+        read_timeout 15s
+        write_timeout 45s
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        X-Robots-Tag "noindex, nofollow"
+        -Server
+    }
+    @internal path /api/health /api/setup /.git* /.env*
+    respond @internal 404
+    reverse_proxy margin-app:8080 {
+        header_up X-Forwarded-Proto https
+        transport http {
+            dial_timeout 5s
+            response_header_timeout 40s
+        }
+    }
+}

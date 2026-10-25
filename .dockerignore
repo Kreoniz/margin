@@ -1,0 +1,17 @@
+.git
+.local
+.env
+.env.*
+backups
+**/node_modules
+**/.local
+**/dist
+**/test-results
+**/playwright-report
+**/*.log
+**/*.tsbuildinfo
+docs
+deploy
+**/*.dump
+**/.env
+**/.env.*
