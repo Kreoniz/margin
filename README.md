@@ -26,7 +26,7 @@ docker compose up -d --build
 
 The project bridge defaults to MTU 1376, verified for this laptop's VPN path. `DOCKER_MTU` can adjust it for another host; keep it at or below the outbound path's MTU. If changed, recreate Margin's network with `docker compose down` **without `-v`**, then `docker compose up -d`. No Docker daemon or host VPN change is needed.
 
-For remote Docker hosting, secrets, HTTPS, backups and domain changes, see the [production deployment runbook](docs/deployment.md).
+For remote Docker hosting, secrets, HTTPS, backups and domain changes, see the [production deployment runbook](docs/deployment.md) and [deployment verification](docs/deployment-2026-10-25.md).
 
 ## Use
 
