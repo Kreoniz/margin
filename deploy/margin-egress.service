@@ -1,0 +1,31 @@
+[Unit]
+Description=Restricted SSH egress for one Margin publisher
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=margin-egress
+Group=margin-egress
+EnvironmentFile=/opt/margin/.env.egress
+LoadCredential=id_ed25519:/opt/margin/.local/egress/id_ed25519
+LoadCredential=known_hosts:/opt/margin/.local/egress/known_hosts
+ExecStart=/usr/bin/ssh -F /dev/null -N -D ${EGRESS_BIND} -i %d/id_ed25519 -o UserKnownHostsFile=%d/known_hosts -o StrictHostKeyChecking=yes -o UpdateHostKeys=no -o IdentitiesOnly=yes -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 ${EGRESS_TARGET}
+Restart=always
+RestartSec=10s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+MemoryMax=32M
+TasksMax=16
+
+[Install]
+WantedBy=multi-user.target

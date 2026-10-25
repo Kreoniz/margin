@@ -20,6 +20,7 @@ type config struct {
 	password       string
 	staticDir      string
 	trustedProxies []netip.Prefix
+	fetcher        app.FetcherConfig
 }
 
 func loadConfig() (config, error) {
@@ -51,6 +52,10 @@ func loadConfig() (config, error) {
 	}
 	c.trustedProxies, err = app.ParseTrustedProxies(os.Getenv("TRUSTED_PROXIES"))
 	if err != nil {
+		return c, err
+	}
+	c.fetcher = app.FetcherConfig{SOCKSProxyAddress: os.Getenv("SOCKS_PROXY_ADDRESS"), SOCKSProxyHosts: os.Getenv("SOCKS_PROXY_HOSTS")}
+	if err := c.fetcher.Validate(); err != nil {
 		return c, err
 	}
 	return c, nil

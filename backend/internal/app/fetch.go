@@ -182,13 +182,17 @@ type FetchResult struct {
 	ContentType string
 }
 type Fetcher struct {
-	client  *http.Client
-	resolve func(context.Context, string) ([]netip.Addr, error)
-	dial    func(context.Context, string, string) (net.Conn, error)
+	client     *http.Client
+	resolve    func(context.Context, string) ([]netip.Addr, error)
+	dial       func(context.Context, string, string) (net.Conn, error)
+	socksDial  func(context.Context, string, string) (net.Conn, error)
+	socksHosts map[string]struct{}
 }
 
+const fetchDialTimeout = 5 * time.Second
+
 func NewFetcher() *Fetcher {
-	d := &net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}
+	d := &net.Dialer{Timeout: fetchDialTimeout, KeepAlive: 30 * time.Second}
 	f := &Fetcher{dial: d.DialContext}
 	// LookupNetIP also takes a network argument; bind it explicitly below.
 	f.resolve = func(ctx context.Context, host string) ([]netip.Addr, error) {
@@ -223,9 +227,13 @@ func (f *Fetcher) dialPublic(ctx context.Context, network, addr string) (net.Con
 			return nil, errors.New("hostname resolves to a private or special-use address")
 		}
 	}
+	dial := f.dial
+	if _, ok := f.socksHosts[strings.TrimSuffix(strings.ToLower(host), ".")]; ok {
+		dial = f.socksDial
+	}
 	var last error
 	for _, ip := range ips {
-		conn, err := f.dial(ctx, network, net.JoinHostPort(ip.Unmap().String(), port))
+		conn, err := dial(ctx, network, net.JoinHostPort(ip.Unmap().String(), port))
 		if err == nil {
 			return conn, nil
 		}

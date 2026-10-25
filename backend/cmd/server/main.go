@@ -40,6 +40,11 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
+	fetcher, err := app.NewFetcherWithConfig(config.fetcher)
+	if err != nil {
+		return err
+	}
+	defer fetcher.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	var store *app.Store
@@ -71,8 +76,6 @@ func run(args []string) error {
 		return fmt.Errorf("configure owner: %w", err)
 	}
 	cancelStartup()
-	fetcher := app.NewFetcher()
-	defer fetcher.Close()
 	worker := app.NewWorker(store, fetcher)
 	workerCtx, cancelWorker := context.WithCancel(ctx)
 	defer cancelWorker()

@@ -43,6 +43,8 @@ services:
     environment:
       DATABASE_URL_FILE: /run/secrets/database_url
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:?Set only the verified HTTPS proxy peer IP/32 or /128}
+      SOCKS_PROXY_ADDRESS: ${SOCKS_PROXY_ADDRESS:-}
+      SOCKS_PROXY_HOSTS: ${SOCKS_PROXY_HOSTS:-}
     secrets: [database_url]
     networks:
       data:
