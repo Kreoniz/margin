@@ -146,6 +146,24 @@ func TestLoginLimiterTrustedProxyGlobalBudget(t *testing.T) {
 	}
 }
 
+func TestLoginLimiterRejectedClientPreservesOtherBudgets(t *testing.T) {
+	var limiter loginLimiter
+	now := time.Now()
+	for i := range 200 {
+		if got := limiter.allow("198.51.100.1:1234", now); got != (i < 10) {
+			t.Fatalf("client limit at attempt %d: allowed=%v", i, got)
+		}
+	}
+	if limiter.global.count != 10 {
+		t.Fatal("rejected client requests consumed the global allowance")
+	}
+	for i := range 10 {
+		if !limiter.allow("198.51.100.2:1234", now) {
+			t.Fatalf("another client lost its allowance at attempt %d", i)
+		}
+	}
+}
+
 func TestConfiguredSetupDoesNotConsumeLoginBudget(t *testing.T) {
 	store := integrationStore(t)
 	if err := store.ConfigureOwner(context.Background(), "configured-password-long"); err != nil {

@@ -335,7 +335,6 @@ func (l *loginLimiter) allow(addr string, now time.Time) bool {
 	if l.global.count >= 100 {
 		return false
 	}
-	l.global.count++
 	if l.clients == nil {
 		l.clients = map[string]loginAttempt{}
 	}
@@ -360,6 +359,7 @@ func (l *loginLimiter) allow(addr string, now time.Time) bool {
 			return false
 		}
 	}
+	l.global.count++
 	a.count++
 	l.clients[host] = a
 	return true
