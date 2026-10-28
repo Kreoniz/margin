@@ -120,12 +120,18 @@ export function Collection() {
                         hostname(item.url) ||
                         kindLabels[item.kind]}
                     </p>
-                    {item.description && (
-                      <p className="shared-description">{item.description}</p>
-                    )}
-                    {item.tags.length > 0 && (
-                      <p className="shared-tags">{item.tags.join(" · ")}</p>
-                    )}
+                    <p
+                      className="shared-description"
+                      aria-hidden={!item.description || undefined}
+                    >
+                      {item.description}
+                    </p>
+                    <p
+                      className="shared-tags"
+                      aria-hidden={!item.tags.length || undefined}
+                    >
+                      {item.tags.join(" · ")}
+                    </p>
                     <span className="shared-status">
                       {item.status === "done" ? "Done" : "To read/watch"}
                     </span>

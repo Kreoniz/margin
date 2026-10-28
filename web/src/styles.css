@@ -1027,35 +1027,38 @@
     @apply h-8 min-h-8 w-auto min-w-0 px-2 text-[10px];
   }
   .collection-grid {
-    @apply grid items-start gap-4;
+    @apply grid items-stretch gap-4;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
   }
   .collection-card {
-    @apply min-w-0 overflow-hidden rounded-xl border border-solid border-u-soft bg-u-surface;
+    @apply flex flex-col min-w-0 overflow-hidden rounded-xl border border-solid border-u-soft bg-u-surface;
   }
   .collection-card > .mini-cover {
     @apply h-40 w-full min-w-0 rounded-none;
   }
   .collection-copy {
-    @apply grid min-w-0 gap-1.5 p-3;
+    @apply grid min-w-0 flex-1 content-start gap-1.5 p-3;
   }
   .collection-copy .type-label {
     @apply m-0;
   }
   .collection-copy h2 {
     @apply m-0 text-sm leading-snug;
+    min-block-size: 2.75em;
   }
   .collection-copy .item-title {
     @apply line-clamp-2 text-sm leading-snug;
   }
   .collection-copy .item-meta {
-    @apply m-0 text-[11px] leading-snug;
+    @apply m-0 block truncate text-[11px] leading-snug;
   }
   .collection-copy .shared-description {
     @apply m-0 line-clamp-2 leading-snug;
+    min-block-size: 2.75em;
   }
   .collection-copy .shared-tags {
     @apply m-0 truncate text-[10px] leading-snug;
+    min-block-size: 1.375em;
   }
   .collection-copy .shared-status {
     @apply m-0 text-left leading-snug;

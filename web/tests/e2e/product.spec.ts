@@ -1537,3 +1537,69 @@ test("development shortcut loads all kinds once and clears only its fixtures", a
     await request.delete("/api/dev/fixtures");
   }
 });
+
+test("public cards align across wrapped titles and missing details", async ({
+  page,
+  request,
+}) => {
+  const names = [
+    title("Short title"),
+    title("A long title that wraps across two lines in the public collection"),
+    title("Another title"),
+  ];
+  for (let i = 0; i < names.length; i++) {
+    const response = await request.post("/api/media", {
+      data: {
+        title: names[i],
+        kind: ["book", "video", "article"][i],
+        visibility: "public",
+        author:
+          i === 1
+            ? "A creator name long enough to otherwise wrap onto extra lines"
+            : "Demo creator",
+        description:
+          i === 1
+            ? ""
+            : "A description that can occupy two lines without changing the alignment of nearby cards.",
+        tags: i === 0 ? ["design", "a-long-tag-to-check-overflow"] : [],
+      },
+    });
+    expect(response.status()).toBe(201);
+  }
+  await page.goto("/");
+  await expect(page.locator(".collection-card")).toHaveCount(3);
+  const widths =
+    (page.viewportSize()?.width || 1440) < 600 ? [320, 390] : [1440];
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 844 });
+    const layout = await page.locator(".collection-card").evaluateAll((cards) =>
+      cards.map((card) => {
+        const bounds = card.getBoundingClientRect();
+        const offset = (selector: string) =>
+          card.querySelector(selector)!.getBoundingClientRect().top -
+          bounds.top;
+        return {
+          height: bounds.height,
+          author: offset(".item-meta"),
+          description: offset(".shared-description"),
+          tags: offset(".shared-tags"),
+          status: offset(".shared-status"),
+        };
+      }),
+    );
+    for (const key of [
+      "height",
+      "author",
+      "description",
+      "tags",
+      "status",
+    ] as const) {
+      const values = layout.map((card) => card[key]);
+      expect(
+        Math.max(...values) - Math.min(...values),
+        `${key} should align at ${width}px`,
+      ).toBeLessThanOrEqual(1);
+    }
+    await checkAccess(page);
+  }
+});
