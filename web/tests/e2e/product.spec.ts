@@ -190,6 +190,7 @@ test("compact library supports title-only adding, two-state toggles, editing, se
     .getByRole("textbox", { name: "Private note" })
     .fill("Owner-only test note.");
   await dialog(page).getByRole("button", { name: "Save changes" }).click();
+  await expect(dialog(page)).toHaveCount(0);
   await page.reload();
   await page
     .getByRole("searchbox", { name: "Search library" })
@@ -388,6 +389,7 @@ test("private and public items have owner-only edits and notes never leak", asyn
       .getByRole("option", { name: "Private · only you", exact: true })
       .click();
     await dialog(page).getByRole("button", { name: "Save changes" }).click();
+    await expect(dialog(page)).toHaveCount(0);
     expect(
       (await guest.get("/api/public/media/" + publicItem.id)).status(),
     ).toBe(404);
@@ -1601,5 +1603,285 @@ test("public cards align across wrapped titles and missing details", async ({
       ).toBeLessThanOrEqual(1);
     }
     await checkAccess(page);
+  }
+});
+
+test("retry recovers an existing capture and saving preserves review context", async ({
+  page,
+  request,
+}) => {
+  const name = title("Recovered article");
+  const url = "https://publisher.example/recoverable-article-" + Date.now();
+  const response = await request.post("/api/media", {
+    data: {
+      title: name,
+      author: "",
+      kind: "article",
+      url,
+      cover_url: "",
+      description: "",
+      metadata_warning: "Site did not share details.",
+      needs_review: true,
+      notes: "Private thought",
+    },
+  });
+  expect(response.status()).toBe(201);
+  const item = await response.json();
+  try {
+    await page.route("**/api/metadata", (route) =>
+      route.fulfill({
+        json: {
+          title: "Publisher replacement",
+          author: "Publisher writer",
+          kind: "article",
+          url,
+          cover_url: "",
+          description: "Recovered page summary",
+        },
+      }),
+    );
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: /To review/ }).click();
+    await page
+      .getByRole("searchbox", { name: "Search library" })
+      .fill("publisher.example");
+    const row = page.locator(".media-row").filter({ hasText: name });
+    await expect(row).toBeVisible();
+    await row
+      .getByRole("button", { name: "Edit " + name, exact: true })
+      .click();
+    await expect(
+      dialog(page).getByRole("textbox", { name: "URL (optional)" }),
+    ).toHaveValue(url);
+    await dialog(page)
+      .getByRole("button", { name: "Retry details", exact: true })
+      .click();
+    await expect(
+      dialog(page).getByRole("region", { name: "Link details" }),
+    ).toContainText("Recovered page summary");
+    await expect(
+      dialog(page).getByRole("textbox", { name: "Title", exact: true }),
+    ).toHaveValue(name);
+    await dialog(page)
+      .getByRole("button", { name: "Save & review", exact: true })
+      .click();
+    await expect(dialog(page)).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: /To review/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByRole("searchbox", { name: "Search library" }),
+    ).toHaveValue("publisher.example");
+    const stored = (await (await request.get("/api/media")).json()).find(
+      (m: { id: string }) => m.id === item.id,
+    );
+    expect(stored).toMatchObject({
+      title: name,
+      author: "Publisher writer",
+      description: "Recovered page summary",
+      notes: "Private thought",
+      needs_review: false,
+      status: "pending",
+      metadata_state: "ready",
+    });
+  } finally {
+    await request.delete("/api/media/" + item.id);
+  }
+});
+
+test("review actions undo cleanly and mobile row actions stay aligned", async ({
+  page,
+  request,
+}) => {
+  const name = title("A capture that still needs review");
+  const item = await (
+    await request.post("/api/media", {
+      data: { title: name, needs_review: true, status: "done" },
+    })
+  ).json();
+  try {
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: /To review/ }).click();
+    const row = page.locator(".media-row").filter({ hasText: name });
+    await expect(row).toBeVisible();
+    if ((page.viewportSize()?.width || 1440) < 600) {
+      for (const width of [320, 390, 570]) {
+        await page.setViewportSize({ width, height: 844 });
+        const edit = (await row
+          .getByRole("button", { name: "Edit " + name, exact: true })
+          .boundingBox())!;
+        const content = (await row.locator(".row-content").boundingBox())!;
+        expect(edit.x).toBeGreaterThanOrEqual(content.x + content.width);
+        expect((await row.boundingBox())!.height).toBeLessThanOrEqual(180);
+        await checkAccess(page);
+      }
+    }
+    await row.getByRole("button", { name: "Mark reviewed: " + name }).click();
+    await expect(row).toHaveCount(0);
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect(row).toBeVisible();
+    expect(
+      (await (await request.get("/api/media")).json()).find(
+        (m: { id: string }) => m.id === item.id,
+      ),
+    ).toMatchObject({ needs_review: true, status: "done" });
+  } finally {
+    await request.delete("/api/media/" + item.id);
+  }
+});
+
+test("changing a URL ignores late background details from its previous page", async ({
+  page,
+  request,
+}) => {
+  const name = title("URL change while fetching");
+  const firstURL = "https://publisher.example/first";
+  const nextURL = "https://publisher.example/next";
+  const created = await (
+    await request.post("/api/media", {
+      data: {
+        title: name,
+        author: "",
+        kind: "article",
+        cover_url: "",
+        description: "",
+        url: firstURL,
+      },
+    })
+  ).json();
+  let finished = false;
+  await page.route("**/api/bootstrap", async (route) => {
+    const original = await route.fetch();
+    const data = await original.json();
+    data.media = data.media.map((item: { id: string }) =>
+      item.id === created.id
+        ? {
+            ...item,
+            url: firstURL,
+            author: finished ? "Old page author" : "",
+            description: finished ? "Old page description" : "",
+            metadata_state: finished ? "ready" : "pending",
+            updated_at: finished
+              ? "2030-01-02T00:00:00Z"
+              : "2030-01-01T00:00:00Z",
+          }
+        : item,
+    );
+    await route.fulfill({ json: data });
+  });
+  try {
+    await page.goto("/dashboard");
+    await page
+      .getByRole("button", { name: "Edit " + name, exact: true })
+      .click();
+    await dialog(page)
+      .getByRole("textbox", { name: "URL (optional)" })
+      .fill(nextURL);
+    finished = true;
+    const refreshed = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/bootstrap",
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await refreshed;
+    await dialog(page)
+      .getByText("Details, image & note", { exact: true })
+      .click();
+    await expect(
+      dialog(page).getByRole("textbox", { name: "Creator (optional)" }),
+    ).toHaveValue("");
+    await expect(
+      dialog(page).getByRole("textbox", { name: "Description (optional)" }),
+    ).toHaveValue("");
+    const patch = page.waitForRequest(
+      (r) =>
+        r.method() === "PATCH" &&
+        new URL(r.url()).pathname === "/api/media/" + created.id,
+    );
+    await dialog(page)
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    expect((await patch).postDataJSON()).toMatchObject({
+      url: nextURL,
+      fetch_metadata: true,
+      author: "",
+      description: "",
+    });
+    await expect(dialog(page)).toHaveCount(0);
+  } finally {
+    await request.delete("/api/media/" + created.id);
+  }
+});
+
+test("a duplicate quick save stops its spinner and allows metadata retry", async ({
+  page,
+  request,
+}) => {
+  const name = title("Duplicate metadata recovery");
+  const url = "https://publisher.example/duplicate-" + Date.now();
+  const existing = await (
+    await request.post("/api/media", {
+      data: {
+        title: name,
+        url,
+        author: "",
+        kind: "article",
+        cover_url: "",
+        description: "",
+      },
+    })
+  ).json();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let calls = 0;
+  await page.route("**/api/metadata", async (route) => {
+    calls++;
+    if (calls === 1) await gate;
+    await route
+      .fulfill({
+        json: {
+          title: name,
+          author: "Recovered writer",
+          kind: "article",
+          url,
+          cover_url: "",
+          description: "Recovered summary",
+        },
+      })
+      .catch(() => {});
+  });
+  try {
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: "Add item", exact: true }).click();
+    await dialog(page).getByRole("textbox", { name: "Title or URL" }).fill(url);
+    await expect(
+      dialog(page).getByText("Finding details… You can save now."),
+    ).toBeVisible();
+    await dialog(page)
+      .getByRole("button", { name: "Add to library", exact: true })
+      .click();
+    await expect(
+      dialog(page).getByRole("button", { name: "Open existing item" }),
+    ).toBeVisible();
+    await expect(
+      dialog(page).getByText("Finding details… You can save now."),
+    ).toHaveCount(0);
+    release();
+    await dialog(page)
+      .getByRole("button", { name: "Find missing details", exact: true })
+      .click();
+    await expect(
+      dialog(page).getByRole("region", { name: "Link details" }),
+    ).toContainText("Recovered summary");
+    await expect(
+      dialog(page).getByRole("button", {
+        name: "Find missing details",
+        exact: true,
+      }),
+    ).toBeEnabled();
+  } finally {
+    release();
+    await request.delete("/api/media/" + existing.id);
   }
 });

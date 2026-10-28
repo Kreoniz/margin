@@ -161,6 +161,9 @@ function Owner({
         setError(e instanceof Error ? e.message : "Could not load your list.");
     }
   }, []);
+  const hasPendingMetadata = Boolean(
+    data?.media.some((item) => item.metadata_state === "pending"),
+  );
   useEffect(() => {
     void refresh();
     const focus = () => {
@@ -169,13 +172,17 @@ function Owner({
     window.addEventListener("focus", focus);
     const timer = setInterval(
       focus,
-      view === "discover" || sourcesOpen ? 30_000 : 90_000,
+      hasPendingMetadata
+        ? 2_000
+        : view === "discover" || sourcesOpen
+          ? 30_000
+          : 90_000,
     );
     return () => {
       clearInterval(timer);
       window.removeEventListener("focus", focus);
     };
-  }, [refresh, view, sourcesOpen]);
+  }, [refresh, view, sourcesOpen, hasPendingMetadata]);
   useEffect(() => {
     const change = () => {
       setView(window.location.hash === "#discover" ? "discover" : "library");
@@ -459,6 +466,23 @@ function Owner({
       });
     }
   }
+  async function markReviewed(item: Media) {
+    if (!item.needs_review) return;
+    if (
+      await perform(item.id, () =>
+        api("/media/" + item.id, send("PATCH", { needs_review: false })),
+      )
+    ) {
+      undo.current = () =>
+        void perform(item.id, () =>
+          api("/media/" + item.id, send("PATCH", { needs_review: true })),
+        );
+      toast.add({
+        title: "Marked reviewed.",
+        actionProps: { children: "Undo", onClick: undo.current },
+      });
+    }
+  }
   async function toggleDemoData() {
     if (!data?.dev_mode) return;
     const remove = Boolean(data.dev_fixture_count);
@@ -711,7 +735,13 @@ function Owner({
           {data && (
             <span className="result-count" aria-live="polite">
               {view === "library" ? filtered.length : articles.length}{" "}
-              {view === "library" ? "items" : "articles"}
+              {view === "library"
+                ? filtered.length === 1
+                  ? "item"
+                  : "items"
+                : articles.length === 1
+                  ? "article"
+                  : "articles"}
             </span>
           )}
         </div>
@@ -791,6 +821,22 @@ function Owner({
                         </button>
                       ))}
                     </div>
+                    {item.metadata_state === "pending" && (
+                      <p
+                        className="mt-1 text-[11px] text-u-muted"
+                        role="status"
+                      >
+                        Finding details…
+                      </p>
+                    )}
+                    {item.metadata_state === "partial" && (
+                      <button
+                        className="metadata-warning"
+                        onClick={() => setEditor(item)}
+                      >
+                        Details incomplete · Open editor
+                      </button>
+                    )}
                   </div>
                   {item.needs_review && (
                     <Button
@@ -799,19 +845,9 @@ function Owner({
                       size="sm"
                       disabled={pending.has(item.id)}
                       aria-label={"Mark reviewed: " + item.title}
-                      onClick={() =>
-                        void perform(
-                          item.id,
-                          () =>
-                            api(
-                              "/media/" + item.id,
-                              send("PATCH", { needs_review: false }),
-                            ),
-                          "Reviewed.",
-                        )
-                      }
+                      onClick={() => void markReviewed(item)}
                     >
-                      Reviewed
+                      Mark reviewed
                     </Button>
                   )}
                   <TypeLabel kind={item.kind} />
@@ -839,6 +875,7 @@ function Owner({
             <EmptyState
               filtered={Boolean(query || kind !== "all" || tag)}
               done={status === "done"}
+              review={status === "review"}
               action={
                 query || kind !== "all" || tag ? (
                   <Button
@@ -853,7 +890,7 @@ function Owner({
                     Clear filters
                   </Button>
                 ) : (
-                  status !== "done" && (
+                  !["done", "review"].includes(status) && (
                     <Button
                       variant="secondary"
                       size="sm"
@@ -1033,16 +1070,31 @@ function Owner({
       {editor && (
         <Editor
           key={editor === "new" ? "new" : editor.id}
-          item={editor === "new" ? undefined : editor}
+          item={
+            editor === "new"
+              ? undefined
+              : media.find((item) => item.id === editor.id) || editor
+          }
           onClose={() => setEditor(undefined)}
           onSaved={(item) => {
             setEditor(undefined);
-            setStatus(item.status);
-            if (view === "library") {
+            if (editor === "new") setStatus(item.status);
+            if (view === "library" && editor === "new") {
               setQuery("");
               setKind("all");
               setTag("");
-            } else toast.add({ title: "Added to library.", type: "success" });
+            }
+            toast.add({
+              title:
+                editor === "new"
+                  ? item.metadata_state === "pending"
+                    ? "Saved. Details will fill in shortly."
+                    : "Added to library."
+                  : editor.needs_review && !item.needs_review
+                    ? "Saved and marked reviewed."
+                    : "Changes saved.",
+              type: "success",
+            });
             void refresh();
           }}
           onDuplicate={(id) => {

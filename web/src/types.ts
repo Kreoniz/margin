@@ -13,6 +13,8 @@ export type Kind = (typeof kinds)[number];
 export type Status = "pending" | "done";
 export type Visibility = "private" | "public";
 export interface Media {
+  metadata_state?: "pending" | "ready" | "partial";
+  metadata_warning?: string;
   needs_review?: boolean;
   id: string;
   title: string;
@@ -29,10 +31,19 @@ export interface Media {
   updated_at: string;
   completed_at?: string;
 }
-export type PublicMedia = Omit<Media, "notes" | "needs_review">;
+export type PublicMedia = Omit<
+  Media,
+  "notes" | "needs_review" | "metadata_state" | "metadata_warning"
+>;
 export type MediaDraft = Omit<
   Media,
-  "id" | "created_at" | "updated_at" | "completed_at" | "needs_review"
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "completed_at"
+  | "needs_review"
+  | "metadata_state"
+  | "metadata_warning"
 >;
 export interface InboxItem {
   id: string;

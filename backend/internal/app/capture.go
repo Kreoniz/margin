@@ -40,8 +40,14 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		URL    string `json:"url"`
-		Action string `json:"action"`
+		URL          string `json:"url"`
+		Action       string `json:"action"`
+		PageMetadata *struct {
+			Title       string `json:"title"`
+			Author      string `json:"author"`
+			CoverURL    string `json:"cover_url"`
+			Description string `json:"description"`
+		} `json:"page_metadata,omitempty"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -68,6 +74,34 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			respond(w, 400, nil, err)
 			return
+		}
+		if in.PageMetadata != nil {
+			hint := in.PageMetadata
+			hint.Title = clip(strings.TrimSpace(hint.Title), 1000)
+			hint.Author = clip(strings.TrimSpace(hint.Author), 1000)
+			hint.Description = clip(strings.TrimSpace(hint.Description), 20000)
+			patch := MediaInput{}
+			if hint.Title != "" && generatedTitle(m) {
+				patch.Title = &hint.Title
+			}
+			if m.Author == "" && hint.Author != "" {
+				patch.Author = &hint.Author
+			}
+			if m.CoverURL == "" && hint.CoverURL != "" {
+				if cover, e := CanonicalURL(hint.CoverURL); e == nil {
+					patch.CoverURL = &cover
+				}
+			}
+			if m.Description == "" && hint.Description != "" {
+				patch.Description = &hint.Description
+			}
+			if enriched, e := patch.Apply(m); e == nil {
+				m = enriched
+				if !generatedTitle(m) && (m.CoverURL != "" || m.Description != "") {
+					m.MetadataWarning = ""
+					m.MetadataState = "ready"
+				}
+			}
 		}
 		m.NeedsReview = true
 	}
@@ -117,9 +151,14 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 	if created {
 		status = 201
 	}
+	warning := ""
+	if created && current.MetadataWarning != "" {
+		warning = "Some details are unavailable. Open Margin to retry or edit them."
+	}
 	respond(w, status, struct {
 		ID      string `json:"id"`
 		Created bool   `json:"created"`
 		Action  string `json:"action"`
-	}{current.ID, created, strings.ToLower(in.Action)}, err)
+		Warning string `json:"warning,omitempty"`
+	}{current.ID, created, strings.ToLower(in.Action), warning}, err)
 }

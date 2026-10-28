@@ -58,6 +58,7 @@ export function selectMedia<
           [
             item.title,
             item.author,
+            item.url,
             item.description,
             item.notes || "",
             ...item.tags,
@@ -74,4 +75,18 @@ export const publicPath = (id?: string) =>
 
 export function imageURL(value: string): string | undefined {
   return /^\/api\/images\/[0-9a-f-]{36}$/i.test(value) ? value : safeURL(value);
+}
+
+export function isFallbackTitle(title: string, raw: string): boolean {
+  try {
+    const url = new URL(raw);
+    const name = decodeURIComponent(
+      url.pathname.split("/").filter(Boolean).at(-1) || "",
+    )
+      .replace(/\.(?:html?|pdf|php)$/i, "")
+      .replace(/[-_]/g, " ");
+    return title === raw || title === url.hostname || title === name;
+  } catch {
+    return false;
+  }
 }

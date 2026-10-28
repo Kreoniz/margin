@@ -11,11 +11,11 @@ For the current local review:
 
 The extension is loaded locally, not installed automatically or published to an extension store. For a deployed Margin instance, use that instance’s HTTPS origin and create its browser token there.
 
-Choose separate shortcuts for **Save current page** and **Mark current page Done** at `chrome://extensions/shortcuts` (or Helium’s equivalent). They deliberately have no defaults, avoiding browser and OS conflicts. Both commands also appear in the popup. The extension sends only the current URL and action; Margin fetches metadata. The popup offers a secondary link to edit details or visibility in the dashboard.
+Choose separate shortcuts for **Save current page** and **Mark current page Done** at `chrome://extensions/shortcuts` (or Helium’s equivalent). They deliberately have no defaults, avoiding browser and OS conflicts. Both commands also appear in the popup. Margin fetches metadata from the captured URL. The extension also supplies optional title/author/summary/image hints from the page you explicitly capture, so a publisher blocking the server can still have useful details. The popup offers a secondary link to edit details or visibility in the dashboard.
 
 Save creates a private pending item. Done creates a private done item when the URL is new, or marks a canonical URL match done without changing its title, notes, visibility, or review state. Repeated saves preserve existing items. New external captures remain in **To review** until explicitly marked reviewed; viewing, scrolling, and completion do not clear that flag.
 
-The browser token can create private items and mark a URL done. It cannot read the library, edit metadata, delete items, or publish. Existing bot submission tokens remain add-only and cannot call the browser endpoint. Rotate/revoke the browser token independently in Settings. Tokens stay in extension-local storage, accessible only to trusted extension contexts. There are no content scripts, page scraping, or broad mandatory host permissions; only the configured Margin origin receives a requested host permission.
+The browser token can create private items and mark a URL done. It cannot read the library, edit metadata, delete items, or publish. Existing bot submission tokens remain add-only and cannot call the browser endpoint. Rotate/revoke the browser token independently in Settings. Tokens stay in extension-local storage, accessible only to trusted extension contexts. There are no persistent content scripts or full-page capture. The scripting permission reads only those metadata fields when you invoke Save or Done; it is limited by activeTab. There are no broad mandatory host permissions; only the configured Margin origin receives a requested host permission.
 
 Run the command tests from the repository root:
 
@@ -24,3 +24,5 @@ mise exec -- node --test extension/background.test.mjs
 ```
 
 This extension uses Manifest V3 and Chromium APIs. Actual installation and shortcut conflicts depend on the Helium/browser build; verify the selected shortcuts there. A red `!` badge means capture failed; hover the toolbar icon or open the popup for the error.
+
+After updating from version 1.0.0, reload the unpacked extension in Helium’s Extensions page so its new scripting permission and page-metadata recovery are active. Captures with incomplete metadata now show a warning rather than an unconditional success badge. Badge feedback is tied to the page captured and clears on navigation.

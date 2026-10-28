@@ -10,8 +10,9 @@ for (const button of buttons)
         action: button.dataset.action,
       });
       if (reply.error) throw new Error(reply.error);
-      status.textContent =
-        button.dataset.action === "done"
+      status.textContent = reply.result.warning
+        ? "Saved. " + reply.result.warning
+        : button.dataset.action === "done"
           ? "Marked Done."
           : reply.result.created
             ? "Saved. Ready to review in Margin."

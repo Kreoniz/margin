@@ -61,3 +61,12 @@ See [capture decisions and sources](capture-and-collection.md) and [extension se
 ## Opt-in development fixtures
 
 `MARGIN_DEV_MODE=1` registers owner-only POST/DELETE `/api/dev/fixtures`. POST loads one labeled fictional public item per media kind with offline covers, varied completion states, and review flags; repeated calls reuse the tracked set. DELETE removes only tracked fixture IDs and fixture images unused by other items. Real duplicates are never adopted into the fixture manifest. Bootstrap includes `dev_mode:boolean` and `dev_fixture_count:number`. The default server has no fixture mutation routes. `mise run dev` opts in; the owner UI exposes G then M and Settings → Development.
+
+
+## Metadata recovery (migration 005)
+
+Owner Media adds `metadata_state` (`pending`, `ready`, `partial`, or empty for older/manual records) and a bounded `metadata_warning`. Public DTOs exclude both. Owner create/patch accepts `fetch_metadata:true` to persist a quick save without a remote fetch. A separate worker loop claims pending rows with 45-second leases and a 32-second fetch budget; unfinished work survives restart. Completion fills only missing/default-derived fields and preserves concurrent owner edits, completion, review, notes, and visibility. Changing URLs invalidates the previous lease. The owner UI polls while metadata is pending and offers retry through `/api/metadata`; retry fills the draft and saves normally.
+
+Known first-party RSS feeds can recover metadata when HTML is blocked. Lookup matches the canonical URL across up to 5,000 body-bounded entries, independently of the inbox’s recent-item retention, and caches known feeds for ten minutes. No third-party mirror or invented author/image is substituted. Article, NewsArticle, BlogPosting, and Book JSON-LD supply structured fallbacks without loading contexts.
+
+Browser capture optionally accepts `page_metadata:{title,author,description,cover_url}` from the page explicitly captured. Hints fill missing fields on new captures only and are bounded/validated like other input. They cannot update existing records. New-capture receipts may include a generic `warning`; duplicate receipts never disclose stored owner warning text. The extension uses activeTab plus scripting to read these metadata fields, verifies the captured URL, and scopes all feedback to the original tab/page.

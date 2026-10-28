@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "unlikely-ui/button";
+import { Checkbox } from "unlikely-ui/checkbox";
 import { Input } from "unlikely-ui/input";
 import { Textarea } from "unlikely-ui/textarea";
 import { formatForDisplay, useHotkey } from "@tanstack/react-hotkeys";
@@ -14,7 +15,7 @@ import {
   type MediaDraft,
   type Metadata,
 } from "./types";
-import { hostname, publicPath, safeURL } from "./utils";
+import { hostname, isFallbackTitle, publicPath, safeURL } from "./utils";
 import { optimizeImage } from "./images";
 
 export function Editor({
@@ -39,7 +40,13 @@ export function Editor({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [warning, setWarning] = useState("");
+  const [warning, setWarning] = useState(item?.metadata_warning || "");
+  const [lookupVersion, setLookupVersion] = useState(0);
+  const [lookupComplete, setLookupComplete] = useState(
+    Boolean(item && item.metadata_state !== "pending"),
+  );
+  const [markReviewed, setMarkReviewed] = useState(Boolean(item?.needs_review));
+  const [authorQuery, setAuthorQuery] = useState("");
   const [error, setError] = useState("");
   const [duplicate, setDuplicate] = useState<string>();
   const [confirm, setConfirm] = useState(false);
@@ -80,14 +87,39 @@ export function Editor({
     setDraft((d) => ({ ...d, [key]: value }));
   }
   useEffect(() => {
-    if (!urlMode) return;
+    if (!item || draft.url !== item.url) return;
+    setDraft((d) => {
+      const next = { ...d };
+      for (const key of [
+        "title",
+        "author",
+        "description",
+        "cover_url",
+        "kind",
+      ] as const) {
+        if (
+          !dirty.current.has(key) &&
+          (!d[key] || (key === "title" && isFallbackTitle(d.title, d.url)))
+        )
+          (next[key] as string) = item[key];
+      }
+      return next;
+    });
+    if (!lookupVersion) {
+      setWarning(item.metadata_warning || "");
+      setLookupComplete(item.metadata_state !== "pending");
+    }
+  }, [item?.updated_at, draft.url]);
+  const metadataURL = urlMode ? capture : draft.url;
+  useEffect(() => {
+    if (!safeURL(metadataURL) || (!urlMode && !lookupVersion)) return;
     const abort = new AbortController();
     abortLookup.current = abort;
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
         const metadata = await api<Metadata>("/metadata", {
-          ...send("POST", { url: capture }),
+          ...send("POST", { url: metadataURL }),
           signal: AbortSignal.any([abort.signal, AbortSignal.timeout(23_000)]),
         });
         if (abort.signal.aborted) return;
@@ -100,12 +132,19 @@ export function Editor({
             "cover_url",
             "kind",
           ] as const)
-            if (!dirty.current.has(key))
+            if (
+              !dirty.current.has(key) &&
+              (!item ||
+                !d[key] ||
+                (key === "title" && isFallbackTitle(d.title, metadataURL)) ||
+                (key === "kind" && d.kind === "article"))
+            )
               (next[key] as string) =
                 metadata[key] || (key === "kind" ? "article" : "");
           return next;
         });
         setWarning(metadata.warning || "");
+        setLookupComplete(true);
       } catch {
         if (!abort.signal.aborted)
           setWarning(
@@ -120,7 +159,7 @@ export function Editor({
       abort.abort();
       setLoading(false);
     };
-  }, [capture, urlMode]);
+  }, [metadataURL, urlMode, lookupVersion]);
   // A title or ISBN with Type=Book resolves automatically; choosing another
   // match is optional. Existing items are looked up only on explicit request.
   const automaticBookQuery =
@@ -137,7 +176,7 @@ export function Editor({
           const data = await api<{ items: Metadata[]; warning?: string }>(
             "/books/search",
             {
-              ...send("POST", { query, author: draft.author }),
+              ...send("POST", { query, author: authorQuery || draft.author }),
               signal: abort.signal,
             },
           );
@@ -166,8 +205,9 @@ export function Editor({
       abort.abort();
       setBookLoading(false);
     };
-  }, [automaticBookQuery, bookRequest]);
+  }, [automaticBookQuery, bookRequest, authorQuery]);
   function applyBook(book: Metadata, explicit: boolean) {
+    setLookupComplete(true);
     setDraft((d) => {
       const next = { ...d, kind: "book" as const };
       for (const key of ["title", "author", "cover_url"] as const)
@@ -194,14 +234,22 @@ export function Editor({
     }
     setSaving(true);
     abortLookup.current?.abort();
+    setLoading(false);
     try {
-      const payload = Object.fromEntries(
+      const payload: Record<string, unknown> = Object.fromEntries(
         Object.keys(emptyDraft()).map((key) => [
           key,
           draft[key as keyof MediaDraft],
         ]),
       );
       payload.title = title;
+      if (draft.url) {
+        payload.fetch_metadata =
+          !lookupComplete ||
+          Boolean(item?.metadata_state === "pending" && !lookupVersion);
+        payload.metadata_warning = warning;
+      }
+      if (item?.needs_review && markReviewed) payload.needs_review = false;
       payload.tags = [
         ...new Set(
           tags
@@ -247,6 +295,7 @@ export function Editor({
                 const link = safeURL(value);
                 setCapture(value);
                 setWarning("");
+                setLookupComplete(false);
                 setMatches([]);
                 setBookRequest(0);
                 setBookWarning("");
@@ -291,7 +340,72 @@ export function Editor({
                 onChange={(e) => set("title", e.target.value)}
               />
             </FormField>
+            {item && (
+              <FormField label="URL (optional)">
+                <Input
+                  type="url"
+                  value={draft.url}
+                  placeholder="https://…"
+                  onChange={(e) => {
+                    set("url", e.target.value);
+                    setLookupComplete(false);
+                  }}
+                />
+              </FormField>
+            )}
           </div>
+        )}
+        {safeURL(draft.url) && (
+          <section className="editor-metadata" aria-label="Link details">
+            {draft.cover_url && (
+              <MiniCover kind={draft.kind} url={draft.cover_url} />
+            )}
+            <div className="min-w-0 flex-1">
+              <a
+                className="text-link block truncate text-xs"
+                href={safeURL(draft.url)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {hostname(draft.url)} <Icon name="external" size={12} />
+              </a>
+              {draft.author && (
+                <p className="mt-1 text-xs text-u-muted">{draft.author}</p>
+              )}
+              {draft.description && (
+                <p className="mt-1 line-clamp-2 text-xs text-u-muted">
+                  {draft.description}
+                </p>
+              )}
+              {item?.metadata_state === "pending" && !loading && (
+                <p role="status" className="mt-1 text-xs text-u-muted">
+                  Details are being fetched in the background.
+                </p>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                loading={loading}
+                disabled={busy}
+                onClick={() => {
+                  setLookupComplete(false);
+                  setLookupVersion((n) => n + 1);
+                }}
+              >
+                {warning ? "Retry details" : "Find missing details"}
+              </Button>
+            </div>
+          </section>
+        )}
+        {item?.needs_review && (
+          <label className="my-3 flex items-center gap-2 text-xs">
+            <Checkbox
+              checked={markReviewed}
+              onCheckedChange={setMarkReviewed}
+            />
+            Mark reviewed when saving
+          </label>
         )}
         <div className="form-grid editor-options">
           <FormField label="Type">
@@ -321,7 +435,10 @@ export function Editor({
                 value={draft.author}
                 maxLength={500}
                 placeholder="Author…"
-                onChange={(e) => set("author", e.target.value)}
+                onChange={(e) => {
+                  set("author", e.target.value);
+                  setAuthorQuery(e.target.value);
+                }}
               />
             </FormField>
             {bookLoading && (
@@ -427,14 +544,19 @@ export function Editor({
             Details, image & note <Icon name="chevron" size={15} />
           </summary>
           <div className="details-fields">
-            <FormField label="URL (optional)">
-              <Input
-                type="url"
-                value={draft.url}
-                placeholder="https://…"
-                onChange={(e) => set("url", e.target.value)}
-              />
-            </FormField>
+            {!item && (
+              <FormField label="URL (optional)">
+                <Input
+                  type="url"
+                  value={draft.url}
+                  placeholder="https://…"
+                  onChange={(e) => {
+                    set("url", e.target.value);
+                    setLookupComplete(false);
+                  }}
+                />
+              </FormField>
+            )}
             {draft.kind !== "book" && (
               <FormField label="Creator (optional)">
                 <Input
@@ -625,7 +747,11 @@ export function Editor({
               title={`Save (${formatForDisplay("Mod+Enter")})`}
               aria-keyshortcuts="Control+Enter Meta+Enter"
             >
-              {item ? "Save changes" : "Add to library"}
+              {item
+                ? item.needs_review && markReviewed
+                  ? "Save & review"
+                  : "Save changes"
+                : "Add to library"}
             </Button>
           </div>
         </div>

@@ -144,6 +144,16 @@ func (s *Store) submit(ctx context.Context, token string, m Media) (Media, bool,
 }
 func (s *Server) prepareMedia(ctx context.Context, in MediaInput) (Media, error) {
 	m := NewMedia()
+	if in.FetchMetadata && in.URL != nil {
+		canonical, err := CanonicalURL(*in.URL)
+		if err != nil {
+			return m, &ValidationError{err.Error()}
+		}
+		m.URL = canonical
+		m.Title = fallbackTitle(canonical)
+		m.Kind = "article"
+		return in.Apply(m)
+	}
 	if in.URL != nil && strings.TrimSpace(*in.URL) != "" && !(in.Title != nil && in.Author != nil && in.Kind != nil && in.CoverURL != nil && in.Description != nil) {
 		metadata, err := s.Fetcher.Metadata(ctx, *in.URL)
 		if err != nil {
@@ -155,6 +165,11 @@ func (s *Server) prepareMedia(ctx context.Context, in MediaInput) (Media, error)
 		m.URL = metadata.URL
 		m.CoverURL = metadata.CoverURL
 		m.Description = metadata.Description
+		m.MetadataWarning = metadata.Warning
+		m.MetadataState = "ready"
+		if metadata.Warning != "" {
+			m.MetadataState = "partial"
+		}
 		// Preserve the submitted canonical URL for stable duplicate matching across
 		// redirects/canonical metadata changes. Explicit fields always win.
 	}

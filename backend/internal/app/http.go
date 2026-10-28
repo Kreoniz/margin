@@ -161,6 +161,9 @@ func (s *Server) createMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m, err = s.Store.CreateMedia(r.Context(), m)
+	if err == nil && m.MetadataState == "pending" && s.Worker != nil {
+		s.Worker.TriggerMetadata()
+	}
 	respond(w, 201, m, err)
 }
 func (s *Server) patchMedia(w http.ResponseWriter, r *http.Request) {
@@ -172,6 +175,9 @@ func (s *Server) patchMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m, err := s.Store.PatchMedia(r.Context(), r.PathValue("id"), in)
+	if err == nil && m.MetadataState == "pending" && s.Worker != nil {
+		s.Worker.TriggerMetadata()
+	}
 	respond(w, 200, m, err)
 }
 func (s *Server) metadata(w http.ResponseWriter, r *http.Request) {

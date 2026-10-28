@@ -1170,3 +1170,51 @@
     }
   }
 }
+
+@layer components {
+  .editor-metadata {
+    @apply my-3 flex items-start gap-3 rounded-md border border-solid border-u-soft bg-u-well/40 p-3;
+  }
+  .editor-metadata > .mini-cover {
+    @apply h-20 w-16 min-w-16;
+  }
+  .metadata-warning {
+    @apply mt-1 block border-0 bg-transparent p-0 text-left text-[11px] text-u-warning hover:underline;
+  }
+  @media (max-width: 600px) {
+    .owner-shell .media-row {
+      @apply grid grid-cols-[24px_64px_minmax(0,1fr)_32px] items-center gap-x-2 gap-y-1;
+    }
+    .owner-shell .media-row > .mini-cover {
+      @apply col-start-2 row-start-1 h-22 w-16 min-w-16;
+    }
+    .owner-shell .media-row > .u-choice {
+      @apply col-start-1 row-start-1 min-w-0;
+    }
+    .owner-shell .media-row > .row-content {
+      @apply col-start-3 row-start-1;
+    }
+    .owner-shell .media-row > .u-button:last-child {
+      @apply col-start-4 row-start-1 size-8 min-h-8 min-w-8;
+    }
+    .owner-shell .media-row > .review-button {
+      @apply col-start-3 row-start-2 w-fit;
+    }
+    .owner-shell .media-row > .type-label {
+      @apply hidden;
+    }
+    .owner-shell .media-row > .public-marker {
+      @apply col-start-4 row-start-2 justify-center;
+    }
+    .modal-footer {
+      @apply flex-wrap gap-y-2;
+    }
+  }
+}
+@layer components {
+  @media (max-width: 600px) {
+    .owner-shell .media-row > .mini-cover[data-empty] {
+      @apply h-16 w-12 min-w-12 justify-self-center;
+    }
+  }
+}

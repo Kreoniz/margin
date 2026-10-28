@@ -27,7 +27,7 @@ func sampleStore(t *testing.T) (*Store, []Media) {
 func sampleSnapshot(t *testing.T, s *Store) string {
 	t.Helper()
 	var snapshot string
-	if err := s.Pool.QueryRow(context.Background(), "SELECT jsonb_agg((to_jsonb(m) - 'needs_review') ORDER BY id)::text FROM media m WHERE is_demo").Scan(&snapshot); err != nil {
+	if err := s.Pool.QueryRow(context.Background(), "SELECT jsonb_agg((to_jsonb(m) - 'needs_review' - 'metadata_state' - 'metadata_warning' - 'metadata_lease_token' - 'metadata_lease_until') ORDER BY id)::text FROM media m WHERE is_demo").Scan(&snapshot); err != nil {
 		t.Fatal(err)
 	}
 	return snapshot

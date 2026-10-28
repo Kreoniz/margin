@@ -13,21 +13,23 @@ import (
 )
 
 type Media struct {
-	NeedsReview bool       `json:"needs_review"`
-	ID          string     `json:"id"`
-	Title       string     `json:"title"`
-	Author      string     `json:"author"`
-	Kind        string     `json:"kind"`
-	Status      string     `json:"status"`
-	URL         string     `json:"url"`
-	CoverURL    string     `json:"cover_url"`
-	Description string     `json:"description"`
-	Notes       string     `json:"notes"`
-	Tags        []string   `json:"tags"`
-	Visibility  string     `json:"visibility"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	MetadataState   string     `json:"metadata_state,omitempty"`
+	MetadataWarning string     `json:"metadata_warning,omitempty"`
+	NeedsReview     bool       `json:"needs_review"`
+	ID              string     `json:"id"`
+	Title           string     `json:"title"`
+	Author          string     `json:"author"`
+	Kind            string     `json:"kind"`
+	Status          string     `json:"status"`
+	URL             string     `json:"url"`
+	CoverURL        string     `json:"cover_url"`
+	Description     string     `json:"description"`
+	Notes           string     `json:"notes"`
+	Tags            []string   `json:"tags"`
+	Visibility      string     `json:"visibility"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	CompletedAt     *time.Time `json:"completed_at,omitempty"`
 }
 
 // PublicMedia is an explicit allowlist: owner notes and operational data never serialize.
@@ -52,17 +54,19 @@ func publicMedia(m Media) PublicMedia {
 }
 
 type MediaInput struct {
-	NeedsReview *bool     `json:"needs_review"`
-	Title       *string   `json:"title"`
-	Author      *string   `json:"author"`
-	Kind        *string   `json:"kind"`
-	Status      *string   `json:"status"`
-	URL         *string   `json:"url"`
-	CoverURL    *string   `json:"cover_url"`
-	Description *string   `json:"description"`
-	Notes       *string   `json:"notes"`
-	Tags        *[]string `json:"tags"`
-	Visibility  *string   `json:"visibility"`
+	FetchMetadata   bool      `json:"fetch_metadata,omitempty"`
+	MetadataWarning *string   `json:"metadata_warning,omitempty"`
+	NeedsReview     *bool     `json:"needs_review"`
+	Title           *string   `json:"title"`
+	Author          *string   `json:"author"`
+	Kind            *string   `json:"kind"`
+	Status          *string   `json:"status"`
+	URL             *string   `json:"url"`
+	CoverURL        *string   `json:"cover_url"`
+	Description     *string   `json:"description"`
+	Notes           *string   `json:"notes"`
+	Tags            *[]string `json:"tags"`
+	Visibility      *string   `json:"visibility"`
 }
 
 func NewMedia() Media {
@@ -70,6 +74,18 @@ func NewMedia() Media {
 }
 
 func (in MediaInput) Apply(m Media) (Media, error) {
+	if in.MetadataWarning != nil {
+		m.MetadataWarning = clip(strings.TrimSpace(*in.MetadataWarning), 1000)
+		if m.MetadataWarning != "" {
+			m.MetadataState = "partial"
+		} else if m.URL != "" {
+			m.MetadataState = "ready"
+		}
+	}
+	if in.FetchMetadata {
+		m.MetadataState = "pending"
+		m.MetadataWarning = ""
+	}
 	if in.NeedsReview != nil {
 		m.NeedsReview = *in.NeedsReview
 	}
@@ -137,6 +153,12 @@ func (in MediaInput) Apply(m Media) (Media, error) {
 		m.CompletedAt = nil
 	}
 
+	if m.URL == "" {
+		m.MetadataState = ""
+		m.MetadataWarning = ""
+	} else if m.MetadataState == "" {
+		m.MetadataState = "ready"
+	}
 	return m, nil
 }
 

@@ -1,0 +1,46 @@
+# Two-round capture and usability audit — 2026-10-28
+
+The user reported a slug-only capture of `https://openai.com/index/scaling-postgresql/` and requested two subagent review/refinement rounds. Each round used two independent read-only agents: one technical capture/data review and one browser usability review. The parent implemented fixes between reviews and after the second round. Browser audit records lived only in disposable instances and were removed.
+
+## Root cause reproduced
+
+The article's HTML returned HTTP 403 to the server while the [official RSS](https://openai.com/news/rss.xml) returned 200. The RSS contains the full title and a 144-character description, but no author or image for this item. At verification it was well beyond the inbox's newest 100 entries. The old capture path returned a URL-derived title, discarded the metadata warning, and gave the extension an unconditional Saved result. Existing captures had no retry action.
+
+The corrected live lookup returns **Scaling PostgreSQL to power 800 million ChatGPT users**, its description, and an explicit missing-image warning. It does not invent an author or cover. The extension can supplement missing fields from the open page's metadata when explicitly invoked.
+
+## Round 1 — findings and refinements
+
+| Finding | Refinement |
+| --- | --- |
+| Blocked HTML lost metadata despite usable publisher RSS | Canonical URL lookup in a complete body-bounded known-source feed, separate from inbox retention; ten-minute cache |
+| Save now aborted enrichment permanently | Durable pending state, worker leases, background completion and temporary UI polling |
+| Failed external captures lost warnings and had no recovery | Persistent owner-only warning, visible URL/preview/retry controls, honest extension feedback |
+| Only Book JSON-LD was parsed | Article, NewsArticle and BlogPosting extraction added |
+| Editing a To review item switched status and cleared filters | Existing edits preserve review/search/filter context; optional Save & review |
+| Reviewed looked like a state, with no reversal | Mark reviewed action with Undo; accurate all-reviewed empty state |
+| Mobile Edit wrapped beneath a large empty cover | Predictable mobile grid, right-aligned Edit, smaller empty-cover treatment |
+| Search omitted saved URLs; author refinement was stale | URL/domain search, singular counts, manual author changes refine book matching |
+
+## Round 2 — independent validation and final refinements
+
+The live browser reviewer measured a quick OpenAI capture returning in about 70 ms before its background feed recovery. Retry, domain search, review context, Save & review, Undo, and mobile action placement worked; the audited mobile row was 125px tall without overflow. The technical reviewer confirmed the durable merge tests passed.
+
+| Remaining finding | Final refinement |
+| --- | --- |
+| Passive polling could copy old-page details into an edited URL draft | Match draft and stored URL before passive synchronization; preserve pending lookup for unsaved URL changes |
+| Extension injection could read a newly navigated page for the previous URL | Bind extraction to the expected URL and discard mismatches |
+| Delayed extension errors could mark a different active tab | Keep both success and failure feedback on the original tab and URL |
+| Duplicate receipts could disclose an owner-written warning | Only new captures receive a generic capture warning; duplicates omit it |
+| JSON-LD image arrays of ImageObject were missed | Normalize array entries before extracting image URLs |
+| Duplicate save left an aborted metadata spinner active | Clear loading on abort; keep retry usable after failed saves |
+| Row Retry merely opened Edit | Label the action accurately as opening the editor |
+
+The second browser reviewer encountered two preview snapshot timeouts and used isolated Playwright on a separate disposable instance, following the browser fallback rule. All audit contexts/tabs were closed. There was no third review round.
+
+## Validation
+
+Deterministic backend tests cover blocked HTML plus a matching feed entry beyond position 650, feed caching, article JSON-LD images, immediate save, concurrent edits/URL changes, browser hints, duplicate warning privacy, and public-data boundaries. Extension tests cover expected-page binding and feedback after navigation/focus changes. Browser regressions cover retry, review context/Undo, mobile controls, stale background results after URL edits, and duplicate-save recovery, alongside the existing suite.
+
+Final checks: the frontend production build and three utility tests passed; full Go tests passed with race detection on isolated PostgreSQL schemas, and go vet passed. All seven extension tests passed, and Chromium loaded extension 1.0.1 with its options page and both commands. The 58-case browser run passed 57 cases; one existing privacy assertion queried the public endpoint before its save completed. The trace showed the GET starting during the pending PATCH. The test now waits for save completion; all four affected desktop/mobile save/privacy cases passed on rerun. The new recovery, stale-URL, duplicate-save, review, and layout cases passed. Mobile action placement also covers 570px.
+
+The reported slug-only record in the local review database was selectively queued for enrichment only while its title matched the URL fallback and author/image/description were empty. It now has the full title and 144-character description. Its existing To review flag and pending completion state were preserved. The original installation was not changed.

@@ -132,7 +132,11 @@ export function MiniCover({ kind, url = "" }: { kind: Kind; url?: string }) {
   const [loaded, setLoaded] = useState("");
   const src = imageURL(url);
   return (
-    <span className={"mini-cover mini-" + kind} aria-hidden="true">
+    <span
+      className={"mini-cover mini-" + kind}
+      data-empty={!src || src === failed || undefined}
+      aria-hidden="true"
+    >
       <Icon name={kind} size={20} />
       {src && src !== failed && (
         <img
@@ -152,11 +156,13 @@ export function EmptyState({
   discovery = false,
   filtered = false,
   done = false,
+  review = false,
   action,
 }: {
   discovery?: boolean;
   filtered?: boolean;
   done?: boolean;
+  review?: boolean;
   action?: ReactNode;
 }) {
   return (
@@ -172,20 +178,24 @@ export function EmptyState({
       <h2>
         {filtered
           ? "Nothing matches yet."
-          : discovery
-            ? "You’re all caught up."
-            : done
-              ? "Your finished reads go here."
-              : "Something worth keeping?"}
+          : review
+            ? "All captures reviewed."
+            : discovery
+              ? "You’re all caught up."
+              : done
+                ? "Your finished reads go here."
+                : "Something worth keeping?"}
       </h2>
       <p>
         {filtered
           ? "Try another search or clear your filters."
-          : discovery
-            ? "Your sources keep collecting in the background. Save the articles you want to come back to."
-            : done
-              ? "Mark an item done when you’re finished. It stays here whenever you want to find it again."
-              : "Save a link or a title. It stays private until you choose to share it."}
+          : review
+            ? "New captures from the extension, integrations, and automatic saves will appear here. Reviewing keeps completion separate."
+            : discovery
+              ? "Your sources keep collecting in the background. Save the articles you want to come back to."
+              : done
+                ? "Mark an item done when you’re finished. It stays here whenever you want to find it again."
+                : "Save a link or a title. It stays private until you choose to share it."}
       </p>
       {action}
     </div>

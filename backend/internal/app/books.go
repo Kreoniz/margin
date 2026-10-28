@@ -180,7 +180,7 @@ func (s *Server) searchBooks(w http.ResponseWriter, r *http.Request) {
 
 // Publishers expose exact edition data in schema.org Book JSON-LD. Prefer it
 // over a fuzzy catalogue match; never follow a remote JSON-LD context.
-func bookFromJSONLD(doc *html.Node, base string) (Metadata, string, bool) {
+func structuredMetadata(doc *html.Node, base string) (Metadata, string, bool) {
 	var out Metadata
 	var isbn string
 	found := false
@@ -221,15 +221,22 @@ func bookFromJSONLD(doc *html.Node, base string) (Metadata, string, bool) {
 				}
 			}
 			for _, t := range types {
-				if t == "Book" || t == "https://schema.org/Book" || t == "http://schema.org/Book" {
-					image := text(x["image"])
-					if list, ok := x["image"].([]any); ok && len(list) > 0 {
-						image = text(list[0])
+				if oneOf(strings.TrimPrefix(strings.TrimPrefix(t, "https://schema.org/"), "http://schema.org/"), "Book", "Article", "NewsArticle", "BlogPosting") {
+					imageValue := x["image"]
+					if list, ok := imageValue.([]any); ok && len(list) > 0 {
+						imageValue = list[0]
 					}
-					if obj, ok := x["image"].(map[string]any); ok {
+					image := text(imageValue)
+					if obj, ok := imageValue.(map[string]any); ok {
 						image = text(obj["url"])
 					}
-					out = Metadata{Title: clip(text(x["name"]), 1000), Author: clip(names(x["author"]), 1000), CoverURL: safeLink(base, image), Description: clip(plain(text(x["description"])), 20000), Kind: "book"}
+					kind := "article"
+					title := first(text(x["headline"]), text(x["name"]))
+					if strings.HasSuffix(t, "Book") {
+						kind = "book"
+						title = first(text(x["name"]), text(x["headline"]))
+					}
+					out = Metadata{Title: clip(title, 1000), Author: clip(names(x["author"]), 1000), CoverURL: safeLink(base, image), Description: clip(plain(text(x["description"])), 20000), Kind: kind}
 					isbn = validISBN(text(x["isbn"]))
 					found = true
 					return

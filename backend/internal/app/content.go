@@ -33,18 +33,7 @@ func (f *Fetcher) Metadata(ctx context.Context, raw string) (m Metadata, err err
 		return Metadata{}, &ValidationError{err.Error()}
 	}
 	parsed, _ := url.Parse(u)
-	title := parsed.Hostname()
-	if name := path.Base(parsed.Path); name != "/" && name != "." {
-		if decoded, e := url.PathUnescape(name); e == nil {
-			name = decoded
-		}
-		title = name
-		if oneOf(strings.ToLower(path.Ext(name)), ".html", ".htm", ".pdf", ".php") {
-			title = strings.TrimSuffix(name, path.Ext(name))
-		}
-		title = strings.NewReplacer("-", " ", "_", " ").Replace(title)
-	}
-	m = Metadata{Title: clip(title, 1000), Kind: "article", URL: u}
+	m = Metadata{Title: fallbackTitle(u), Kind: "article", URL: u}
 	if isBookHost(parsed.Hostname()) {
 		m.Kind = "book"
 	}
@@ -84,7 +73,10 @@ func (f *Fetcher) Metadata(ctx context.Context, raw string) (m Metadata, err err
 	}()
 	result, err := f.Get(ctx, u, 2<<20)
 	if err != nil {
-		m.Warning = "Could not retrieve metadata: " + clip(err.Error(), 300)
+		if recovered, ok := f.publisherMetadata(ctx, u); ok {
+			return recovered, nil
+		}
+		m.Warning = "This site did not share its page details. You can retry or add them manually."
 		return m, nil
 	}
 	m.URL = result.URL
@@ -148,16 +140,35 @@ func (f *Fetcher) Metadata(ctx context.Context, raw string) (m Metadata, err err
 	if strings.HasPrefix(values["og:type"], "video") {
 		m.Kind = "video"
 	}
-	if book, isbn, ok := bookFromJSONLD(doc, result.URL); ok {
+	if book, isbn, ok := structuredMetadata(doc, result.URL); ok {
 		bookISBN = isbn
 		structuredBook = book.Title != ""
-		m.Kind = "book"
+		m.Kind = book.Kind
 		m.Title = first(book.Title, m.Title)
 		m.Author = first(book.Author, m.Author)
 		m.CoverURL = first(book.CoverURL, m.CoverURL)
 		m.Description = first(book.Description, m.Description)
 	}
 	return m, nil
+}
+
+func fallbackTitle(raw string) string {
+	parsed, _ := url.Parse(raw)
+	if parsed == nil {
+		return raw
+	}
+	title := parsed.Hostname()
+	if name := path.Base(parsed.Path); name != "/" && name != "." {
+		if decoded, e := url.PathUnescape(name); e == nil {
+			name = decoded
+		}
+		title = name
+		if oneOf(strings.ToLower(path.Ext(name)), ".html", ".htm", ".pdf", ".php") {
+			title = strings.TrimSuffix(name, path.Ext(name))
+		}
+		title = strings.NewReplacer("-", " ", "_", " ").Replace(title)
+	}
+	return clip(title, 1000)
 }
 
 func isBookHost(host string) bool {

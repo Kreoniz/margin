@@ -10,17 +10,18 @@ import (
 )
 
 type Worker struct {
-	store   *Store
-	fetcher *Fetcher
-	trigger chan struct{}
-	busy    atomic.Bool
-	mu      sync.Mutex
-	forced  bool
-	done    chan struct{}
+	store           *Store
+	fetcher         *Fetcher
+	trigger         chan struct{}
+	metadataTrigger chan struct{}
+	busy            atomic.Bool
+	mu              sync.Mutex
+	forced          bool
+	done            chan struct{}
 }
 
 func NewWorker(store *Store, fetcher *Fetcher) *Worker {
-	return &Worker{store: store, fetcher: fetcher, trigger: make(chan struct{}, 1), done: make(chan struct{})}
+	return &Worker{store: store, fetcher: fetcher, trigger: make(chan struct{}, 1), metadataTrigger: make(chan struct{}, 1), done: make(chan struct{})}
 }
 func (w *Worker) Trigger() {
 	w.mu.Lock()
@@ -38,6 +39,10 @@ func (w *Worker) Trigger() {
 func (w *Worker) Done() <-chan struct{} { return w.done }
 func (w *Worker) Run(ctx context.Context) {
 	defer close(w.done)
+	metadataCtx, cancelMetadata := context.WithCancel(ctx)
+	metadataDone := make(chan struct{})
+	go func() { defer close(metadataDone); w.runMetadata(metadataCtx) }()
+	defer func() { cancelMetadata(); <-metadataDone }()
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	w.sync(ctx, false)
