@@ -80,7 +80,7 @@ func run(args []string) error {
 	workerCtx, cancelWorker := context.WithCancel(ctx)
 	defer cancelWorker()
 	go worker.Run(workerCtx)
-	api := &app.Server{Store: store, Fetcher: fetcher, Worker: worker, StaticDir: config.staticDir, TrustedProxies: config.trustedProxies}
+	api := &app.Server{DevMode: config.devMode, Store: store, Fetcher: fetcher, Worker: worker, StaticDir: config.staticDir, TrustedProxies: config.trustedProxies}
 	server := &http.Server{Addr: ":" + config.port, Handler: api.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 45 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 64 << 10}
 	serverErrors := make(chan error, 1)
 	go func() { slog.Info("Margin listening", "port", config.port); serverErrors <- server.ListenAndServe() }()

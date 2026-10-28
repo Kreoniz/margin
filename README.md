@@ -111,3 +111,9 @@ Backend tests use isolated schemas, require explicit TEST_DATABASE_URL and never
 [Corrected product audit](docs/product-correction.md) · [Design research](docs/product-correction-research.md) · [API contract](docs/api-contract.md). Inter is self-hosted with its SIL Open Font License; Unlikely UI, TanStack and Tailwind license notices are retained under web/public/licenses.
 
 See [capture, book matching, images, export, and Collection changes](docs/capture-and-collection.md) and the [Helium extension setup](extension/README.md).
+
+### Development demo data
+
+`mise run dev` enables development controls. In the owner dashboard, press **G then M** to load or clear nine fictional items, one for each media type. The same action is available under **Settings → Development** and in the dashboard footer. Loading shows all demo types together, including Done and To review examples. Every fixture is labeled `[Demo]`; its generated cover works offline, and fixtures are public so you can inspect the Collection too.
+
+Other local server runs can opt in with `MARGIN_DEV_MODE=1`. It is off by default, and the fixture API is absent without it. Loading is idempotent. Cleanup removes only the recorded fixture IDs and unused fixture images, preserving real items even if they have the same title or `demo` tag. Owner login is still required. Clear fixtures before reusing that database outside development.

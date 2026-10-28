@@ -18,6 +18,7 @@ import (
 )
 
 type Server struct {
+	DevMode   bool
 	Store     *Store
 	Fetcher   *Fetcher
 	Worker    *Worker
@@ -30,6 +31,10 @@ type Server struct {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	if s.DevMode {
+		mux.HandleFunc("POST /api/dev/fixtures", s.devFixtures)
+		mux.HandleFunc("DELETE /api/dev/fixtures", s.devFixtures)
+	}
 	mux.HandleFunc("GET /api/session", s.session)
 	mux.HandleFunc("POST /api/setup", func(w http.ResponseWriter, r *http.Request) { s.signIn(w, r, true) })
 	mux.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) { s.signIn(w, r, false) })
@@ -128,12 +133,22 @@ func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, nil, err)
 		return
 	}
+	fixtureCount := 0
+	if s.DevMode {
+		fixtureCount, err = s.Store.devFixtureCount(r.Context())
+		if err != nil {
+			respond(w, 500, nil, err)
+			return
+		}
+	}
 	writeJSON(w, 200, struct {
+		DevMode           bool        `json:"dev_mode"`
+		DevFixtureCount   int         `json:"dev_fixture_count"`
 		LegacySampleCount int         `json:"legacy_sample_count"`
 		Media             []Media     `json:"media"`
 		Inbox             []InboxItem `json:"inbox"`
 		Sources           []Source    `json:"sources"`
-	}{count, media, inbox, sources})
+	}{s.DevMode, fixtureCount, count, media, inbox, sources})
 }
 func (s *Server) createMedia(w http.ResponseWriter, r *http.Request) {
 	var in MediaInput

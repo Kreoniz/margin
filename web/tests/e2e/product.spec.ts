@@ -1434,3 +1434,87 @@ test("late metadata preserves manual title and custom image edits", async ({
     dialog(page).getByRole("textbox", { name: "Image URL (optional)" }),
   ).toHaveValue("https://example.com/custom.jpg");
 });
+
+test("development shortcut loads all kinds once and clears only its fixtures", async ({
+  page,
+  request,
+  browser,
+}) => {
+  const bootstrap = await (await request.get("/api/bootstrap")).json();
+  test.skip(
+    !bootstrap.dev_mode,
+    "Requires MARGIN_DEV_MODE=1 on the disposable test instance.",
+  );
+  const realTitle = title("Keep beside demo data");
+  const real = await (
+    await request.post("/api/media", {
+      data: { title: realTitle, tags: ["demo"] },
+    })
+  ).json();
+  await request.delete("/api/dev/fixtures");
+  try {
+    await page.goto("/dashboard");
+    await expect(
+      page.getByRole("region", { name: "Development tools", exact: true }),
+    ).toBeVisible();
+    await page.locator("main").focus();
+    await page.keyboard.press("g");
+    await page.keyboard.press("m");
+    await expect(
+      page.locator(".media-row").filter({ hasText: "[Demo]" }),
+    ).toHaveCount(9);
+    const loaded = await (await request.get("/api/bootstrap")).json();
+    expect(loaded.dev_fixture_count).toBe(9);
+    expect(
+      new Set(
+        loaded.media
+          .filter((m: { title: string }) => m.title.startsWith("[Demo]"))
+          .map((m: { kind: string }) => m.kind),
+      ).size,
+    ).toBe(9);
+    await request.post("/api/dev/fixtures");
+    expect(
+      (await (await request.get("/api/bootstrap")).json()).dev_fixture_count,
+    ).toBe(9);
+    const guest = await browser.newContext();
+    try {
+      const publicPage = await guest.newPage();
+      await publicPage.goto(baseURL + "/");
+      await expect(
+        publicPage.locator(".collection-card").filter({ hasText: "[Demo]" }),
+      ).toHaveCount(9);
+      const images = publicPage.locator(".collection-card img");
+      for (const image of await images.all()) {
+        await image.scrollIntoViewIfNeeded();
+        await expect
+          .poll(() =>
+            image.evaluate(
+              (element) => (element as HTMLImageElement).naturalWidth,
+            ),
+          )
+          .toBeGreaterThan(0);
+      }
+      await checkAccess(publicPage);
+    } finally {
+      await guest.close();
+    }
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await dialog(page).getByText("Development", { exact: true }).click();
+    await dialog(page)
+      .getByRole("button", { name: "Clear demo data", exact: true })
+      .click();
+    await expect(
+      dialog(page).getByRole("button", { name: "Load demo data", exact: true }),
+    ).toBeVisible();
+    expect(
+      (await (await request.get("/api/media")).json()).some(
+        (m: { id: string }) => m.id === real.id,
+      ),
+    ).toBe(true);
+    expect(
+      (await (await request.get("/api/bootstrap")).json()).dev_fixture_count,
+    ).toBe(0);
+  } finally {
+    await request.delete("/api/dev/fixtures");
+  }
+});

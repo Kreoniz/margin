@@ -62,6 +62,8 @@ export interface Source {
   item_count: number;
 }
 export interface LibraryData {
+  dev_mode?: boolean;
+  dev_fixture_count?: number;
   media: Media[];
   inbox: InboxItem[];
   sources: Source[];

@@ -57,3 +57,7 @@ Document curl/Python/Hermes HTTP submission using environment token placeholders
 - POST `/api/integrations/capture` requires the browser token, never a session or submission token. Input is exactly `{url,action:"save"|"done"}`. New URLs create private items; done also marks them done. Existing canonical URL matches retain all metadata, visibility, and review flags; done changes completion only. Returns 201/200 `{id,created,action}`. Revocation/rotation is rechecked under a token-row lock after metadata fetching. Same-URL capture transactions are serialized. This bearer-only endpoint permits cross-origin extension requests; all cookie-authenticated mutation routes retain same-origin checks.
 
 See [capture decisions and sources](capture-and-collection.md) and [extension setup](../extension/README.md).
+
+## Opt-in development fixtures
+
+`MARGIN_DEV_MODE=1` registers owner-only POST/DELETE `/api/dev/fixtures`. POST loads one labeled fictional public item per media kind with offline covers, varied completion states, and review flags; repeated calls reuse the tracked set. DELETE removes only tracked fixture IDs and fixture images unused by other items. Real duplicates are never adopted into the fixture manifest. Bootstrap includes `dev_mode:boolean` and `dev_fixture_count:number`. The default server has no fixture mutation routes. `mise run dev` opts in; the owner UI exposes G then M and Settings → Development.

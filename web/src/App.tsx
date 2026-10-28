@@ -225,6 +225,13 @@ function Owner({
         callback: () => navigate("discover"),
         options: { enabled: shortcutsEnabled && singleKeys },
       },
+      {
+        hotkey: ["G", "M"],
+        callback: () => void toggleDemoData(),
+        options: {
+          enabled: shortcutsEnabled && singleKeys && Boolean(data?.dev_mode),
+        },
+      },
       { hotkey: "Mod+,", callback: () => setSettings(true) },
       {
         hotkey: ["G", "S"],
@@ -450,6 +457,25 @@ function Owner({
               : "Marked new.",
         actionProps: { children: "Undo", onClick: undo.current },
       });
+    }
+  }
+  async function toggleDemoData() {
+    if (!data?.dev_mode) return;
+    const remove = Boolean(data.dev_fixture_count);
+    if (
+      await perform(
+        "demo-data",
+        () => api("/dev/fixtures", send(remove ? "DELETE" : "POST")),
+        remove
+          ? "Demo data cleared."
+          : "Demo data loaded · all nine media types.",
+      )
+    ) {
+      if (!remove) {
+        navigate("library");
+        setStatus("all");
+        setTag("demo");
+      } else setTag("");
     }
   }
   async function checkSources() {
@@ -973,6 +999,23 @@ function Owner({
             </Button>
           </div>
         )}
+        {data?.dev_mode && (
+          <div
+            className="mt-5 flex items-center gap-3 text-xs text-u-muted"
+            role="region"
+            aria-label="Development tools"
+          >
+            <span>Development · G then M</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              loading={pending.has("demo-data")}
+              onClick={() => void toggleDemoData()}
+            >
+              {data.dev_fixture_count ? "Clear demo data" : "Load demo data"}
+            </Button>
+          </div>
+        )}
         <footer className="page-footer">
           <Icon name={view === "library" ? "lock" : "rss"} size={13} />
           {view === "library"
@@ -1044,6 +1087,10 @@ function Owner({
               /* optional preference */
             }
           }}
+          devMode={data?.dev_mode}
+          fixtureCount={data?.dev_fixture_count}
+          onDemoData={() => void toggleDemoData()}
+          demoBusy={pending.has("demo-data")}
           legacyCount={data?.legacy_sample_count || 0}
           onChanged={refresh}
           onLogout={() =>

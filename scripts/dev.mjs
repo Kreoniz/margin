@@ -55,6 +55,7 @@ for (const [command, args, cwd, extra] of [
     "backend",
     {
       PORT: "8088",
+      MARGIN_DEV_MODE: "1",
       STATIC_DIR: path.join(root, "web/dist"),
       DATABASE_URL: `postgres://margin:${process.env.POSTGRES_PASSWORD}@127.0.0.1:55439/margin?sslmode=disable`,
     },

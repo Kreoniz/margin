@@ -20,6 +20,10 @@ export function Settings({
   onSingleKeys,
   legacyCount,
   onChanged,
+  devMode = false,
+  fixtureCount = 0,
+  onDemoData,
+  demoBusy = false,
 }: {
   onClose: () => void;
   onLogout: () => void;
@@ -29,6 +33,10 @@ export function Settings({
   onSingleKeys: (enabled: boolean) => void;
   legacyCount: number;
   onChanged: () => Promise<void>;
+  devMode?: boolean;
+  fixtureCount?: number;
+  onDemoData?: () => void;
+  demoBusy?: boolean;
 }) {
   const [configured, setConfigured] = useState<boolean>();
   const [token, setToken] = useState("");
@@ -78,8 +86,33 @@ export function Settings({
       title="Settings"
       onClose={onClose}
       className="settings-modal"
-      busy={busy}
+      busy={busy || demoBusy}
     >
+      {devMode && (
+        <details className="settings-disclosure">
+          <summary>
+            <span>
+              <Icon name="settings" size={15} />
+              Development
+            </span>
+            <Icon name="chevron" size={14} />
+          </summary>
+          <div className="settings-detail">
+            <p>
+              Nine fictional public items with local covers. G then M loads or
+              clears them.
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={demoBusy}
+              onClick={onDemoData}
+            >
+              {fixtureCount ? "Clear demo data" : "Load demo data"}
+            </Button>
+          </div>
+        </details>
+      )}
       <section
         className="flex items-center justify-between gap-3 pb-3"
         aria-labelledby="appearance-heading"
