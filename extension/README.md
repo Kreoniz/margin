@@ -5,7 +5,7 @@ Version 1.1.0 uses the selected Margin icon and a compact, keyboard-friendly pop
 ## Connect once
 
 1. Load `/home/kreoniz/code/margin/extension` (the folder containing `manifest.json`), or extract the supplied ZIP and select that folder.
-2. Open Margin → **Settings → Helium / browser capture → Create browser token**. The current local review is at `http://localhost:5178/dashboard`.
+2. Open [Margin](https://margin.kreoniz.ru/dashboard) → **Settings → Helium / browser capture → Create browser token**. Use `https://margin.kreoniz.ru` as the extension's Margin address for production. The local review remains available at `http://localhost:5178/dashboard`.
 3. Open the extension’s **Settings**, paste your Margin address and browser token, then choose **Save connection**. Pasting a full dashboard URL works: setup keeps its site address. HTTPS is required except for HTTP on localhost or 127.0.0.1.
 4. Allow access to that Margin site when the browser asks. The connection is stored locally; saving it does not verify the token against the server. A rejected token or unavailable server produces a clear error when capturing, with a **Check connection** action.
 

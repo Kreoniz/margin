@@ -2,7 +2,20 @@
 # Configure/restore the owner before opening ingress. Do not publish app/DB ports.
 margin.example.com {
     encode zstd gzip
-    request_body {
+    @imageUpload {
+        method POST
+        path /api/images
+    }
+    @standardBody not {
+        method POST
+        path /api/images
+    }
+    request_body @imageUpload {
+        max_size 2097152
+        read_timeout 15s
+        write_timeout 45s
+    }
+    request_body @standardBody {
         max_size 256KB
         read_timeout 15s
         write_timeout 45s

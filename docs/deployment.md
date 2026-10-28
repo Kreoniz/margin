@@ -38,7 +38,7 @@ The selected hostname is **margin.kreoniz.ru**. Set its A record to your ingress
 
 Test a backup by restoring into a **new disposable database**, verify record/migration counts, then remove that database. Never restore over the running database. Keep production credentials separately in protected recovery storage.
 
-Update sequence: verified backup → new tested image → recreate only app → health, auth/privacy and source checks. Retain the previous image and compatible dump. Rollback app only when schema-compatible; a database rewind requires a separate plan to preserve new writes. Do not use `down -v`, global Docker prune, or restart neighboring services. No automatic code deployment is installed.
+Update sequence: verified backup → new tested image → recreate only app → health, auth/privacy and source checks. For releases with image uploads, apply the site's exclusive request-body matchers from `deploy/Caddyfile`: only `POST /api/images` gets 2 MiB, while other requests retain 256 KB. Validate with the installed Caddy binary before reloading; preserve existing timeout settings and neighboring routes. Retain the previous image and compatible dump. Rollback app only when schema-compatible; a database rewind requires a separate plan to preserve new writes. Do not use `down -v`, global Docker prune, or restart neighboring services. No automatic code deployment is installed.
 
 ## Optional publisher egress
 
