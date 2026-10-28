@@ -1,11 +1,12 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "unlikely-ui/button";
 import { Dialog } from "unlikely-ui/dialog";
 import { Select } from "unlikely-ui/select";
 import { Field } from "unlikely-ui/field";
 import { Icon } from "./Icon";
 import { kindLabels, type Kind } from "./types";
-import { safeURL } from "./utils";
+import { imageURL } from "./utils";
+import { ActionHint, HintScope } from "./ActionHint";
 
 export function Picker<T extends string>({
   value,
@@ -68,6 +69,8 @@ export function Modal({
   onClose,
   className = "",
   busy = false,
+  closeRequested = false,
+  focusTitle = true,
 }: {
   title: string;
   description?: string;
@@ -75,8 +78,15 @@ export function Modal({
   onClose: () => void;
   className?: string;
   busy?: boolean;
+  closeRequested?: boolean;
+  focusTitle?: boolean;
 }) {
   const [open, setOpen] = useState(true);
+  // Avoid opening the Close tooltip as a side effect of dialog autofocus.
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (closeRequested) setOpen(false);
+  }, [closeRequested]);
   // These dialogs can open from a shortcut, without a Dialog.Trigger.
   const [origin] = useState(() =>
     document.activeElement instanceof HTMLElement
@@ -95,29 +105,40 @@ export function Modal({
     >
       <Dialog.Content
         className={"app-modal " + className}
+        initialFocus={focusTitle ? titleRef : undefined}
         finalFocus={() => (origin?.isConnected ? origin : true)}
       >
-        <div className="modal-header">
-          <div>
-            <Dialog.Title>{title}</Dialog.Title>
-            {description && (
-              <Dialog.Description>{description}</Dialog.Description>
-            )}
-          </div>
-          <Dialog.Close
-            render={
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Close dialog"
+        <HintScope>
+          <div className="modal-header">
+            <div>
+              <Dialog.Title
+                ref={titleRef}
+                tabIndex={focusTitle ? -1 : undefined}
+              >
+                {title}
+              </Dialog.Title>
+              {description && (
+                <Dialog.Description>{description}</Dialog.Description>
+              )}
+            </div>
+            <ActionHint label="Close dialog" shortcut="Esc">
+              <Dialog.Close
                 disabled={busy}
-              />
-            }
-          >
-            <Icon name="close" size={18} />
-          </Dialog.Close>
-        </div>
-        {children}
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Close dialog"
+                    disabled={busy}
+                  />
+                }
+              >
+                <Icon name="close" size={18} />
+              </Dialog.Close>
+            </ActionHint>
+          </div>
+          {children}
+        </HintScope>
       </Dialog.Content>
     </Dialog.Root>
   );
@@ -125,9 +146,13 @@ export function Modal({
 export function MiniCover({ kind, url = "" }: { kind: Kind; url?: string }) {
   const [failed, setFailed] = useState("");
   const [loaded, setLoaded] = useState("");
-  const src = safeURL(url);
+  const src = imageURL(url);
   return (
-    <span className={"mini-cover mini-" + kind} aria-hidden="true">
+    <span
+      className={"mini-cover mini-" + kind}
+      data-empty={!src || src === failed || undefined}
+      aria-hidden="true"
+    >
       <Icon name={kind} size={20} />
       {src && src !== failed && (
         <img
@@ -147,11 +172,13 @@ export function EmptyState({
   discovery = false,
   filtered = false,
   done = false,
+  review = false,
   action,
 }: {
   discovery?: boolean;
   filtered?: boolean;
   done?: boolean;
+  review?: boolean;
   action?: ReactNode;
 }) {
   return (
@@ -167,20 +194,24 @@ export function EmptyState({
       <h2>
         {filtered
           ? "Nothing matches yet."
-          : discovery
-            ? "You’re all caught up."
-            : done
-              ? "Your finished reads go here."
-              : "Something worth keeping?"}
+          : review
+            ? "All captures reviewed."
+            : discovery
+              ? "You’re all caught up."
+              : done
+                ? "Your finished reads go here."
+                : "Something worth keeping?"}
       </h2>
       <p>
         {filtered
           ? "Try another search or clear your filters."
-          : discovery
-            ? "Your sources keep collecting in the background. Save the articles you want to come back to."
-            : done
-              ? "Mark an item done when you’re finished. It stays here whenever you want to find it again."
-              : "Save a link or a title. It stays private until you choose to share it."}
+          : review
+            ? "New captures from the extension, integrations, and automatic saves will appear here. Reviewing keeps completion separate."
+            : discovery
+              ? "Your sources keep collecting in the background. Save the articles you want to come back to."
+              : done
+                ? "Mark an item done when you’re finished. It stays here whenever you want to find it again."
+                : "Save a link or a title. It stays private until you choose to share it."}
       </p>
       {action}
     </div>

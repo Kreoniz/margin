@@ -15,6 +15,7 @@ import (
 const maxSecretFileSize = 64 << 10
 
 type config struct {
+	devMode        bool
 	databaseURL    string
 	port           string
 	password       string
@@ -25,6 +26,7 @@ type config struct {
 
 func loadConfig() (config, error) {
 	var c config
+	c.devMode = os.Getenv("MARGIN_DEV_MODE") == "1"
 	var err error
 	c.databaseURL, err = secretValue("DATABASE_URL")
 	if err != nil {

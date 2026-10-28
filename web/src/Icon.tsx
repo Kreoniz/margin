@@ -95,14 +95,14 @@ export function Logo({ small = false }: { small?: boolean }) {
         <path
           d="M9 31V8l11 12L31 8v23M5 8h4m22 0h4"
           stroke="currentColor"
-          strokeWidth="2.8"
+          strokeWidth="3.1"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
         <path
           d="M20 27v8"
           stroke="currentColor"
-          strokeWidth="2.8"
+          strokeWidth="3.1"
           strokeLinecap="round"
         />
       </svg>

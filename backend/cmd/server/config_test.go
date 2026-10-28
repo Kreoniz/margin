@@ -96,6 +96,7 @@ func TestLoadConfig(t *testing.T) {
 		wantErr string
 	}{
 		{name: "defaults", env: map[string]string{"DATABASE_URL": "database-secret"}, want: config{databaseURL: "database-secret", port: "8080", staticDir: "../web/dist"}},
+		{name: "development opt-in", env: map[string]string{"DATABASE_URL": "database-secret", "MARGIN_DEV_MODE": "1"}, want: config{databaseURL: "database-secret", port: "8080", staticDir: "../web/dist", devMode: true}},
 		{name: "trusted proxy", env: map[string]string{"DATABASE_URL": "database-secret", "TRUSTED_PROXIES": "192.0.2.4/32"}, want: config{databaseURL: "database-secret", port: "8080", staticDir: "../web/dist", trustedProxies: []netip.Prefix{netip.MustParsePrefix("192.0.2.4/32")}}},
 		{name: "reject broad proxy trust", env: map[string]string{"DATABASE_URL": "database-secret", "TRUSTED_PROXIES": "192.0.2.0/24"}, wantErr: "invalid trusted proxy configuration: expected exact IP prefixes (/32 or /128)"},
 		{name: "SOCKS egress", env: map[string]string{"DATABASE_URL": "database-secret", "SOCKS_PROXY_ADDRESS": "172.30.0.1:11080", "SOCKS_PROXY_HOSTS": "thinkingmachines.ai"}, want: config{databaseURL: "database-secret", port: "8080", staticDir: "../web/dist", fetcher: app.FetcherConfig{SOCKSProxyAddress: "172.30.0.1:11080", SOCKSProxyHosts: "thinkingmachines.ai"}}},
@@ -111,7 +112,7 @@ func TestLoadConfig(t *testing.T) {
 		{name: "invalid file password", env: map[string]string{"DATABASE_URL": "database-secret"}, files: map[string]string{"APP_PASSWORD": "short\n"}, wantErr: "APP_PASSWORD: password must contain at least 12 characters and at most 1024 bytes"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			for _, name := range []string{"DATABASE_URL", "DATABASE_URL_FILE", "APP_PASSWORD", "APP_PASSWORD_FILE", "PORT", "STATIC_DIR", "TRUSTED_PROXIES", "SOCKS_PROXY_ADDRESS", "SOCKS_PROXY_HOSTS"} {
+			for _, name := range []string{"MARGIN_DEV_MODE", "DATABASE_URL", "DATABASE_URL_FILE", "APP_PASSWORD", "APP_PASSWORD_FILE", "PORT", "STATIC_DIR", "TRUSTED_PROXIES", "SOCKS_PROXY_ADDRESS", "SOCKS_PROXY_HOSTS"} {
 				t.Setenv(name, "")
 			}
 			for name, value := range tc.env {

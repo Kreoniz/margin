@@ -27,7 +27,7 @@ func sampleStore(t *testing.T) (*Store, []Media) {
 func sampleSnapshot(t *testing.T, s *Store) string {
 	t.Helper()
 	var snapshot string
-	if err := s.Pool.QueryRow(context.Background(), "SELECT jsonb_agg(to_jsonb(m) ORDER BY id)::text FROM media m WHERE is_demo").Scan(&snapshot); err != nil {
+	if err := s.Pool.QueryRow(context.Background(), "SELECT jsonb_agg((to_jsonb(m) - 'needs_review' - 'metadata_state' - 'metadata_warning' - 'metadata_lease_token' - 'metadata_lease_until') ORDER BY id)::text FROM media m WHERE is_demo").Scan(&snapshot); err != nil {
 		t.Fatal(err)
 	}
 	return snapshot
@@ -73,8 +73,12 @@ func TestSampleKeyMigrationFrom002PreservesRowsAndSeenHistory(t *testing.T) {
 	if sampleSnapshot(t, s) != beforeSamples || seenSnapshot() != beforeSeen {
 		t.Fatal("003 changed sample data or historical seen keys")
 	}
+	migrationFiles, err := migrations.ReadDir("migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
 	var applied int
-	if err = s.Pool.QueryRow(ctx, "SELECT count(*) FROM schema_migrations").Scan(&applied); err != nil || applied != 3 {
+	if err = s.Pool.QueryRow(ctx, "SELECT count(*) FROM schema_migrations").Scan(&applied); err != nil || applied != len(migrationFiles) {
 		t.Fatalf("migration ledger: %d %v", applied, err)
 	}
 	// Exercise both repaired indexes on the upgraded database.

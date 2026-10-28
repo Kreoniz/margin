@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Margin capture settings</title>
+    <link rel="icon" href="icons/icon32.png" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="settings">
+    <main>
+      <header class="header">
+        <div class="brand">
+          <img src="icons/icon128.png" alt="" width="28" height="28" /><span
+            >margin<span class="dot">.</span></span
+          >
+        </div>
+        <span class="muted">Browser capture</span>
+      </header>
+      <h1>Connect your library.</h1>
+      <p class="muted">
+        Set this up once. Then save a page or mark it done without leaving it.
+      </p>
+      <section class="settings-section" aria-labelledby="connection-heading">
+        <h2 id="connection-heading">Connection</h2>
+        <p class="hint">
+          Get a browser token from Margin → Settings → Helium / browser capture.
+        </p>
+        <form id="connection" novalidate>
+          <label for="origin">Margin address</label>
+          <input
+            id="origin"
+            type="url"
+            required
+            inputmode="url"
+            autocomplete="url"
+            spellcheck="false"
+            placeholder="http://localhost:5178"
+            aria-describedby="origin-hint"
+          />
+          <p id="origin-hint" class="hint">
+            Paste your Margin URL. We’ll use its site address.
+          </p>
+          <label for="token">Browser token</label>
+          <div class="token-field">
+            <input
+              id="token"
+              type="password"
+              required
+              autocomplete="off"
+              spellcheck="false"
+              aria-describedby="token-hint"
+            /><button
+              id="show-token"
+              type="button"
+              class="secondary"
+              aria-label="Show browser token"
+              aria-pressed="false"
+            >
+              Show
+            </button>
+          </div>
+          <p id="token-hint" class="hint">
+            Stored in this browser. Use the browser capture token, not a
+            submission token.
+          </p>
+          <button id="save" type="submit">Save connection</button>
+        </form>
+        <p id="status" class="status" role="status" hidden></p>
+      </section>
+      <section class="settings-section" aria-labelledby="shortcuts-heading">
+        <h2 id="shortcuts-heading">Your shortcuts</h2>
+        <dl id="command-list" class="command-list"></dl>
+        <button id="shortcuts" class="secondary" type="button">
+          Configure browser shortcuts
+        </button>
+        <p class="hint">
+          Open capture, then press S to save or D to mark done. H/L and arrow
+          keys move between the actions. These letter keys work inside the
+          popup.
+        </p>
+        <p class="hint">
+          Direct Save and Done browser shortcuts are optional. If a shortcut is
+          unassigned or taken, choose one in your browser’s extension settings.
+        </p>
+      </section>
+      <p class="hint">
+        New captures are private. Review details, change visibility, or revoke
+        the browser token in Margin.
+      </p>
+    </main>
+    <script src="options.js" type="module"></script>
+  </body>
+</html>

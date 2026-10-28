@@ -182,11 +182,13 @@ type FetchResult struct {
 	ContentType string
 }
 type Fetcher struct {
-	client     *http.Client
-	resolve    func(context.Context, string) ([]netip.Addr, error)
-	dial       func(context.Context, string, string) (net.Conn, error)
-	socksDial  func(context.Context, string, string) (net.Conn, error)
-	socksHosts map[string]struct{}
+	metadataFeeds publisherFeedCache
+	books         bookSearchState
+	client        *http.Client
+	resolve       func(context.Context, string) ([]netip.Addr, error)
+	dial          func(context.Context, string, string) (net.Conn, error)
+	socksDial     func(context.Context, string, string) (net.Conn, error)
+	socksHosts    map[string]struct{}
 }
 
 const fetchDialTimeout = 5 * time.Second

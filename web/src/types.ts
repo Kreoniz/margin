@@ -13,6 +13,9 @@ export type Kind = (typeof kinds)[number];
 export type Status = "pending" | "done";
 export type Visibility = "private" | "public";
 export interface Media {
+  metadata_state?: "pending" | "ready" | "partial";
+  metadata_warning?: string;
+  needs_review?: boolean;
   id: string;
   title: string;
   author: string;
@@ -28,10 +31,19 @@ export interface Media {
   updated_at: string;
   completed_at?: string;
 }
-export type PublicMedia = Omit<Media, "notes">;
+export type PublicMedia = Omit<
+  Media,
+  "notes" | "needs_review" | "metadata_state" | "metadata_warning"
+>;
 export type MediaDraft = Omit<
   Media,
-  "id" | "created_at" | "updated_at" | "completed_at"
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "completed_at"
+  | "needs_review"
+  | "metadata_state"
+  | "metadata_warning"
 >;
 export interface InboxItem {
   id: string;
@@ -61,6 +73,8 @@ export interface Source {
   item_count: number;
 }
 export interface LibraryData {
+  dev_mode?: boolean;
+  dev_fixture_count?: number;
   media: Media[];
   inbox: InboxItem[];
   sources: Source[];

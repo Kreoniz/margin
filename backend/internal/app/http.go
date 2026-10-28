@@ -18,6 +18,7 @@ import (
 )
 
 type Server struct {
+	DevMode   bool
 	Store     *Store
 	Fetcher   *Fetcher
 	Worker    *Worker
@@ -30,6 +31,10 @@ type Server struct {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	if s.DevMode {
+		mux.HandleFunc("POST /api/dev/fixtures", s.devFixtures)
+		mux.HandleFunc("DELETE /api/dev/fixtures", s.devFixtures)
+	}
 	mux.HandleFunc("GET /api/session", s.session)
 	mux.HandleFunc("POST /api/setup", func(w http.ResponseWriter, r *http.Request) { s.signIn(w, r, true) })
 	mux.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) { s.signIn(w, r, false) })
@@ -66,6 +71,14 @@ func (s *Server) Handler() http.Handler {
 		respond(w, 204, nil, s.Store.DeleteMedia(r.Context(), r.PathValue("id")))
 	})
 	mux.HandleFunc("POST /api/metadata", s.metadata)
+	mux.HandleFunc("POST /api/books/search", s.searchBooks)
+	mux.HandleFunc("POST /api/images", s.uploadImage)
+	mux.HandleFunc("GET /api/images/{id}", s.image)
+	mux.HandleFunc("GET /api/export", s.exportLibrary)
+	mux.HandleFunc("GET /api/integration/browser-token", s.browserTokenStatus)
+	mux.HandleFunc("POST /api/integration/browser-token", s.rotateBrowserToken)
+	mux.HandleFunc("DELETE /api/integration/browser-token", s.revokeBrowserToken)
+	mux.HandleFunc("POST /api/integrations/capture", s.captureItem)
 	mux.HandleFunc("PATCH /api/inbox/{id}", s.patchInbox)
 	mux.HandleFunc("POST /api/inbox/{id}/save", func(w http.ResponseWriter, r *http.Request) {
 		if !requireID(w, r) {
@@ -120,12 +133,22 @@ func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, nil, err)
 		return
 	}
+	fixtureCount := 0
+	if s.DevMode {
+		fixtureCount, err = s.Store.devFixtureCount(r.Context())
+		if err != nil {
+			respond(w, 500, nil, err)
+			return
+		}
+	}
 	writeJSON(w, 200, struct {
+		DevMode           bool        `json:"dev_mode"`
+		DevFixtureCount   int         `json:"dev_fixture_count"`
 		LegacySampleCount int         `json:"legacy_sample_count"`
 		Media             []Media     `json:"media"`
 		Inbox             []InboxItem `json:"inbox"`
 		Sources           []Source    `json:"sources"`
-	}{count, media, inbox, sources})
+	}{s.DevMode, fixtureCount, count, media, inbox, sources})
 }
 func (s *Server) createMedia(w http.ResponseWriter, r *http.Request) {
 	var in MediaInput
@@ -138,6 +161,9 @@ func (s *Server) createMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m, err = s.Store.CreateMedia(r.Context(), m)
+	if err == nil && m.MetadataState == "pending" && s.Worker != nil {
+		s.Worker.TriggerMetadata()
+	}
 	respond(w, 201, m, err)
 }
 func (s *Server) patchMedia(w http.ResponseWriter, r *http.Request) {
@@ -149,6 +175,9 @@ func (s *Server) patchMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m, err := s.Store.PatchMedia(r.Context(), r.PathValue("id"), in)
+	if err == nil && m.MetadataState == "pending" && s.Worker != nil {
+		s.Worker.TriggerMetadata()
+	}
 	respond(w, 200, m, err)
 }
 func (s *Server) metadata(w http.ResponseWriter, r *http.Request) {
@@ -308,7 +337,7 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 				writeJSON(w, 500, map[string]string{"error": "Internal server error"})
 			}
 		}()
-		if !oneOf(r.Method, "GET", "HEAD", "OPTIONS") && !sameOrigin(r) {
+		if !oneOf(r.Method, "GET", "HEAD", "OPTIONS") && r.URL.Path != "/api/integrations/capture" && !sameOrigin(r) {
 			writeJSON(w, 403, map[string]string{"error": "Mutation requests must come from the same origin"})
 			return
 		}
@@ -318,7 +347,7 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 			r = r.WithContext(ctx)
 		}
 		path := r.URL.Path
-		publicPath := path == "/api/health" || path == "/api/session" || path == "/api/setup" || path == "/api/login" || path == "/api/logout" || path == "/api/integrations/items" || strings.HasPrefix(path, "/api/public/")
+		publicPath := path == "/api/health" || path == "/api/session" || path == "/api/setup" || path == "/api/login" || path == "/api/logout" || path == "/api/integrations/items" || path == "/api/integrations/capture" || (strings.HasPrefix(path, "/api/images/") && oneOf(r.Method, "GET", "HEAD")) || strings.HasPrefix(path, "/api/public/")
 		if strings.HasPrefix(path, "/api/public/") && !oneOf(r.Method, "GET", "HEAD") {
 			writeJSON(w, 405, map[string]string{"error": "Public library is read-only"})
 			return

@@ -13,7 +13,8 @@ const test = base.extend({
   },
 });
 let ownerState:
-  Awaited<ReturnType<APIRequestContext["storageState"]>> | undefined;
+  | Awaited<ReturnType<APIRequestContext["storageState"]>>
+  | undefined;
 const password = process.env.E2E_OWNER_PASSWORD || "qa-only-owner-password";
 const baseURL = process.env.BASE_URL || "http://127.0.0.1:5178";
 const ownedTitles = new Set<string>();
@@ -95,7 +96,7 @@ test("access: first-run setup or login, private empty list and logout", async ({
   request,
 }, info) => {
   const session = await (await request.get("/api/session")).json();
-  await page.goto("/");
+  await page.goto("/dashboard");
   if (session.setup_required) {
     await expect(
       page.getByRole("heading", { name: "Make it yours." }),
@@ -146,7 +147,7 @@ test("compact library supports title-only adding, two-state toggles, editing, se
   const name = title("reading list");
   const edited = name + " edited";
   ownedTitles.add(edited);
-  await page.goto("/");
+  await page.goto("/dashboard");
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page).getByRole("textbox", { name: "Title or URL" }).fill(name);
   await dialog(page)
@@ -177,6 +178,9 @@ test("compact library supports title-only adding, two-state toggles, editing, se
     .getByRole("textbox", { name: "Title", exact: true })
     .fill(edited);
   await dialog(page)
+    .getByText("Details, image & note", { exact: true })
+    .click();
+  await dialog(page)
     .getByRole("textbox", { name: "Creator (optional)" })
     .fill("A test creator");
   await dialog(page)
@@ -186,6 +190,7 @@ test("compact library supports title-only adding, two-state toggles, editing, se
     .getByRole("textbox", { name: "Private note" })
     .fill("Owner-only test note.");
   await dialog(page).getByRole("button", { name: "Save changes" }).click();
+  await expect(dialog(page)).toHaveCount(0);
   await page.reload();
   await page
     .getByRole("searchbox", { name: "Search library" })
@@ -219,7 +224,7 @@ test("compact library supports title-only adding, two-state toggles, editing, se
   ).toBeVisible();
 });
 
-test("URL capture extracts editable metadata, preserves chosen type and uses canonical URL", async ({
+test("URL capture extracts editable metadata and preserves chosen type", async ({
   page,
 }) => {
   const name = title("URL capture");
@@ -238,14 +243,14 @@ test("URL capture extracts editable metadata, preserves chosen type and uses can
       },
     });
   });
-  await page.goto("/");
+  await page.goto("/dashboard");
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page)
     .getByRole("textbox", { name: "Title or URL" })
     .fill("https://example.com/qa-redirect");
   await expect(
     dialog(page).getByRole("button", { name: "Add to library", exact: true }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   await dialog(page)
     .getByRole("combobox", { name: "Type", exact: true })
     .click();
@@ -280,7 +285,7 @@ test("switching URL capture to a manual title clears fetched details and preserv
       },
     }),
   );
-  await page.goto("/");
+  await page.goto("/dashboard");
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page)
     .getByRole("textbox", { name: "Title or URL" })
@@ -288,7 +293,9 @@ test("switching URL capture to a manual title clears fetched details and preserv
   await expect(
     dialog(page).getByRole("textbox", { name: "Title", exact: true }),
   ).toHaveValue("Fetched test page");
-  await dialog(page).getByText("Details & note", { exact: true }).click();
+  await dialog(page)
+    .getByText("Details, image & note", { exact: true })
+    .click();
   await dialog(page)
     .getByRole("textbox", { name: "Creator (optional)" })
     .fill("My own creator");
@@ -371,7 +378,7 @@ test("private and public items have owner-only edits and notes never leak", asyn
     );
     await checkAccess(publicPage);
     await context.close();
-    await page.goto("/");
+    await page.goto("/dashboard");
     await page
       .getByRole("button", { name: "Edit " + publicTitle, exact: true })
       .click();
@@ -382,6 +389,7 @@ test("private and public items have owner-only edits and notes never leak", asyn
       .getByRole("option", { name: "Private · only you", exact: true })
       .click();
     await dialog(page).getByRole("button", { name: "Save changes" }).click();
+    await expect(dialog(page)).toHaveCount(0);
     expect(
       (await guest.get("/api/public/media/" + publicItem.id)).status(),
     ).toBe(404);
@@ -466,7 +474,7 @@ test("discovery remains separate while saving, dismissing and reading", async ({
     has: page.getByRole("link", { name: article.title, exact: true }),
   });
   try {
-    await page.goto("/#discover");
+    await page.goto("/dashboard#discover");
     await page
       .getByRole("searchbox", { name: "Search discoveries" })
       .fill(article.title);
@@ -525,7 +533,7 @@ test("source auto-save settings persist and dialogs are accessible on mobile and
     (s: { name: string }) => s.name === "Hugging Face",
   );
   try {
-    await page.goto("/#discover");
+    await page.goto("/dashboard#discover");
     await page.getByRole("button", { name: "Sources", exact: true }).click();
     const row = page.locator(".source-row").filter({
       has: page.getByRole("heading", { name: "Hugging Face", exact: true }),
@@ -578,7 +586,7 @@ test("empty library, real discoveries, keyboard navigation and two-state UI rema
 }, info) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(
     page.getByText("Something worth keeping?", { exact: true }),
   ).toBeVisible();
@@ -613,7 +621,7 @@ test("empty library, real discoveries, keyboard navigation and two-state UI rema
 test("TanStack shortcuts respect typing and dialogs and submit the editor once", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const search = page.getByRole("searchbox", { name: "Search library" });
   await expect(search).toBeVisible();
   const mod = (await page.locator(".search-box kbd").innerText()).includes("⌘")
@@ -660,7 +668,7 @@ test("TanStack shortcuts respect typing and dialogs and submit the editor once",
 test("single-key shortcuts can be disabled without disabling modifier shortcuts", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByRole("searchbox")).toBeVisible();
   const mod = (await page.locator(".search-box kbd").innerText()).includes("⌘")
     ? "Meta"
@@ -692,6 +700,244 @@ test("single-key shortcuts can be disabled without disabling modifier shortcuts"
   await checkAccess(page);
 });
 
+test("Vim navigation moves through rows, tabs and pages without colliding with go sequences", async ({
+  page,
+  request,
+}) => {
+  const items = [];
+  for (let index = 0; index < 4; index++) {
+    const response = await request.post("/api/media", {
+      data: {
+        title: title("Vim navigation " + index),
+        status: index === 3 ? "done" : "pending",
+        needs_review: index === 1,
+      },
+    });
+    expect(response.status()).toBe(201);
+    items.push(await response.json());
+  }
+  await page.route("**/api/bootstrap", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: { ...(await response.json()), inbox: [] },
+    });
+  });
+  await page.goto("/dashboard");
+  const rows = page.locator(".media-row");
+  const tabs = page.locator(".list-tabs");
+  await expect(rows).toHaveCount(3);
+  await page.locator("main").focus();
+  await page.keyboard.press("j");
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press("j");
+  await expect(rows.nth(1)).toBeFocused();
+  await page.keyboard.press("k");
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press("Shift+G");
+  await expect(rows.last()).toBeFocused();
+  await page.keyboard.press("g");
+  await page.keyboard.press("g");
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press("l");
+  await expect(
+    tabs.getByRole("button", { name: "Done", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(rows).toHaveCount(1);
+  await page.keyboard.press("l");
+  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("l");
+  await expect(
+    tabs.getByRole("button", { name: "All", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(rows).toHaveCount(4);
+  await page.keyboard.press("h");
+  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("[");
+  await expect(
+    tabs.getByRole("button", { name: "Done", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("]");
+  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("Shift+L");
+  await expect(
+    page.getByRole("heading", { name: "Discover.", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("l");
+  await expect(
+    tabs.getByRole("button", { name: "Saved", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".article-row")).toHaveCount(0);
+  await page.keyboard.press("l");
+  await expect(
+    tabs.getByRole("button", { name: "Read", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("h");
+  await expect(
+    tabs.getByRole("button", { name: "Saved", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Shift+H");
+  await expect(
+    page.getByRole("heading", { name: "Your library.", exact: true }),
+  ).toBeVisible();
+  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("g");
+  await page.keyboard.press("d");
+  await expect(
+    page.getByRole("heading", { name: "Discover.", exact: true }),
+  ).toBeVisible();
+  await expect(
+    tabs.getByRole("button", { name: "Saved", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("g");
+  await page.keyboard.press("l");
+  await expect(
+    page.getByRole("heading", { name: "Your library.", exact: true }),
+  ).toBeVisible();
+  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("g");
+  await page.keyboard.press("s");
+  await expect(
+    dialog(page).getByRole("heading", { name: "Your sources", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+  const stored = await (await request.get("/api/media")).json();
+  for (const item of items)
+    expect(
+      stored.find((candidate: { id: string }) => candidate.id === item.id),
+    ).toMatchObject({ status: item.status, needs_review: item.needs_review });
+  await checkAccess(page);
+});
+
+test("Vim keys leave typing, widgets and dialogs alone and follow the shortcut preference", async ({
+  page,
+  request,
+}) => {
+  expect(
+    (
+      await request.post("/api/media", {
+        data: { title: title("Vim focus guard") },
+      })
+    ).status(),
+  ).toBe(201);
+  await page.goto("/dashboard");
+  const search = page.getByRole("searchbox", {
+    name: "Search library",
+    exact: true,
+  });
+  await search.click();
+  await search.pressSequentially("hlgg");
+  await page.keyboard.press("Shift+H");
+  await page.keyboard.press("Shift+L");
+  await expect(search).toHaveValue("hlggHL");
+  await expect(search).toBeFocused();
+  await search.fill("");
+  const type = page.getByRole("combobox", {
+    name: "Filter media type",
+    exact: true,
+  });
+  await type.click();
+  await page.keyboard.press("h");
+  await page.keyboard.press("l");
+  await page.keyboard.press("Shift+L");
+  await expect(
+    page.getByRole("heading", { name: "Your library.", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator(".list-tabs")
+      .getByRole("button", { name: "To read/watch", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await page.locator("main").focus();
+  await page.keyboard.press("n");
+  const capture = dialog(page).getByRole("textbox", {
+    name: "Title or URL",
+    exact: true,
+  });
+  await capture.pressSequentially("hlgg");
+  await page.keyboard.press("Shift+L");
+  await expect(capture).toHaveValue("hlggL");
+  const close = dialog(page).getByRole("button", {
+    name: "Close dialog",
+    exact: true,
+  });
+  await close.focus();
+  for (const key of ["h", "l", "Shift+H", "Shift+L", "Shift+G", "g", "g"])
+    await page.keyboard.press(key);
+  await expect(dialog(page)).toBeVisible();
+  await expect(capture).toHaveValue("hlggL");
+  await expect(page).not.toHaveURL(/#discover$/);
+  await dialog(page)
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await expect(dialog(page)).toHaveCount(0);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const quickKeys = dialog(page).getByRole("checkbox", {
+    name: /Enable single-key shortcuts/,
+  });
+  await quickKeys.click();
+  await expect(quickKeys).not.toBeChecked();
+  await dialog(page)
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
+  await expect(dialog(page)).toHaveCount(0);
+  await page.reload();
+  await expect(search).toBeVisible();
+  await page.locator("main").focus();
+  for (const key of [
+    "l",
+    "h",
+    "Shift+L",
+    "Shift+H",
+    "j",
+    "k",
+    "Shift+G",
+    "g",
+    "g",
+  ])
+    await page.keyboard.press(key);
+  await expect(page.locator("main")).toBeFocused();
+  await expect(
+    page
+      .locator(".list-tabs")
+      .getByRole("button", { name: "To read/watch", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page).not.toHaveURL(/#discover$/);
+  await page.keyboard.press((await modifier(page)) + "+k");
+  await expect(search).toBeFocused();
+  await page.keyboard.press("F1");
+  await expect(
+    dialog(page).getByRole("heading", {
+      name: "Keyboard shortcuts",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    dialog(page).getByText("Shift+H / Shift+L", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog(page).getByText("g then g / Shift+G", { exact: true }),
+  ).toBeVisible();
+  await checkAccess(page);
+});
+
 test("rows move smoothly and reduced motion removes movement and dialog transitions", async ({
   page,
   request,
@@ -706,7 +952,7 @@ test("rows move smoothly and reduced motion removes movement and dialog transiti
     ids.push((await response.json()).id);
   }
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/");
+  await page.goto("/dashboard");
   const rows = page.locator(".media-row");
   await expect(rows).toHaveCount(2);
   const moving = rows.filter({ hasText: names[0] });
@@ -741,7 +987,7 @@ test("compact navigation exposes sources and source controls persist without ove
   page,
   request,
 }, info) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(
     page.getByRole("heading", { name: "Your library." }),
   ).toBeVisible();
@@ -847,7 +1093,7 @@ test("keyboard-only library navigation supports opening, editing, completion, un
       ).status(),
     ).toBe(201);
   }
-  await page.goto("/");
+  await page.goto("/dashboard");
   const rows = page.locator(".media-row");
   await expect(rows).toHaveCount(3);
   const mod = await modifier(page);
@@ -932,11 +1178,16 @@ test("keyboard navigation reaches items beyond the first page", async ({
       ).status(),
     ).toBe(201);
   }
-  await page.goto("/");
+  await page.goto("/dashboard");
   const rows = page.locator(".media-row");
   await expect(rows).toHaveCount(40);
-  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+G");
   await expect(rows).toHaveCount(44);
+  await expect(rows.last()).toBeFocused();
+  await page.keyboard.press("g");
+  await page.keyboard.press("g");
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press("Shift+G");
   await expect(rows.last()).toBeFocused();
   if (info.project.name === "desktop") {
     const hiddenID = await rows.last().getAttribute("data-row-id");
@@ -1007,7 +1258,7 @@ test("keyboard-only discovery supports save, read, dismiss, undo and opening the
   );
   let savedURL: string | undefined;
   try {
-    await page.goto("/#discover");
+    await page.goto("/dashboard#discover");
     const rows = page.locator(".article-row");
     await expect(rows.first()).toBeVisible();
     await page.keyboard.press("ArrowDown");
@@ -1064,7 +1315,8 @@ test("keyboard-only discovery supports save, read, dismiss, undo and opening the
     await original.close();
     await page.bringToFront();
     await expect(page.locator(`[data-row-id="${openID}"]`)).toHaveCount(0);
-    await page.keyboard.press("Alt+s");
+    await page.keyboard.press("g");
+    await page.keyboard.press("s");
     await expect(
       page.getByRole("heading", { name: "Your sources" }),
     ).toBeVisible();
@@ -1090,7 +1342,7 @@ test("dark is the default, settings has a full hit area, and theme persists thro
   await page.addInitScript(() =>
     localStorage.setItem("margin-appearance", "light"),
   );
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.locator(".app-theme")).toHaveAttribute(
     "data-appearance",
     "dark",
@@ -1160,4 +1412,1105 @@ test("dark is the default, settings has a full hit area, and theme persists thro
   );
   await page.keyboard.press("Enter");
   await checkAccess(page);
+});
+
+test("public root stays a Collection for visitors and signed-in owners", async ({
+  page,
+  request,
+  browser,
+}) => {
+  const name = title("Collection book");
+  await request.post("/api/media", {
+    data: { title: name, kind: "book", visibility: "public" },
+  });
+  for (const signedIn of [true, false]) {
+    const guest = signedIn ? undefined : await browser.newContext();
+    const surface = guest ? await guest.newPage() : page;
+    await surface.goto(baseURL + "/");
+    await expect(
+      surface.getByRole("heading", { name: "Collection." }),
+    ).toBeVisible();
+    await expect(surface.getByRole("link", { name })).toBeVisible();
+    await expect(
+      surface.getByRole("link", { name: /sign in|private library/i }),
+    ).toHaveCount(0);
+    await expect(
+      surface.getByRole("button", { name: "Settings", exact: true }),
+    ).toHaveCount(0);
+    const cover = surface.locator(".collection-card .mini-cover");
+    expect((await cover.boundingBox())!.height).toBeGreaterThanOrEqual(96);
+    expect((await cover.boundingBox())!.height).toBeLessThanOrEqual(160);
+    await checkAccess(surface);
+    await guest?.close();
+  }
+});
+
+test("metadata lookup never blocks saving", async ({ page, request }) => {
+  const name = title("Fast capture");
+  await page.route("**/api/metadata", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    await route
+      .fulfill({
+        json: {
+          title: "Late metadata",
+          author: "Late creator",
+          kind: "article",
+          url: "https://example.com/fast",
+          cover_url: "",
+          description: "",
+        },
+      })
+      .catch(() => {});
+  });
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  await dialog(page)
+    .getByRole("textbox", { name: "Title or URL" })
+    .fill("https://example.com/fast-" + Date.now());
+  await dialog(page)
+    .getByRole("textbox", { name: "Title", exact: true })
+    .fill(name);
+  await expect(
+    dialog(page).getByRole("button", { name: "Add to library", exact: true }),
+  ).toBeEnabled();
+  await page.keyboard.press((await modifier(page)) + "+Enter");
+  await expect(dialog(page)).toHaveCount(0);
+  await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+  expect(
+    (await (await request.get("/api/media")).json()).find(
+      (m: { title: string }) => m.title === name,
+    ),
+  ).toBeTruthy();
+});
+
+test("book ISBN resolves automatically with an optional keyboard correction", async ({
+  page,
+  request,
+}) => {
+  const first = title("Automatic edition"),
+    second = title("Corrected edition");
+  await page.route("**/api/books/search", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            title: first,
+            author: "First writer",
+            kind: "book",
+            url: "https://openlibrary.org/books/OL1M",
+            cover_url: "",
+            description: "",
+          },
+          {
+            title: second,
+            author: "Second writer",
+            kind: "book",
+            url: "https://openlibrary.org/books/OL2M",
+            cover_url: "",
+            description: "",
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  await dialog(page)
+    .getByRole("textbox", { name: "Title or URL" })
+    .fill("9780132350884");
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Title", exact: true }),
+  ).toHaveValue(first);
+  await dialog(page)
+    .getByRole("button", { name: "Correct book match" })
+    .click();
+  const radio = dialog(page).getByRole("radio");
+  await expect(radio.first()).toBeChecked();
+  await radio.first().focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(radio.nth(1)).toBeChecked();
+  await page.keyboard.press((await modifier(page)) + "+Enter");
+  await expect(dialog(page)).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: second, exact: true }),
+  ).toBeVisible();
+  const item = (await (await request.get("/api/media")).json()).find(
+    (m: { title: string }) => m.title === second,
+  );
+  expect(item).toMatchObject({
+    kind: "book",
+    author: "Second writer",
+    url: "https://openlibrary.org/books/OL2M",
+  });
+});
+
+test("external captures are reviewed explicitly without changing completion", async ({
+  page,
+  request,
+}) => {
+  const name = title("External review");
+  const token = (await (await request.post("/api/integration/token")).json())
+    .token;
+  const receipt = await request.post("/api/integrations/items", {
+    headers: { Authorization: "Bearer " + token },
+    data: { title: name },
+  });
+  expect(receipt.status()).toBe(201);
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: /To review/ }).click();
+  const row = page.locator(".media-row").filter({ hasText: name });
+  await expect(row).toBeVisible();
+  await expect(row.getByRole("checkbox")).not.toBeChecked();
+  await page.reload();
+  await page.getByRole("button", { name: /To review/ }).click();
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: "Mark reviewed: " + name }).click();
+  await expect(row).toHaveCount(0);
+  const item = (await (await request.get("/api/media")).json()).find(
+    (m: { title: string }) => m.title === name,
+  );
+  expect(item).toMatchObject({ needs_review: false, status: "pending" });
+});
+
+test("local image uploads resize before sending and preserve private access", async ({
+  page,
+  request,
+  playwright,
+}) => {
+  const name = title("Custom image");
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  await dialog(page).getByRole("textbox", { name: "Title or URL" }).fill(name);
+  await page.keyboard.press((await modifier(page)) + "+Shift+d");
+  const fixture = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 3200;
+    canvas.height = 2400;
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = "#89cdb0";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  const upload = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === "/api/images",
+  );
+  await dialog(page)
+    .getByLabel("Upload image")
+    .setInputFiles({
+      name: "large-cover.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(fixture, "base64"),
+    });
+  const uploaded = await upload;
+  expect(uploaded.status()).toBe(201); // Server rejects unresized images over 1600px.
+  const path = (await uploaded.json()).url;
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Image URL (optional)" }),
+  ).toHaveValue(path);
+  await page.keyboard.press((await modifier(page)) + "+Enter");
+  await expect(dialog(page)).toHaveCount(0);
+  const row = page.locator(".media-row").filter({ hasText: name });
+  await expect(row.locator("img")).toBeVisible();
+  await expect
+    .poll(() =>
+      row
+        .locator("img")
+        .evaluate((image) => (image as HTMLImageElement).naturalWidth),
+    )
+    .toBe(1600);
+  const guest = await playwright.request.newContext({ baseURL });
+  expect((await guest.get(path)).status()).toBe(404);
+  expect((await request.get(path)).status()).toBe(200);
+  await guest.dispose();
+});
+
+test("late metadata preserves manual title and custom image edits", async ({
+  page,
+}) => {
+  const name = title("Manual metadata correction");
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let started!: () => void;
+  const requested = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  await page.route("**/api/metadata", async (route) => {
+    started();
+    await released;
+    await route.fulfill({
+      json: {
+        title: "Publisher title",
+        author: "Publisher creator",
+        kind: "article",
+        url: "https://example.com/manual",
+        cover_url: "https://example.com/publisher.jpg",
+        description: "Publisher description",
+      },
+    });
+  });
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  await dialog(page)
+    .getByRole("textbox", { name: "Title or URL" })
+    .fill("https://example.com/manual-" + Date.now());
+  await requested;
+  await dialog(page)
+    .getByRole("textbox", { name: "Title", exact: true })
+    .fill(name);
+  await page.keyboard.press((await modifier(page)) + "+Shift+d");
+  await dialog(page)
+    .getByRole("textbox", { name: "Image URL (optional)" })
+    .fill("https://example.com/custom.jpg");
+  const fetched = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/metadata",
+  );
+  release();
+  await fetched;
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Creator (optional)" }),
+  ).toHaveValue("Publisher creator");
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Title", exact: true }),
+  ).toHaveValue(name);
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Image URL (optional)" }),
+  ).toHaveValue("https://example.com/custom.jpg");
+});
+
+test("development shortcut loads all kinds once and clears only its fixtures", async ({
+  page,
+  request,
+  browser,
+}, info) => {
+  const bootstrap = await (await request.get("/api/bootstrap")).json();
+  test.skip(
+    !bootstrap.dev_mode,
+    "Requires MARGIN_DEV_MODE=1 on the disposable test instance.",
+  );
+  const realTitle = title("Keep beside demo data");
+  const real = await (
+    await request.post("/api/media", {
+      data: { title: realTitle, tags: ["demo"] },
+    })
+  ).json();
+  await request.delete("/api/dev/fixtures");
+  try {
+    await page.goto("/dashboard");
+    await expect(
+      page.getByRole("region", { name: "Development tools", exact: true }),
+    ).toBeVisible();
+    await page.locator("main").focus();
+    await page.keyboard.press("g");
+    await page.keyboard.press("m");
+    await expect(
+      page.locator(".media-row").filter({ hasText: "[Demo]" }),
+    ).toHaveCount(9);
+    const compactWidths =
+      (page.viewportSize()?.width || 1440) < 600 ? [320, 390] : [1440];
+    for (const width of compactWidths) {
+      await page.setViewportSize({ width, height: 844 });
+      for (const row of await page.locator(".media-row").all()) {
+        const bounds = (await row.boundingBox())!;
+        expect(bounds.height).toBeLessThanOrEqual(width < 600 ? 120 : 96);
+        const checkbox = (await row.getByRole("checkbox").boundingBox())!;
+        const edit = (await row
+          .getByRole("button", { name: /^Edit / })
+          .boundingBox())!;
+        expect(checkbox.x - bounds.x).toBeGreaterThanOrEqual(8);
+        expect(
+          bounds.x + bounds.width - edit.x - edit.width,
+        ).toBeGreaterThanOrEqual(8);
+      }
+      expect(
+        await page
+          .locator(".list-tabs")
+          .evaluate((tabs) => tabs.scrollWidth - tabs.clientWidth),
+      ).toBeLessThanOrEqual(1);
+    }
+    await page
+      .getByRole("button", { name: "Dismiss notification", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Dismiss notification", exact: true }),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: "test-results/populated-library-" + info.project.name + ".png",
+      fullPage: true,
+      animations: "disabled",
+    });
+    const loaded = await (await request.get("/api/bootstrap")).json();
+    expect(loaded.dev_fixture_count).toBe(9);
+    expect(
+      new Set(
+        loaded.media
+          .filter((m: { title: string }) => m.title.startsWith("[Demo]"))
+          .map((m: { kind: string }) => m.kind),
+      ).size,
+    ).toBe(9);
+    await request.post("/api/dev/fixtures");
+    expect(
+      (await (await request.get("/api/bootstrap")).json()).dev_fixture_count,
+    ).toBe(9);
+    const guest = await browser.newContext();
+    try {
+      const publicPage = await guest.newPage();
+      await publicPage.goto(baseURL + "/");
+      await expect(
+        publicPage.locator(".collection-card").filter({ hasText: "[Demo]" }),
+      ).toHaveCount(9);
+      for (const width of compactWidths) {
+        await publicPage.setViewportSize({ width, height: 844 });
+        const cards = publicPage.locator(".collection-card");
+        for (const card of await cards.all()) {
+          const bounds = (await card.boundingBox())!;
+          expect(bounds.height).toBeLessThanOrEqual(width < 600 ? 220 : 360);
+          if (width < 600) {
+            const cover = (await card.locator(".mini-cover").boundingBox())!;
+            const copy = (await card
+              .locator(".collection-copy")
+              .boundingBox())!;
+            expect(copy.x).toBeGreaterThanOrEqual(cover.x + cover.width);
+          }
+        }
+        await checkAccess(publicPage);
+        await publicPage.screenshot({
+          path: "test-results/populated-collection-" + width + ".png",
+          fullPage: true,
+          animations: "disabled",
+        });
+      }
+      const images = publicPage.locator(".collection-card img");
+      for (const image of await images.all()) {
+        await image.scrollIntoViewIfNeeded();
+        await expect
+          .poll(() =>
+            image.evaluate(
+              (element) => (element as HTMLImageElement).naturalWidth,
+            ),
+          )
+          .toBeGreaterThan(0);
+      }
+      await checkAccess(publicPage);
+    } finally {
+      await guest.close();
+    }
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await dialog(page).getByText("Development", { exact: true }).click();
+    await dialog(page)
+      .getByRole("button", { name: "Clear demo data", exact: true })
+      .click();
+    await expect(
+      dialog(page).getByRole("button", { name: "Load demo data", exact: true }),
+    ).toBeVisible();
+    expect(
+      (await (await request.get("/api/media")).json()).some(
+        (m: { id: string }) => m.id === real.id,
+      ),
+    ).toBe(true);
+    expect(
+      (await (await request.get("/api/bootstrap")).json()).dev_fixture_count,
+    ).toBe(0);
+  } finally {
+    await request.delete("/api/dev/fixtures");
+  }
+});
+
+test("action hints share one lazy popup across repeated rows and support hover, focus and Escape", async ({
+  page,
+  request,
+}, info) => {
+  for (let index = 0; index < 9; index++) {
+    expect(
+      (
+        await request.post("/api/media", {
+          data: { title: title("Hinted item " + index) },
+        })
+      ).status(),
+    ).toBe(201);
+  }
+  await page.goto("/dashboard");
+  const rows = page.locator(".media-row");
+  await expect(rows).toHaveCount(9);
+  const hints = page.getByRole("tooltip");
+  const floating = page.locator(".u-tooltip-theme");
+  const firstEdit = rows.first().getByRole("button", { name: /^Edit / });
+  await expect(floating).toHaveCount(0);
+  if (info.project.name === "desktop") {
+    await firstEdit.hover();
+    await expect(hints).toHaveCount(1);
+    await expect(hints).toContainText("Edit item");
+    await expect(hints.locator("kbd")).toHaveText("E");
+    await hints.hover();
+    // Exceed the 100ms close delay to verify the popup itself stays hoverable.
+    await page.waitForTimeout(200);
+    await expect(hints).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect(floating).toHaveCount(0);
+  } else {
+    await firstEdit.tap();
+    await expect(dialog(page)).toBeVisible();
+    await expect(floating).toHaveCount(0);
+    await dialog(page)
+      .getByRole("button", { name: "Cancel", exact: true })
+      .tap();
+    await expect(dialog(page)).toHaveCount(0);
+  }
+  await rows.first().focus();
+  await tabTo(page, firstEdit);
+  await expect(hints).toContainText("Edit item");
+  await expect(hints).toContainText("With this row focused");
+  const sharedID = (await hints.getAttribute("id"))!;
+  await expect(firstEdit).toHaveAttribute("aria-describedby", sharedID);
+  await page.keyboard.press("Escape");
+  await expect(floating).toHaveCount(0);
+  await expect(firstEdit).toBeFocused();
+  await expect(firstEdit).not.toHaveAttribute("aria-describedby");
+
+  const lastEdit = rows.last().getByRole("button", { name: /^Edit / });
+  await rows.last().focus();
+  await tabTo(page, lastEdit);
+  await expect(hints).toHaveCount(1);
+  await expect(hints).toHaveAttribute("id", sharedID);
+  await expect(lastEdit).toHaveAttribute("aria-describedby", sharedID);
+  await expect(firstEdit).not.toHaveAttribute("aria-describedby");
+  await expect(floating).toHaveCount(1);
+  await checkAccess(page);
+  await page.screenshot({
+    path: "test-results/action-hint-" + info.project.name + ".png",
+    animations: "disabled",
+  });
+  await lastEdit.press("Enter");
+  await expect(dialog(page)).toBeVisible();
+  const close = dialog(page).getByRole("button", {
+    name: "Close dialog",
+    exact: true,
+  });
+  await tabTo(page, close);
+  await expect(hints).toContainText("Close dialog");
+  await expect(hints.locator("kbd")).toHaveText("Esc");
+  await checkAccess(page);
+  await page.keyboard.press("Escape");
+  await expect(floating).toHaveCount(0);
+  await expect(dialog(page)).toBeVisible();
+  await expect(close).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+});
+
+test("action hints omit disabled quick keys and keep modifier shortcuts", async ({
+  page,
+  request,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("margin-single-key-shortcuts", "off"),
+  );
+  expect(
+    (
+      await request.post("/api/media", {
+        data: { title: title("Hint preferences") },
+      })
+    ).status(),
+  ).toBe(201);
+  await page.goto("/dashboard");
+  const row = page.locator(".media-row");
+  await row.focus();
+  const edit = row.getByRole("button", { name: /^Edit / });
+  await tabTo(page, edit);
+  const hint = page.getByRole("tooltip");
+  await expect(hint).toHaveText("Edit item");
+  await expect(hint.locator("kbd")).toHaveCount(0);
+  await expect(hint.locator("small")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  const settings = page.getByRole("button", { name: "Settings", exact: true });
+  await settings.focus();
+  await expect(hint).toContainText("Settings");
+  await expect(hint.locator("kbd")).toContainText(",");
+  await expect(settings).not.toHaveAttribute("title");
+  await checkAccess(page);
+  await settings.press("Enter");
+  await expect(dialog(page)).toBeVisible();
+  await expect(
+    dialog(page).getByRole("heading", { name: "Settings", exact: true }),
+  ).toBeFocused();
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+});
+
+test("secondary control hints explain review, filtering and editor details without changing actions", async ({
+  page,
+  request,
+}, info) => {
+  const name = title("Secondary hints");
+  expect(
+    (
+      await request.post("/api/media", {
+        data: {
+          title: name,
+          tags: ["reference"],
+          needs_review: true,
+        },
+      })
+    ).status(),
+  ).toBe(201);
+  await page.goto("/dashboard");
+  const row = page.locator(".media-row").filter({ hasText: name });
+  await expect(row).toBeVisible();
+  const hint = page.getByRole("tooltip");
+  await row.focus();
+  const review = row.getByRole("button", { name: "Mark reviewed: " + name });
+  await tabTo(page, review);
+  await expect(hint).toContainText("without marking it done");
+  await page.keyboard.press("Escape");
+  if (info.project.name === "desktop") {
+    const tag = row.getByRole("button", { name: "reference", exact: true });
+    await tag.hover();
+    await expect(hint).toContainText("Show items tagged reference");
+  }
+  await review.click();
+  await expect(review).toHaveCount(0);
+  await expect(row.getByRole("checkbox")).not.toBeChecked();
+  const reviewFilter = page
+    .locator(".list-tabs")
+    .getByRole("button", { name: /To review/ });
+  await page.keyboard.press("Tab");
+  await reviewFilter.focus();
+  await expect(hint).toContainText("Captured items waiting for your review");
+  await expect(hint.locator("kbd")).toHaveText("h / l");
+  await page.keyboard.press("Escape");
+  await row.getByRole("button", { name: "Edit " + name, exact: true }).click();
+  const details = dialog(page)
+    .locator("summary")
+    .filter({ hasText: "Details, image & note" });
+  await tabTo(page, details);
+  await expect(hint).toContainText("Show or hide item details");
+  await expect(hint.locator("kbd")).toContainText("D");
+  await page.keyboard.press("Enter");
+  await expect(dialog(page).locator(".extra-details")).toHaveAttribute("open");
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Private note" }),
+  ).toBeVisible();
+  await checkAccess(page);
+});
+
+test("whole public cards open from covers, copy, padding and keyboard", async ({
+  page,
+  context,
+  request,
+}) => {
+  const name = title("Whole public card");
+  const manualName = title("Public card without a URL");
+  const url = "https://reader.example/article";
+  await context.route("https://reader.example/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<h1>Original article</h1>",
+    }),
+  );
+  for (const data of [
+    {
+      title: name,
+      url,
+      description: "Read the whole story.",
+      author: "Writer",
+    },
+    { title: manualName },
+  ]) {
+    expect(
+      (
+        await request.post("/api/media", {
+          data: { ...data, kind: "article", visibility: "public" },
+        })
+      ).status(),
+    ).toBe(201);
+  }
+  await page.goto("/");
+  const card = page.locator(".collection-card").filter({ hasText: name });
+  const open = async (click: () => Promise<unknown>) => {
+    const popup = page.waitForEvent("popup");
+    await click();
+    const original = await popup;
+    await expect(original).toHaveURL(url);
+    await original.close();
+  };
+  await open(() => card.locator(".mini-cover").click());
+  await open(() => card.getByText("Read the whole story.").click());
+  await open(() => card.click({ position: { x: 3, y: 3 } }));
+  await card.getByRole("link", { name, exact: true }).focus();
+  await open(() => page.keyboard.press("Enter"));
+  await checkAccess(page);
+  await page
+    .locator(".collection-card")
+    .filter({ hasText: manualName })
+    .locator(".mini-cover")
+    .click();
+  await expect(page).toHaveURL(/\/shared\/[a-z0-9-]+$/);
+  await expect(page.getByRole("heading", { name: manualName })).toBeVisible();
+});
+
+test("compact library rows open from covers and whitespace while controls stay independent", async ({
+  page,
+  context,
+  request,
+}) => {
+  const name = title("Whole library row");
+  const manualName = title("Library row without a URL");
+  const url = "https://reader.example/article";
+  await context.route("https://reader.example/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<h1>Original article</h1>",
+    }),
+  );
+  for (const data of [
+    {
+      title: name,
+      url,
+      author: "Writer",
+      tags: ["reading"],
+      needs_review: true,
+    },
+    { title: manualName },
+  ]) {
+    expect((await request.post("/api/media", { data })).status()).toBe(201);
+  }
+  await page.goto("/dashboard");
+  await page
+    .locator(".list-tabs")
+    .getByRole("button", { name: "All", exact: true })
+    .click();
+  const row = page.locator(".media-row").filter({ hasText: name });
+  const manual = page.locator(".media-row").filter({ hasText: manualName });
+  // Use real pointer coordinates: the native stretched link covers these elements.
+  const clickBody = async (target: Locator, x = 0.5, y = 0.5) => {
+    await target.scrollIntoViewIfNeeded();
+    const bounds = (await target.boundingBox())!;
+    await page.mouse.click(
+      bounds.x + bounds.width * x,
+      bounds.y + bounds.height * y,
+    );
+  };
+  const open = async (click: () => Promise<unknown>) => {
+    const popup = page.waitForEvent("popup");
+    await click();
+    const original = await popup;
+    await expect(original).toHaveURL(url);
+    await original.close();
+  };
+  await expect(row).toBeVisible();
+  expect((await row.boundingBox())!.height).toBeLessThanOrEqual(
+    (page.viewportSize()?.width || 1440) < 600 ? 140 : 96,
+  );
+  expect((await manual.boundingBox())!.height).toBeLessThanOrEqual(96);
+  await open(() => clickBody(row.locator(".mini-cover")));
+  await open(() => clickBody(row.locator(".item-meta > span")));
+  await open(() => clickBody(row, 0.65, 0.95));
+  await row.getByRole("link", { name, exact: true }).focus();
+  await open(() => page.keyboard.press("Enter"));
+  const popups: Page[] = [];
+  page.on("popup", (popup) => popups.push(popup));
+  const checkbox = row.getByRole("checkbox");
+  await checkbox.click();
+  await expect(checkbox).toBeChecked();
+  await checkbox.press("Space");
+  await expect(checkbox).not.toBeChecked();
+  const edit = row.getByRole("button", { name: "Edit " + name, exact: true });
+  await edit.click();
+  await expect(dialog(page)).toBeVisible();
+  await dialog(page)
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await expect(dialog(page)).toHaveCount(0);
+  await edit.press("Enter");
+  await expect(dialog(page)).toBeVisible();
+  await dialog(page)
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await expect(dialog(page)).toHaveCount(0);
+  await row
+    .getByRole("button", { name: "Edit missing details: " + name })
+    .click();
+  await expect(dialog(page)).toBeVisible();
+  await dialog(page)
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await expect(dialog(page)).toHaveCount(0);
+  if ((page.viewportSize()?.width || 1440) >= 600) {
+    await row.getByRole("button", { name: "reading", exact: true }).click();
+  } else {
+    await page
+      .getByRole("combobox", { name: "Filter tag", exact: true })
+      .click();
+    await page.getByRole("option", { name: "reading", exact: true }).click();
+  }
+  await expect(manual).toHaveCount(0);
+  await row.getByRole("button", { name: "Mark reviewed: " + name }).click();
+  await expect(row.getByRole("button", { name: /Mark reviewed/ })).toHaveCount(
+    0,
+  );
+  expect(popups).toHaveLength(0);
+  await page.reload();
+  await page
+    .locator(".list-tabs")
+    .getByRole("button", { name: "All", exact: true })
+    .click();
+  await clickBody(manual.locator(".mini-cover"));
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Title", exact: true }),
+  ).toHaveValue(manualName);
+  await dialog(page)
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  expect(popups).toHaveLength(0);
+  await checkAccess(page);
+});
+
+test("public cards align across wrapped titles and missing details", async ({
+  page,
+  request,
+}) => {
+  const names = [
+    title("Short title"),
+    title("A long title that wraps across two lines in the public collection"),
+    title("Another title"),
+  ];
+  for (let i = 0; i < names.length; i++) {
+    const response = await request.post("/api/media", {
+      data: {
+        title: names[i],
+        kind: ["book", "video", "article"][i],
+        visibility: "public",
+        author:
+          i === 1
+            ? "A creator name long enough to otherwise wrap onto extra lines"
+            : "Demo creator",
+        description:
+          i === 1
+            ? ""
+            : "A description that can occupy two lines without changing the alignment of nearby cards.",
+        tags: i === 0 ? ["design", "a-long-tag-to-check-overflow"] : [],
+      },
+    });
+    expect(response.status()).toBe(201);
+  }
+  await page.goto("/");
+  await expect(page.locator(".collection-card")).toHaveCount(3);
+  const widths =
+    (page.viewportSize()?.width || 1440) < 600 ? [320, 390] : [1440];
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 844 });
+    const layout = await page.locator(".collection-card").evaluateAll((cards) =>
+      cards.map((card) => {
+        const bounds = card.getBoundingClientRect();
+        const offset = (selector: string) =>
+          card.querySelector(selector)!.getBoundingClientRect().top -
+          bounds.top;
+        return {
+          height: bounds.height,
+          author: offset(".item-meta"),
+          description: offset(".shared-description"),
+          tags: offset(".shared-tags"),
+          status: offset(".shared-status"),
+        };
+      }),
+    );
+    for (const key of [
+      "height",
+      "author",
+      "description",
+      "tags",
+      "status",
+    ] as const) {
+      const values = layout.map((card) => card[key]);
+      expect(
+        Math.max(...values) - Math.min(...values),
+        `${key} should align at ${width}px`,
+      ).toBeLessThanOrEqual(1);
+    }
+    await checkAccess(page);
+  }
+});
+
+test("retry recovers an existing capture and saving preserves review context", async ({
+  page,
+  request,
+}) => {
+  const name = title("Recovered article");
+  const url = "https://publisher.example/recoverable-article-" + Date.now();
+  const response = await request.post("/api/media", {
+    data: {
+      title: name,
+      author: "",
+      kind: "article",
+      url,
+      cover_url: "",
+      description: "",
+      metadata_warning: "Site did not share details.",
+      needs_review: true,
+      notes: "Private thought",
+    },
+  });
+  expect(response.status()).toBe(201);
+  const item = await response.json();
+  try {
+    await page.route("**/api/metadata", (route) =>
+      route.fulfill({
+        json: {
+          title: "Publisher replacement",
+          author: "Publisher writer",
+          kind: "article",
+          url,
+          cover_url: "",
+          description: "Recovered page summary",
+        },
+      }),
+    );
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: /To review/ }).click();
+    await page
+      .getByRole("searchbox", { name: "Search library" })
+      .fill("publisher.example");
+    const row = page.locator(".media-row").filter({ hasText: name });
+    await expect(row).toBeVisible();
+    await row
+      .getByRole("button", { name: "Edit " + name, exact: true })
+      .click();
+    await expect(
+      dialog(page).getByRole("textbox", { name: "URL (optional)" }),
+    ).toHaveValue(url);
+    await dialog(page)
+      .getByRole("button", { name: "Retry details", exact: true })
+      .click();
+    await expect(
+      dialog(page).getByRole("region", { name: "Link details" }),
+    ).toContainText("Recovered page summary");
+    await expect(
+      dialog(page).getByRole("textbox", { name: "Title", exact: true }),
+    ).toHaveValue(name);
+    await dialog(page)
+      .getByRole("button", { name: "Save & review", exact: true })
+      .click();
+    await expect(dialog(page)).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: /To review/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByRole("searchbox", { name: "Search library" }),
+    ).toHaveValue("publisher.example");
+    const stored = (await (await request.get("/api/media")).json()).find(
+      (m: { id: string }) => m.id === item.id,
+    );
+    expect(stored).toMatchObject({
+      title: name,
+      author: "Publisher writer",
+      description: "Recovered page summary",
+      notes: "Private thought",
+      needs_review: false,
+      status: "pending",
+      metadata_state: "ready",
+    });
+  } finally {
+    await request.delete("/api/media/" + item.id);
+  }
+});
+
+test("review actions undo cleanly and mobile row actions stay aligned", async ({
+  page,
+  request,
+}) => {
+  const name = title("A capture that still needs review");
+  const item = await (
+    await request.post("/api/media", {
+      data: { title: name, needs_review: true, status: "done" },
+    })
+  ).json();
+  try {
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: /To review/ }).click();
+    const row = page.locator(".media-row").filter({ hasText: name });
+    await expect(row).toBeVisible();
+    if ((page.viewportSize()?.width || 1440) < 600) {
+      for (const width of [320, 390, 570]) {
+        await page.setViewportSize({ width, height: 844 });
+        const edit = (await row
+          .getByRole("button", { name: "Edit " + name, exact: true })
+          .boundingBox())!;
+        const content = (await row.locator(".row-content").boundingBox())!;
+        expect(edit.x).toBeGreaterThanOrEqual(content.x + content.width);
+        expect((await row.boundingBox())!.height).toBeLessThanOrEqual(180);
+        await checkAccess(page);
+      }
+    }
+    await row.getByRole("button", { name: "Mark reviewed: " + name }).click();
+    await expect(row).toHaveCount(0);
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect(row).toBeVisible();
+    expect(
+      (await (await request.get("/api/media")).json()).find(
+        (m: { id: string }) => m.id === item.id,
+      ),
+    ).toMatchObject({ needs_review: true, status: "done" });
+  } finally {
+    await request.delete("/api/media/" + item.id);
+  }
+});
+
+test("changing a URL ignores late background details from its previous page", async ({
+  page,
+  request,
+}) => {
+  const name = title("URL change while fetching");
+  const firstURL = "https://publisher.example/first";
+  const nextURL = "https://publisher.example/next";
+  const created = await (
+    await request.post("/api/media", {
+      data: {
+        title: name,
+        author: "",
+        kind: "article",
+        cover_url: "",
+        description: "",
+        url: firstURL,
+      },
+    })
+  ).json();
+  let finished = false;
+  await page.route("**/api/bootstrap", async (route) => {
+    const original = await route.fetch();
+    const data = await original.json();
+    data.media = data.media.map((item: { id: string }) =>
+      item.id === created.id
+        ? {
+            ...item,
+            url: firstURL,
+            author: finished ? "Old page author" : "",
+            description: finished ? "Old page description" : "",
+            metadata_state: finished ? "ready" : "pending",
+            updated_at: finished
+              ? "2030-01-02T00:00:00Z"
+              : "2030-01-01T00:00:00Z",
+          }
+        : item,
+    );
+    await route.fulfill({ json: data });
+  });
+  try {
+    await page.goto("/dashboard");
+    await page
+      .getByRole("button", { name: "Edit " + name, exact: true })
+      .click();
+    await dialog(page)
+      .getByRole("textbox", { name: "URL (optional)" })
+      .fill(nextURL);
+    finished = true;
+    const refreshed = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/bootstrap",
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await refreshed;
+    await dialog(page)
+      .getByText("Details, image & note", { exact: true })
+      .click();
+    await expect(
+      dialog(page).getByRole("textbox", { name: "Creator (optional)" }),
+    ).toHaveValue("");
+    await expect(
+      dialog(page).getByRole("textbox", { name: "Description (optional)" }),
+    ).toHaveValue("");
+    const patch = page.waitForRequest(
+      (r) =>
+        r.method() === "PATCH" &&
+        new URL(r.url()).pathname === "/api/media/" + created.id,
+    );
+    await dialog(page)
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    expect((await patch).postDataJSON()).toMatchObject({
+      url: nextURL,
+      fetch_metadata: true,
+      author: "",
+      description: "",
+    });
+    await expect(dialog(page)).toHaveCount(0);
+  } finally {
+    await request.delete("/api/media/" + created.id);
+  }
+});
+
+test("a duplicate quick save stops its spinner and allows metadata retry", async ({
+  page,
+  request,
+}) => {
+  const name = title("Duplicate metadata recovery");
+  const url = "https://publisher.example/duplicate-" + Date.now();
+  const existing = await (
+    await request.post("/api/media", {
+      data: {
+        title: name,
+        url,
+        author: "",
+        kind: "article",
+        cover_url: "",
+        description: "",
+      },
+    })
+  ).json();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let calls = 0;
+  await page.route("**/api/metadata", async (route) => {
+    calls++;
+    if (calls === 1) await gate;
+    await route
+      .fulfill({
+        json: {
+          title: name,
+          author: "Recovered writer",
+          kind: "article",
+          url,
+          cover_url: "",
+          description: "Recovered summary",
+        },
+      })
+      .catch(() => {});
+  });
+  try {
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: "Add item", exact: true }).click();
+    await dialog(page).getByRole("textbox", { name: "Title or URL" }).fill(url);
+    await expect(
+      dialog(page).getByText("Finding details… You can save now."),
+    ).toBeVisible();
+    await dialog(page)
+      .getByRole("button", { name: "Add to library", exact: true })
+      .click();
+    await expect(
+      dialog(page).getByRole("button", { name: "Open existing item" }),
+    ).toBeVisible();
+    await expect(
+      dialog(page).getByText("Finding details… You can save now."),
+    ).toHaveCount(0);
+    release();
+    await dialog(page)
+      .getByRole("button", { name: "Find missing details", exact: true })
+      .click();
+    await expect(
+      dialog(page).getByRole("region", { name: "Link details" }),
+    ).toContainText("Recovered summary");
+    await expect(
+      dialog(page).getByRole("button", {
+        name: "Find missing details",
+        exact: true,
+      }),
+    ).toBeEnabled();
+  } finally {
+    release();
+    await request.delete("/api/media/" + existing.id);
+  }
 });

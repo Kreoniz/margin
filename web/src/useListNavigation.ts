@@ -92,6 +92,11 @@ export function useListNavigation<T extends { id: string }>({
         callback: () => move(-1),
         options: { enabled: canNavigate && singleKeys, requireReset: false },
       },
+      {
+        hotkey: "Shift+G",
+        callback: () => focusAt(items.length - 1),
+        options: { enabled: canNavigate && singleKeys },
+      },
       { hotkey: "Enter", callback: () => invoke("open") },
       ...(
         [

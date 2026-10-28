@@ -1,19 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatForDisplay, useHotkeys } from "@tanstack/react-hotkeys";
+import {
+  formatForDisplay,
+  getHotkeyManager,
+  useHotkeys,
+} from "@tanstack/react-hotkeys";
 import { Theme } from "unlikely-ui/theme";
 import { Button } from "unlikely-ui/button";
 import { Checkbox } from "unlikely-ui/checkbox";
 import { Input } from "unlikely-ui/input";
 import { Toast } from "unlikely-ui/toast";
+import { Collection } from "./Collection";
 import { Access } from "./Access";
-import { api, ApiError, send } from "./api";
-import {
-  EmptyState,
-  MiniCover,
-  Picker,
-  SourceMark,
-  TypeLabel,
-} from "./components";
+import { api, send } from "./api";
+import { EmptyState, MiniCover, Picker, TypeLabel } from "./components";
 import { Editor } from "./Editor";
 import { Icon, Logo } from "./Icon";
 import { Settings } from "./Settings";
@@ -24,13 +23,13 @@ import {
   type Kind,
   type LibraryData,
   type Media,
-  type PublicMedia,
   type Session,
 } from "./types";
 import { hostname, relativeDate, safeURL, selectMedia } from "./utils";
 import { useListMotion } from "./useListMotion";
 import { useListNavigation } from "./useListNavigation";
 import { KeyboardHelp } from "./KeyboardHelp";
+import { ActionHint, HintScope } from "./ActionHint";
 
 export default function App() {
   const [appearance, setAppearance] = useState<"light" | "dark">(() => {
@@ -45,6 +44,7 @@ export default function App() {
   const [session, setSession] = useState<Session>();
   const [error, setError] = useState("");
   const shared =
+    window.location.pathname === "/" ||
     window.location.pathname === "/shared" ||
     window.location.pathname.startsWith("/shared/");
   const refreshSession = useCallback(async () => {
@@ -56,12 +56,13 @@ export default function App() {
     }
   }, []);
   useEffect(() => {
+    if (shared) return;
     void refreshSession();
     const expired = () =>
       setSession({ authenticated: false, setup_required: false });
     window.addEventListener("margin-session-expired", expired);
     return () => window.removeEventListener("margin-session-expired", expired);
-  }, [refreshSession]);
+  }, [refreshSession, shared]);
   useEffect(() => {
     document.documentElement.dataset.appearance = appearance;
     try {
@@ -74,7 +75,7 @@ export default function App() {
     <Theme appearance={appearance} className="app-theme">
       <Toast.Provider timeout={3500}>
         {shared ? (
-          <Shared owner={session?.authenticated || false} />
+          <Collection />
         ) : session?.authenticated ? (
           <Owner
             appearance={appearance}
@@ -165,6 +166,9 @@ function Owner({
         setError(e instanceof Error ? e.message : "Could not load your list.");
     }
   }, []);
+  const hasPendingMetadata = Boolean(
+    data?.media.some((item) => item.metadata_state === "pending"),
+  );
   useEffect(() => {
     void refresh();
     const focus = () => {
@@ -173,13 +177,17 @@ function Owner({
     window.addEventListener("focus", focus);
     const timer = setInterval(
       focus,
-      view === "discover" || sourcesOpen ? 30_000 : 90_000,
+      hasPendingMetadata
+        ? 2_000
+        : view === "discover" || sourcesOpen
+          ? 30_000
+          : 90_000,
     );
     return () => {
       clearInterval(timer);
       window.removeEventListener("focus", focus);
     };
-  }, [refresh, view, sourcesOpen]);
+  }, [refresh, view, sourcesOpen, hasPendingMetadata]);
   useEffect(() => {
     const change = () => {
       setView(window.location.hash === "#discover" ? "discover" : "library");
@@ -219,8 +227,6 @@ function Owner({
         callback: () => setEditor("new"),
         options: { enabled: shortcutsEnabled && singleKeys },
       },
-      { hotkey: "Alt+1", callback: () => navigate("library") },
-      { hotkey: "Alt+2", callback: () => navigate("discover") },
       {
         hotkey: ["G", "L"],
         callback: () => navigate("library"),
@@ -231,9 +237,33 @@ function Owner({
         callback: () => navigate("discover"),
         options: { enabled: shortcutsEnabled && singleKeys },
       },
+      {
+        hotkey: ["G", "M"],
+        callback: () => void toggleDemoData(),
+        options: {
+          enabled: shortcutsEnabled && singleKeys && Boolean(data?.dev_mode),
+        },
+      },
       { hotkey: "Mod+,", callback: () => setSettings(true) },
-      { hotkey: "Alt+S", callback: () => setSourcesOpen(true) },
-      { hotkey: "F1", callback: () => setHelpOpen(true) },
+      {
+        hotkey: ["G", "S"],
+        callback: () => setSourcesOpen(true),
+        options: { enabled: shortcutsEnabled && singleKeys },
+      },
+      {
+        hotkey: ["G", "G"],
+        callback: () => {
+          // The second G must not remain a fresh prefix for G L / G D / G S.
+          getHotkeyManager().resetSequenceProgress();
+          navigation.focusFirst();
+        },
+        options: { enabled: shortcutsEnabled && singleKeys },
+      },
+      {
+        hotkey: "F1",
+        callback: () => setHelpOpen(true),
+        options: { ignoreInputs: false },
+      },
       {
         hotkey: "?",
         callback: () => setHelpOpen(true),
@@ -259,6 +289,30 @@ function Owner({
         callback: () => cycleStatus(1),
         options: { enabled: shortcutsEnabled && singleKeys },
       },
+      {
+        hotkey: "H",
+        callback: () => cycleStatus(-1),
+        options: { enabled: shortcutsEnabled && singleKeys },
+      },
+      {
+        hotkey: "L",
+        callback: () => cycleStatus(1),
+        options: { enabled: shortcutsEnabled && singleKeys },
+      },
+      {
+        hotkey: "Shift+H",
+        callback: () => {
+          if (view !== "library") navigate("library");
+        },
+        options: { enabled: shortcutsEnabled && singleKeys },
+      },
+      {
+        hotkey: "Shift+L",
+        callback: () => {
+          if (view !== "discover") navigate("discover");
+        },
+        options: { enabled: shortcutsEnabled && singleKeys },
+      },
     ],
     { enabled: shortcutsEnabled, requireReset: true },
   );
@@ -266,9 +320,21 @@ function Owner({
   const inbox = data?.inbox || [];
   const sources = data?.sources || [];
   const filtered = useMemo(
-    () => selectMedia(media, { query, status, kind, tag }),
+    () =>
+      selectMedia(
+        status === "review" ? media.filter((item) => item.needs_review) : media,
+        { query, status: status === "review" ? "all" : status, kind, tag },
+      ),
     [media, query, status, kind, tag],
   );
+  useEffect(() => {
+    if (!data || !window.location.hash.startsWith("#edit=")) return;
+    const item = data.media.find((m) => m.id === window.location.hash.slice(6));
+    if (item) {
+      setEditor(item);
+      window.history.replaceState(null, "", "/dashboard#library");
+    }
+  }, [data]);
   const tags = [...new Set(media.flatMap((item) => item.tags))].sort((a, b) =>
     a.localeCompare(b),
   );
@@ -379,7 +445,7 @@ function Owner({
   function cycleStatus(direction: number) {
     const values =
       view === "library"
-        ? ["pending", "done", "all"]
+        ? ["pending", "done", "review", "all"]
         : ["new", "saved", "read", "dismissed"];
     const current = values.indexOf(view === "library" ? status : inboxState);
     const next = values[(current + direction + values.length) % values.length];
@@ -442,6 +508,42 @@ function Owner({
       });
     }
   }
+  async function markReviewed(item: Media) {
+    if (!item.needs_review) return;
+    if (
+      await perform(item.id, () =>
+        api("/media/" + item.id, send("PATCH", { needs_review: false })),
+      )
+    ) {
+      undo.current = () =>
+        void perform(item.id, () =>
+          api("/media/" + item.id, send("PATCH", { needs_review: true })),
+        );
+      toast.add({
+        title: "Marked reviewed.",
+        actionProps: { children: "Undo", onClick: undo.current },
+      });
+    }
+  }
+  async function toggleDemoData() {
+    if (!data?.dev_mode) return;
+    const remove = Boolean(data.dev_fixture_count);
+    if (
+      await perform(
+        "demo-data",
+        () => api("/dev/fixtures", send(remove ? "DELETE" : "POST")),
+        remove
+          ? "Demo data cleared."
+          : "Demo data loaded · all nine media types.",
+      )
+    ) {
+      if (!remove) {
+        navigate("library");
+        setStatus("all");
+        setTag("demo");
+      } else setTag("");
+    }
+  }
   async function checkSources() {
     await perform(
       "sync",
@@ -449,7 +551,7 @@ function Owner({
       "Checking your sources. New articles appear automatically.",
     );
   }
-  return (
+  const content = (
     <div className="owner-shell">
       <a
         className="skip-link"
@@ -471,59 +573,80 @@ function Owner({
             <Logo small />
           </button>
           <nav className="main-nav" aria-label="Main navigation">
-            <button
-              aria-current={view === "library" ? "page" : undefined}
-              onClick={() => navigate("library")}
+            <ActionHint
+              label="Library"
+              shortcut={singleKeys ? "G then L" : undefined}
+              context={singleKeys ? "Shift+H opens Library" : undefined}
             >
-              <Icon name="book" size={16} />
-              Library
-            </button>
-            <button
-              aria-current={view === "discover" ? "page" : undefined}
-              onClick={() => navigate("discover")}
+              <button
+                aria-current={view === "library" ? "page" : undefined}
+                onClick={() => navigate("library")}
+              >
+                <Icon name="book" size={16} />
+                Library
+              </button>
+            </ActionHint>
+            <ActionHint
+              label="Discover"
+              shortcut={singleKeys ? "G then D" : undefined}
+              context={singleKeys ? "Shift+L opens Discover" : undefined}
             >
-              <Icon name="inbox" size={16} />
-              Discover
-              {inbox.some((item) => item.state === "new") && (
-                <span
-                  className="new-dot"
-                  role="img"
-                  aria-label="New discoveries"
-                />
-              )}
-            </button>
-            <button
-              onClick={() => setSourcesOpen(true)}
-              aria-haspopup="dialog"
-              aria-expanded={sourcesOpen}
-              title="Manage sources and automatic collection"
+              <button
+                aria-current={view === "discover" ? "page" : undefined}
+                onClick={() => navigate("discover")}
+              >
+                <Icon name="inbox" size={16} />
+                Discover
+                {inbox.some((item) => item.state === "new") && (
+                  <span
+                    className="new-dot"
+                    role="img"
+                    aria-label="New discoveries"
+                  />
+                )}
+              </button>
+            </ActionHint>
+            <ActionHint
+              label="Manage sources"
+              shortcut={singleKeys ? "G then S" : undefined}
             >
-              <Icon name="rss" size={16} />
-              Sources
-            </button>
+              <button
+                onClick={() => setSourcesOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={sourcesOpen}
+              >
+                <Icon name="rss" size={16} />
+                Sources
+              </button>
+            </ActionHint>
           </nav>
           <div className="header-actions">
-            <Button
-              onClick={() => setEditor("new")}
-              size="sm"
-              title={`Add item (${formatForDisplay("Mod+Shift+A")}${singleKeys ? " or N" : ""})`}
-              aria-keyshortcuts="Control+Shift+A Meta+Shift+A"
-              aria-label="Add item"
+            <ActionHint
+              label="Add item"
+              shortcut={formatForDisplay("Mod+Shift+A")}
             >
-              <Icon name="plus" size={16} />
-              <span>Add item</span>
-            </Button>
-            <Button
-              variant="secondary"
-              size="icon"
-              aria-label="Settings"
-              aria-haspopup="dialog"
-              aria-expanded={settings}
-              title={`Settings (${formatForDisplay("Mod+,")})`}
-              onClick={() => setSettings(true)}
-            >
-              <Icon name="settings" size={18} />
-            </Button>
+              <Button
+                onClick={() => setEditor("new")}
+                size="sm"
+                aria-keyshortcuts="Control+Shift+A Meta+Shift+A"
+                aria-label="Add item"
+              >
+                <Icon name="plus" size={16} />
+                <span>Add item</span>
+              </Button>
+            </ActionHint>
+            <ActionHint label="Settings" shortcut={formatForDisplay("Mod+,")}>
+              <Button
+                variant="secondary"
+                size="icon"
+                aria-label="Settings"
+                aria-haspopup="dialog"
+                aria-expanded={settings}
+                onClick={() => setSettings(true)}
+              >
+                <Icon name="settings" size={18} />
+              </Button>
+            </ActionHint>
           </div>
         </div>
       </header>
@@ -554,15 +677,20 @@ function Owner({
           </div>
           {view === "discover" && (
             <div className="discovery-controls">
-              <Button
-                variant="ghost"
-                size="sm"
-                loading={pending.has("sync")}
-                onClick={() => void checkSources()}
+              <ActionHint
+                label="Check sources"
+                shortcut={singleKeys ? "Shift+R" : undefined}
               >
-                <Icon name="sync" size={15} />
-                Check now
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  loading={pending.has("sync")}
+                  onClick={() => void checkSources()}
+                >
+                  <Icon name="sync" size={15} />
+                  Check now
+                </Button>
+              </ActionHint>
             </div>
           )}
         </div>
@@ -642,36 +770,77 @@ function Owner({
           >
             {(view === "library"
               ? [
-                  { value: "pending", label: "To read/watch" },
-                  { value: "done", label: "Done" },
-                  { value: "all", label: "All" },
+                  {
+                    value: "pending",
+                    label: "To read/watch",
+                    hint: "Items you plan to read or watch",
+                  },
+                  {
+                    value: "done",
+                    label: "Done",
+                    hint: "Items you have finished",
+                  },
+                  {
+                    value: "review",
+                    label: `To review (${media.filter((m) => m.needs_review).length})`,
+                    hint: "Captured items waiting for your review",
+                  },
+                  { value: "all", label: "All", hint: "Your entire library" },
                 ]
               : [
-                  { value: "new", label: "New" },
-                  { value: "saved", label: "Saved" },
-                  { value: "read", label: "Read" },
-                  { value: "dismissed", label: "Dismissed" },
+                  {
+                    value: "new",
+                    label: "New",
+                    hint: "Discoveries you have not opened yet",
+                  },
+                  {
+                    value: "saved",
+                    label: "Saved",
+                    hint: "Discoveries saved to your library",
+                  },
+                  {
+                    value: "read",
+                    label: "Read",
+                    hint: "Discoveries marked as read",
+                  },
+                  {
+                    value: "dismissed",
+                    label: "Dismissed",
+                    hint: "Discoveries you have set aside",
+                  },
                 ]
             ).map((tab) => (
-              <button
+              <ActionHint
                 key={tab.value}
-                aria-pressed={
-                  (view === "library" ? status : inboxState) === tab.value
-                }
-                onClick={() =>
-                  view === "library"
-                    ? setStatus(tab.value)
-                    : setInboxState(tab.value)
-                }
+                label={tab.hint}
+                shortcut={singleKeys ? "h / l" : undefined}
+                context={singleKeys ? "Switch status filters" : undefined}
               >
-                {tab.label}
-              </button>
+                <button
+                  aria-pressed={
+                    (view === "library" ? status : inboxState) === tab.value
+                  }
+                  onClick={() =>
+                    view === "library"
+                      ? setStatus(tab.value)
+                      : setInboxState(tab.value)
+                  }
+                >
+                  {tab.label}
+                </button>
+              </ActionHint>
             ))}
           </div>
           {data && (
             <span className="result-count" aria-live="polite">
               {view === "library" ? filtered.length : articles.length}{" "}
-              {view === "library" ? "items" : "articles"}
+              {view === "library"
+                ? filtered.length === 1
+                  ? "item"
+                  : "items"
+                : articles.length === 1
+                  ? "article"
+                  : "articles"}
             </span>
           )}
         </div>
@@ -705,21 +874,31 @@ function Owner({
                   }
                   aria-label={item.title}
                 >
-                  <Checkbox
-                    checked={item.status === "done"}
-                    disabled={pending.has(item.id)}
-                    aria-label={
-                      (item.status === "done"
-                        ? "Mark to read/watch: "
-                        : "Mark done: ") + item.title
+                  <ActionHint
+                    label={
+                      item.status === "done"
+                        ? "Move to read/watch"
+                        : "Mark done"
                     }
-                    onCheckedChange={() => void toggle(item)}
-                  />
+                    shortcut={singleKeys ? "D" : undefined}
+                    context={singleKeys ? "With this row focused" : undefined}
+                  >
+                    <Checkbox
+                      checked={item.status === "done"}
+                      disabled={pending.has(item.id)}
+                      aria-label={
+                        (item.status === "done"
+                          ? "Mark to read/watch: "
+                          : "Mark done: ") + item.title
+                      }
+                      onCheckedChange={() => void toggle(item)}
+                    />
+                  </ActionHint>
                   <MiniCover kind={item.kind} url={item.cover_url} />
                   <div className="row-content">
                     {safeURL(item.url) ? (
                       <a
-                        className="item-title"
+                        className="item-title row-primary-action"
                         href={safeURL(item.url)}
                         target="_blank"
                         rel="noreferrer"
@@ -729,7 +908,7 @@ function Owner({
                       </a>
                     ) : (
                       <button
-                        className="item-title"
+                        className="item-title row-primary-action"
                         onClick={() => setEditor(item)}
                       >
                         {item.title}
@@ -742,34 +921,80 @@ function Owner({
                           kindLabels[item.kind]}
                       </span>
                       {item.tags.slice(0, 2).map((t) => (
-                        <button
-                          className="inline-tag"
-                          key={t}
-                          onClick={() => setTag(t)}
-                        >
-                          {t}
-                        </button>
+                        <ActionHint label={"Show items tagged " + t} key={t}>
+                          <button
+                            className="inline-tag"
+                            onClick={() => setTag(t)}
+                          >
+                            {t}
+                          </button>
+                        </ActionHint>
                       ))}
+                      {item.visibility === "public" && (
+                        <span
+                          className="public-marker"
+                          role="img"
+                          aria-label="Public item"
+                        >
+                          <Icon name="globe" size={15} />
+                        </span>
+                      )}
                     </div>
+                    {item.metadata_state === "pending" && (
+                      <p
+                        className="mt-1 text-[11px] text-u-muted"
+                        role="status"
+                      >
+                        Finding details…
+                      </p>
+                    )}
+                    {item.metadata_state === "partial" && (
+                      <ActionHint
+                        label="Edit missing details"
+                        context="Retry metadata or fill in details in the editor."
+                      >
+                        <button
+                          className="metadata-warning"
+                          aria-label={"Edit missing details: " + item.title}
+                          onClick={() => setEditor(item)}
+                        >
+                          Missing details · Edit
+                        </button>
+                      </ActionHint>
+                    )}
                   </div>
-                  <TypeLabel kind={item.kind} />
-                  {item.visibility === "public" && (
-                    <span
-                      className="public-marker"
-                      role="img"
-                      aria-label="Public item"
+                  {item.needs_review && (
+                    <ActionHint
+                      label="Mark reviewed"
+                      context="Remove from To review without marking it done."
                     >
-                      <Icon name="globe" size={15} />
-                    </span>
+                      <Button
+                        className="review-button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={pending.has(item.id)}
+                        aria-label={"Mark reviewed: " + item.title}
+                        onClick={() => void markReviewed(item)}
+                      >
+                        Mark reviewed
+                      </Button>
+                    </ActionHint>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={"Edit " + item.title}
-                    onClick={() => setEditor(item)}
+                  <TypeLabel kind={item.kind} />
+                  <ActionHint
+                    label="Edit item"
+                    shortcut={singleKeys ? "E" : undefined}
+                    context={singleKeys ? "With this row focused" : undefined}
                   >
-                    <Icon name="edit" size={16} />
-                  </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={"Edit " + item.title}
+                      onClick={() => setEditor(item)}
+                    >
+                      <Icon name="edit" size={16} />
+                    </Button>
+                  </ActionHint>
                 </article>
               ))}
             </div>
@@ -777,6 +1002,7 @@ function Owner({
             <EmptyState
               filtered={Boolean(query || kind !== "all" || tag)}
               done={status === "done"}
+              review={status === "review"}
               action={
                 query || kind !== "all" || tag ? (
                   <Button
@@ -791,7 +1017,7 @@ function Owner({
                     Clear filters
                   </Button>
                 ) : (
-                  status !== "done" && (
+                  !["done", "review"].includes(status) && (
                     <Button
                       variant="secondary"
                       size="sm"
@@ -825,7 +1051,7 @@ function Owner({
                   }
                   aria-label={item.title}
                 >
-                  <SourceMark name={item.source_name} />
+                  <MiniCover kind="article" url={item.cover_url} />
                   <div className="article-content">
                     <div className="article-meta">
                       <span>{item.source_name}</span>
@@ -857,56 +1083,94 @@ function Owner({
                           Saved to library
                         </span>
                       ) : (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          disabled={pending.has(item.id)}
-                          onClick={() => void saveArticle(item.id)}
+                        <ActionHint
+                          label="Save to library"
+                          shortcut={singleKeys ? "S" : undefined}
+                          context={
+                            singleKeys ? "With this row focused" : undefined
+                          }
                         >
-                          <Icon name="plus" size={13} />
-                          Save
-                        </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={pending.has(item.id)}
+                            onClick={() => void saveArticle(item.id)}
+                          >
+                            <Icon name="plus" size={13} />
+                            Save
+                          </Button>
+                        </ActionHint>
                       )}
                       {item.state === "new" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={pending.has(item.id)}
-                          nativeButton={false}
-                          render={
-                            <a
-                              href={safeURL(item.url)}
-                              target="_blank"
-                              rel="noreferrer"
-                            />
-                          }
-                          onClick={() => void setArticleState(item.id, "read")}
+                        <ActionHint
+                          label="Open article and mark read"
+                          shortcut="Enter"
+                          context="With this row focused"
                         >
-                          Read <Icon name="external" size={12} />
-                        </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={pending.has(item.id)}
+                            nativeButton={false}
+                            render={
+                              <a
+                                href={safeURL(item.url)}
+                                target="_blank"
+                                rel="noreferrer"
+                              />
+                            }
+                            onClick={() =>
+                              void setArticleState(item.id, "read")
+                            }
+                          >
+                            Read <Icon name="external" size={12} />
+                          </Button>
+                        </ActionHint>
                       )}
                       {["read", "dismissed"].includes(item.state) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={pending.has(item.id)}
-                          onClick={() => void setArticleState(item.id, "new")}
+                        <ActionHint
+                          label="Move back to new discoveries"
+                          shortcut={
+                            singleKeys && item.state === "read"
+                              ? "R"
+                              : undefined
+                          }
+                          context={
+                            singleKeys && item.state === "read"
+                              ? "With this row focused"
+                              : undefined
+                          }
                         >
-                          Mark new
-                        </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={pending.has(item.id)}
+                            onClick={() => void setArticleState(item.id, "new")}
+                          >
+                            Mark new
+                          </Button>
+                        </ActionHint>
                       )}
                     </div>
                   </div>
                   {!["saved", "dismissed"].includes(item.state) && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={"Dismiss " + item.title}
-                      disabled={pending.has(item.id)}
-                      onClick={() => void setArticleState(item.id, "dismissed")}
+                    <ActionHint
+                      label="Dismiss article"
+                      shortcut={singleKeys ? "X" : undefined}
+                      context={singleKeys ? "With this row focused" : undefined}
                     >
-                      <Icon name="close" size={17} />
-                    </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={"Dismiss " + item.title}
+                        disabled={pending.has(item.id)}
+                        onClick={() =>
+                          void setArticleState(item.id, "dismissed")
+                        }
+                      >
+                        <Icon name="close" size={17} />
+                      </Button>
+                    </ActionHint>
                   )}
                 </article>
               ))}
@@ -928,13 +1192,47 @@ function Owner({
           ))}
         {(view === "library" ? filtered.length : articles.length) > limit && (
           <div className="show-more">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setLimit((n) => n + 40)}
+            <ActionHint
+              label={
+                view === "library"
+                  ? "Show up to 40 more items"
+                  : "Show up to 40 more articles"
+              }
             >
-              Show more <Icon name="chevron" size={14} />
-            </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setLimit((n) => n + 40)}
+              >
+                Show more <Icon name="chevron" size={14} />
+              </Button>
+            </ActionHint>
+          </div>
+        )}
+        {data?.dev_mode && (
+          <div
+            className="mt-5 flex items-center gap-3 text-xs text-u-muted"
+            role="region"
+            aria-label="Development tools"
+          >
+            <span>Development{singleKeys ? " · G then M" : ""}</span>
+            <ActionHint
+              label={
+                data.dev_fixture_count
+                  ? "Remove the generated demo items"
+                  : "Add demo items for all nine media types"
+              }
+              shortcut={singleKeys ? "G then M" : undefined}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                loading={pending.has("demo-data")}
+                onClick={() => void toggleDemoData()}
+              >
+                {data.dev_fixture_count ? "Clear demo data" : "Load demo data"}
+              </Button>
+            </ActionHint>
           </div>
         )}
         <footer className="page-footer">
@@ -942,28 +1240,46 @@ function Owner({
           {view === "library"
             ? "Private by default. Yours to curate."
             : "Collected automatically. Saved by choice."}
-          <button
-            className="ml-auto rounded border-0 bg-transparent px-2 py-1 text-[11px] text-[var(--u-muted)] hover:bg-[var(--u-well)]"
-            onClick={() => setHelpOpen(true)}
-            title="Keyboard shortcuts (F1)"
-          >
-            ↑↓ navigate · Enter open · F1 help
-          </button>
+          <ActionHint label="Keyboard shortcuts" shortcut="F1">
+            <button
+              className="ml-auto rounded border-0 bg-transparent px-2 py-1 text-[11px] text-[var(--u-muted)] hover:bg-[var(--u-well)]"
+              onClick={() => setHelpOpen(true)}
+            >
+              {singleKeys
+                ? "h/l tabs · j/k items · F1 help"
+                : "↑↓ navigate · Enter open · F1 help"}
+            </button>
+          </ActionHint>
         </footer>
       </main>
       {editor && (
         <Editor
           key={editor === "new" ? "new" : editor.id}
-          item={editor === "new" ? undefined : editor}
+          item={
+            editor === "new"
+              ? undefined
+              : media.find((item) => item.id === editor.id) || editor
+          }
           onClose={() => setEditor(undefined)}
           onSaved={(item) => {
             setEditor(undefined);
-            setStatus(item.status);
-            if (view === "library") {
+            if (editor === "new") setStatus(item.status);
+            if (view === "library" && editor === "new") {
               setQuery("");
               setKind("all");
               setTag("");
-            } else toast.add({ title: "Added to library.", type: "success" });
+            }
+            toast.add({
+              title:
+                editor === "new"
+                  ? item.metadata_state === "pending"
+                    ? "Saved. Details will fill in shortly."
+                    : "Added to library."
+                  : editor.needs_review && !item.needs_review
+                    ? "Saved and marked reviewed."
+                    : "Changes saved.",
+              type: "success",
+            });
             void refresh();
           }}
           onDuplicate={(id) => {
@@ -978,7 +1294,6 @@ function Owner({
           }}
           onDelete={async (item) => {
             await api("/media/" + item.id, send("DELETE"));
-            setEditor(undefined);
             await refresh();
           }}
         />
@@ -1009,6 +1324,10 @@ function Owner({
               /* optional preference */
             }
           }}
+          devMode={data?.dev_mode}
+          fixtureCount={data?.dev_fixture_count}
+          onDemoData={() => void toggleDemoData()}
+          demoBusy={pending.has("demo-data")}
           legacyCount={data?.legacy_sample_count || 0}
           onChanged={refresh}
           onLogout={() =>
@@ -1026,146 +1345,5 @@ function Owner({
       )}
     </div>
   );
-}
-
-function Shared({ owner }: { owner: boolean }) {
-  const id = window.location.pathname.split("/").filter(Boolean)[1];
-  const [items, setItems] = useState<PublicMedia[]>();
-  const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
-  useEffect(() => {
-    document.title = "Shared reading — Margin";
-    let active = true;
-    void api<PublicMedia[] | PublicMedia>(
-      "/public/media" + (id ? "/" + encodeURIComponent(id) : ""),
-    )
-      .then((result) => {
-        if (active) setItems(Array.isArray(result) ? result : [result]);
-      })
-      .catch((e) => {
-        if (active)
-          setError(
-            e instanceof ApiError && e.status === 404
-              ? "This item is not shared."
-              : e.message,
-          );
-      });
-    return () => {
-      active = false;
-    };
-  }, [id]);
-  const filtered = selectMedia(items || [], {
-    query,
-    status: "all",
-    kind: "all",
-    tag: "",
-  });
-  return (
-    <div className="shared-page">
-      <header className="app-header">
-        <div className="header-inner">
-          <a href="/shared" className="brand-link" aria-label="Shared library">
-            <Logo small />
-          </a>
-          <span className="shared-label">
-            <Icon name="globe" size={14} />
-            Shared reading
-          </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            nativeButton={false}
-            render={<a href="/" />}
-          >
-            {owner ? "Your private library" : "Owner sign in"}
-          </Button>
-        </div>
-      </header>
-      <main className="content">
-        <div className="page-heading">
-          <div>
-            <h1>
-              {id ? "A little reading" : "Shared library"}
-              <span>.</span>
-            </h1>
-            <p>
-              Public by choice. A read-only collection of things worth a look.
-            </p>
-          </div>
-        </div>
-        {error ? (
-          <p className="notice error" role="alert">
-            {error}
-          </p>
-        ) : !items ? (
-          <p role="status" className="quiet">
-            Loading shared items…
-          </p>
-        ) : (
-          <>
-            {!id && items.length > 0 && (
-              <div className="search-box public-search">
-                <Icon name="search" size={16} />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  aria-label="Search shared items"
-                  placeholder="Find something to read or watch…"
-                />
-              </div>
-            )}
-            <div className="media-list shared-list">
-              {filtered.map((item) => (
-                <article className="media-row" key={item.id}>
-                  <MiniCover kind={item.kind} url={item.cover_url} />
-                  <div className="row-content">
-                    <a
-                      className="item-title"
-                      href={safeURL(item.url) || "/shared/" + item.id}
-                      target={safeURL(item.url) ? "_blank" : undefined}
-                      rel="noreferrer"
-                    >
-                      {item.title}
-                      {safeURL(item.url) && <Icon name="external" size={12} />}
-                    </a>
-                    <p className="item-meta">
-                      {item.author ||
-                        hostname(item.url) ||
-                        kindLabels[item.kind]}
-                    </p>
-                    {item.description && (
-                      <p className="shared-description">{item.description}</p>
-                    )}
-                    {item.tags.length > 0 && (
-                      <p className="shared-tags">{item.tags.join(" · ")}</p>
-                    )}
-                  </div>
-                  <TypeLabel kind={item.kind} />
-                  <span className="shared-status">
-                    {item.status === "done" ? "Done" : "To read/watch"}
-                  </span>
-                </article>
-              ))}
-            </div>
-            {!filtered.length && (
-              <div className="empty-state">
-                <span className="empty-icon">
-                  <Icon name="globe" size={27} />
-                </span>
-                <h2>{query ? "Nothing matches." : "Nothing shared yet."}</h2>
-                <p>
-                  Private items stay private. Only items explicitly made public
-                  appear here.
-                </p>
-              </div>
-            )}
-          </>
-        )}
-        <footer className="page-footer">
-          <Icon name="globe" size={13} />
-          Read-only. Editing belongs to the owner.
-        </footer>
-      </main>
-    </div>
-  );
+  return <HintScope disabled={!shortcutsEnabled}>{content}</HintScope>;
 }

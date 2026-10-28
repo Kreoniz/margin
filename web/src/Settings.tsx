@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "unlikely-ui/button";
+import { ActionHint } from "./ActionHint";
 import { Input } from "unlikely-ui/input";
 import { Checkbox } from "unlikely-ui/checkbox";
 import { formatForDisplay, useHotkey } from "@tanstack/react-hotkeys";
@@ -8,6 +9,7 @@ import { Modal } from "./components";
 import { Icon } from "./Icon";
 import type { Media } from "./types";
 import { publicPath } from "./utils";
+import { BrowserCaptureSettings } from "./BrowserCaptureSettings";
 import { KeyboardHelp } from "./KeyboardHelp";
 
 export function Settings({
@@ -19,6 +21,10 @@ export function Settings({
   onSingleKeys,
   legacyCount,
   onChanged,
+  devMode = false,
+  fixtureCount = 0,
+  onDemoData,
+  demoBusy = false,
 }: {
   onClose: () => void;
   onLogout: () => void;
@@ -28,6 +34,10 @@ export function Settings({
   onSingleKeys: (enabled: boolean) => void;
   legacyCount: number;
   onChanged: () => Promise<void>;
+  devMode?: boolean;
+  fixtureCount?: number;
+  onDemoData?: () => void;
+  demoBusy?: boolean;
 }) {
   const [configured, setConfigured] = useState<boolean>();
   const [token, setToken] = useState("");
@@ -77,8 +87,33 @@ export function Settings({
       title="Settings"
       onClose={onClose}
       className="settings-modal"
-      busy={busy}
+      busy={busy || demoBusy}
     >
+      {devMode && (
+        <details className="settings-disclosure">
+          <summary>
+            <span>
+              <Icon name="settings" size={15} />
+              Development
+            </span>
+            <Icon name="chevron" size={14} />
+          </summary>
+          <div className="settings-detail">
+            <p>
+              Nine fictional public items with local covers. G then M loads or
+              clears them.
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={demoBusy}
+              onClick={onDemoData}
+            >
+              {fixtureCount ? "Clear demo data" : "Load demo data"}
+            </Button>
+          </div>
+        </details>
+      )}
       <section
         className="flex items-center justify-between gap-3 pb-3"
         aria-labelledby="appearance-heading"
@@ -116,7 +151,9 @@ export function Settings({
           <Checkbox checked={singleKeys} onCheckedChange={onSingleKeys} />
           <span>
             Enable single-key shortcuts{" "}
-            <span className="text-u-muted">· / search · N add</span>
+            <span className="text-u-muted">
+              · h/l tabs · j/k items · / search
+            </span>
           </span>
         </label>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-1 text-[11px] text-u-muted">
@@ -230,23 +267,31 @@ export function Settings({
                   value={token}
                   aria-label="New submission token"
                 />
-                <Button
-                  variant="secondary"
-                  size="icon-sm"
-                  aria-label={
-                    copied ? "Submission token copied" : "Copy submission token"
-                  }
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(token);
-                      setCopied(true);
-                    } catch {
-                      setError("Select the token field and copy it manually.");
-                    }
-                  }}
+                <ActionHint
+                  label={copied ? "Token copied" : "Copy submission token"}
                 >
-                  <Icon name={copied ? "check" : "copy"} size={15} />
-                </Button>
+                  <Button
+                    variant="secondary"
+                    size="icon-sm"
+                    aria-label={
+                      copied
+                        ? "Submission token copied"
+                        : "Copy submission token"
+                    }
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(token);
+                        setCopied(true);
+                      } catch {
+                        setError(
+                          "Select the token field and copy it manually.",
+                        );
+                      }
+                    }}
+                  >
+                    <Icon name={copied ? "check" : "copy"} size={15} />
+                  </Button>
+                </ActionHint>
               </div>
               <p className="quiet" role={copied ? "status" : undefined}>
                 {copied
@@ -268,6 +313,31 @@ export function Settings({
               marked To read/watch.
             </p>
           </details>
+        </div>
+      </details>
+      <BrowserCaptureSettings />
+      <details className="settings-disclosure">
+        <summary>
+          <span>
+            <Icon name="book" size={15} />
+            Export library
+          </span>
+          <Icon name="chevron" size={14} />
+        </summary>
+        <div className="settings-detail">
+          <p>
+            Download your library as JSON with uploaded images in a ZIP file.
+            Includes private notes; keep the archive private. External image
+            URLs are retained as links.
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            nativeButton={false}
+            render={<a href="/api/export" download="margin-export.zip" />}
+          >
+            Download library & images
+          </Button>
         </div>
       </details>
       {legacyCount > 0 && (

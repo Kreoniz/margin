@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Margin capture</title>
+    <link rel="icon" href="icons/icon32.png" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="popup">
+    <main>
+      <header class="header">
+        <div class="brand">
+          <img src="icons/icon128.png" alt="" width="28" height="28" /><span
+            >margin<span class="dot">.</span></span
+          >
+        </div>
+        <button id="options" class="quiet small" type="button">Settings</button>
+      </header>
+      <section class="page-preview" aria-labelledby="page-title">
+        <p class="eyebrow">Current page</p>
+        <h1 id="page-title">Loading page…</h1>
+        <p id="page-host" class="muted truncate"></p>
+      </section>
+      <div id="setup" class="notice" hidden>
+        <h2>Connect your library</h2>
+        <p>Add your Margin address and browser token once to start saving.</p>
+        <button id="connect" type="button">Connect to Margin</button>
+      </div>
+      <div class="actions" role="group" aria-label="Capture actions">
+        <button data-action="save" aria-keyshortcuts="s" disabled>
+          <span>Save for later</span><kbd>S</kbd>
+        </button>
+        <button
+          data-action="done"
+          class="secondary"
+          aria-keyshortcuts="d"
+          disabled
+        >
+          <span>Mark done</span><kbd>D</kbd>
+        </button>
+      </div>
+      <p id="status" class="status" role="status">Checking connection…</p>
+      <a id="edit" class="result-link" hidden target="_blank" rel="noreferrer"
+        >Review in Margin <span aria-hidden="true">↗</span></a
+      >
+      <button id="reconnect" class="secondary small" type="button" hidden>
+        Check connection
+      </button>
+      <p class="hint">New items are private and appear in To review.</p>
+      <footer class="popup-footer">
+        <a id="library" hidden target="_blank" rel="noreferrer"
+          >Open library <span aria-hidden="true">↗</span></a
+        >
+        <button id="shortcuts" class="quiet small" type="button">
+          Shortcuts
+        </button>
+      </footer>
+      <p id="shortcut-hint" class="hint keyboard-hint">
+        S save · D done · H/L choose · Enter activate
+      </p>
+    </main>
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>
