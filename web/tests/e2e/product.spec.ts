@@ -1471,9 +1471,16 @@ test("development shortcut loads all kinds once and clears only its fixtures", a
     for (const width of compactWidths) {
       await page.setViewportSize({ width, height: 844 });
       for (const row of await page.locator(".media-row").all()) {
-        expect((await row.boundingBox())!.height).toBeLessThanOrEqual(
-          width < 600 ? 120 : 96,
-        );
+        const bounds = (await row.boundingBox())!;
+        expect(bounds.height).toBeLessThanOrEqual(width < 600 ? 120 : 96);
+        const checkbox = (await row.getByRole("checkbox").boundingBox())!;
+        const edit = (await row
+          .getByRole("button", { name: /^Edit / })
+          .boundingBox())!;
+        expect(checkbox.x - bounds.x).toBeGreaterThanOrEqual(8);
+        expect(
+          bounds.x + bounds.width - edit.x - edit.width,
+        ).toBeGreaterThanOrEqual(8);
       }
       expect(
         await page
@@ -1689,6 +1696,62 @@ test("action hints omit disabled quick keys and keep modifier shortcuts", async 
   await expect(page.getByRole("tooltip")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
+});
+
+test("secondary control hints explain review, filtering and editor details without changing actions", async ({
+  page,
+  request,
+}, info) => {
+  const name = title("Secondary hints");
+  expect(
+    (
+      await request.post("/api/media", {
+        data: {
+          title: name,
+          tags: ["reference"],
+          needs_review: true,
+        },
+      })
+    ).status(),
+  ).toBe(201);
+  await page.goto("/dashboard");
+  const row = page.locator(".media-row").filter({ hasText: name });
+  await expect(row).toBeVisible();
+  const hint = page.getByRole("tooltip");
+  await row.focus();
+  const review = row.getByRole("button", { name: "Mark reviewed: " + name });
+  await tabTo(page, review);
+  await expect(hint).toContainText("without marking it done");
+  await page.keyboard.press("Escape");
+  if (info.project.name === "desktop") {
+    const tag = row.getByRole("button", { name: "reference", exact: true });
+    await tag.hover();
+    await expect(hint).toContainText("Show items tagged reference");
+  }
+  await review.click();
+  await expect(review).toHaveCount(0);
+  await expect(row.getByRole("checkbox")).not.toBeChecked();
+  const reviewFilter = page
+    .locator(".list-tabs")
+    .getByRole("button", { name: /To review/ });
+  await page.keyboard.press("Tab");
+  await reviewFilter.focus();
+  await expect(hint).toContainText("Captured items waiting for your review");
+  await expect(hint.locator("kbd")).toHaveText("[ / ]");
+  await page.keyboard.press("Escape");
+  await row.getByRole("button", { name: "Edit " + name, exact: true }).click();
+  const details = dialog(page)
+    .locator("summary")
+    .filter({ hasText: "Details, image & note" });
+  await tabTo(page, details);
+  await expect(hint).toContainText("Show or hide item details");
+  await expect(hint.locator("kbd")).toContainText("D");
+  await page.keyboard.press("Enter");
+  await expect(dialog(page).locator(".extra-details")).toHaveAttribute("open");
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Private note" }),
+  ).toBeVisible();
+  await checkAccess(page);
 });
 
 test("whole public cards open from covers, copy, padding and keyboard", async ({

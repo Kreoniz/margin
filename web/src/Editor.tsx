@@ -542,9 +542,14 @@ export function Editor({
           open={details}
           onToggle={(e) => setDetails(e.currentTarget.open)}
         >
-          <summary>
-            Details, image & note <Icon name="chevron" size={15} />
-          </summary>
+          <ActionHint
+            label="Show or hide item details"
+            shortcut={formatForDisplay("Mod+Shift+D")}
+          >
+            <summary>
+              Details, image & note <Icon name="chevron" size={15} />
+            </summary>
+          </ActionHint>
           <div className="details-fields">
             {!item && (
               <FormField label="URL (optional)">

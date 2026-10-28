@@ -639,7 +639,7 @@
     @apply my-2 grid grid-cols-3 gap-2 text-[11px];
   }
   .action-hint {
-    @apply flex max-w-[calc(100vw-32px)] flex-wrap items-center gap-x-2 gap-y-1 text-xs;
+    @apply flex max-w-[calc(100vw-32px)] flex-wrap items-center gap-x-2 gap-y-1 px-3 text-xs;
   }
   .action-hint > kbd {
     @apply rounded border border-solid border-u-soft bg-u-well px-1 py-0.5 font-sans text-[10px] leading-none text-u-muted;
@@ -1211,7 +1211,10 @@
   }
   /* The title's native link/button owns the row; independent controls sit above it. */
   .owner-shell .media-row {
-    @apply relative min-h-16 gap-3 py-2;
+    @apply relative min-h-16 gap-3 px-3 py-2;
+  }
+  .owner-shell .article-row {
+    @apply px-3;
   }
   .owner-shell .media-row > .mini-cover {
     @apply h-16 w-20 min-w-20;
@@ -1256,8 +1259,11 @@
     }
   }
   @media (max-width: 600px) {
+    .owner-shell .article-row {
+      @apply px-2;
+    }
     .owner-shell .media-row {
-      @apply grid grid-cols-[24px_48px_minmax(0,1fr)_32px] items-center gap-x-2 gap-y-1;
+      @apply grid grid-cols-[24px_48px_minmax(0,1fr)_32px] items-center gap-x-2 gap-y-1 px-2;
     }
     .owner-shell .media-row > .mini-cover {
       @apply col-start-2 row-start-1 h-14 w-12 min-w-12;
@@ -1272,7 +1278,7 @@
       @apply col-start-3 row-start-1;
     }
     .owner-shell .media-row > .u-button:last-child {
-      @apply col-start-4 row-start-1 size-8 min-h-8 min-w-8;
+      @apply col-start-4 row-start-1 mr-0 size-8 min-h-8 min-w-8;
     }
     .owner-shell .media-row > .review-button {
       @apply col-start-3 row-start-2 w-fit;

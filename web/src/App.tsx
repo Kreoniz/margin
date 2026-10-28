@@ -727,34 +727,65 @@ function Owner({
           >
             {(view === "library"
               ? [
-                  { value: "pending", label: "To read/watch" },
-                  { value: "done", label: "Done" },
+                  {
+                    value: "pending",
+                    label: "To read/watch",
+                    hint: "Items you plan to read or watch",
+                  },
+                  {
+                    value: "done",
+                    label: "Done",
+                    hint: "Items you have finished",
+                  },
                   {
                     value: "review",
                     label: `To review (${media.filter((m) => m.needs_review).length})`,
+                    hint: "Captured items waiting for your review",
                   },
-                  { value: "all", label: "All" },
+                  { value: "all", label: "All", hint: "Your entire library" },
                 ]
               : [
-                  { value: "new", label: "New" },
-                  { value: "saved", label: "Saved" },
-                  { value: "read", label: "Read" },
-                  { value: "dismissed", label: "Dismissed" },
+                  {
+                    value: "new",
+                    label: "New",
+                    hint: "Discoveries you have not opened yet",
+                  },
+                  {
+                    value: "saved",
+                    label: "Saved",
+                    hint: "Discoveries saved to your library",
+                  },
+                  {
+                    value: "read",
+                    label: "Read",
+                    hint: "Discoveries marked as read",
+                  },
+                  {
+                    value: "dismissed",
+                    label: "Dismissed",
+                    hint: "Discoveries you have set aside",
+                  },
                 ]
             ).map((tab) => (
-              <button
+              <ActionHint
                 key={tab.value}
-                aria-pressed={
-                  (view === "library" ? status : inboxState) === tab.value
-                }
-                onClick={() =>
-                  view === "library"
-                    ? setStatus(tab.value)
-                    : setInboxState(tab.value)
-                }
+                label={tab.hint}
+                shortcut={singleKeys ? "[ / ]" : undefined}
+                context={singleKeys ? "Switch status filters" : undefined}
               >
-                {tab.label}
-              </button>
+                <button
+                  aria-pressed={
+                    (view === "library" ? status : inboxState) === tab.value
+                  }
+                  onClick={() =>
+                    view === "library"
+                      ? setStatus(tab.value)
+                      : setInboxState(tab.value)
+                  }
+                >
+                  {tab.label}
+                </button>
+              </ActionHint>
             ))}
           </div>
           {data && (
@@ -847,13 +878,14 @@ function Owner({
                           kindLabels[item.kind]}
                       </span>
                       {item.tags.slice(0, 2).map((t) => (
-                        <button
-                          className="inline-tag"
-                          key={t}
-                          onClick={() => setTag(t)}
-                        >
-                          {t}
-                        </button>
+                        <ActionHint label={"Show items tagged " + t} key={t}>
+                          <button
+                            className="inline-tag"
+                            onClick={() => setTag(t)}
+                          >
+                            {t}
+                          </button>
+                        </ActionHint>
                       ))}
                       {item.visibility === "public" && (
                         <span
@@ -874,26 +906,36 @@ function Owner({
                       </p>
                     )}
                     {item.metadata_state === "partial" && (
-                      <button
-                        className="metadata-warning"
-                        aria-label={"Edit missing details: " + item.title}
-                        onClick={() => setEditor(item)}
+                      <ActionHint
+                        label="Edit missing details"
+                        context="Retry metadata or fill in details in the editor."
                       >
-                        Missing details · Edit
-                      </button>
+                        <button
+                          className="metadata-warning"
+                          aria-label={"Edit missing details: " + item.title}
+                          onClick={() => setEditor(item)}
+                        >
+                          Missing details · Edit
+                        </button>
+                      </ActionHint>
                     )}
                   </div>
                   {item.needs_review && (
-                    <Button
-                      className="review-button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={pending.has(item.id)}
-                      aria-label={"Mark reviewed: " + item.title}
-                      onClick={() => void markReviewed(item)}
+                    <ActionHint
+                      label="Mark reviewed"
+                      context="Remove from To review without marking it done."
                     >
-                      Mark reviewed
-                    </Button>
+                      <Button
+                        className="review-button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={pending.has(item.id)}
+                        aria-label={"Mark reviewed: " + item.title}
+                        onClick={() => void markReviewed(item)}
+                      >
+                        Mark reviewed
+                      </Button>
+                    </ActionHint>
                   )}
                   <TypeLabel kind={item.kind} />
                   <ActionHint
@@ -1017,32 +1059,54 @@ function Owner({
                         </ActionHint>
                       )}
                       {item.state === "new" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={pending.has(item.id)}
-                          nativeButton={false}
-                          render={
-                            <a
-                              href={safeURL(item.url)}
-                              target="_blank"
-                              rel="noreferrer"
-                            />
-                          }
-                          onClick={() => void setArticleState(item.id, "read")}
+                        <ActionHint
+                          label="Open article and mark read"
+                          shortcut="Enter"
+                          context="With this row focused"
                         >
-                          Read <Icon name="external" size={12} />
-                        </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={pending.has(item.id)}
+                            nativeButton={false}
+                            render={
+                              <a
+                                href={safeURL(item.url)}
+                                target="_blank"
+                                rel="noreferrer"
+                              />
+                            }
+                            onClick={() =>
+                              void setArticleState(item.id, "read")
+                            }
+                          >
+                            Read <Icon name="external" size={12} />
+                          </Button>
+                        </ActionHint>
                       )}
                       {["read", "dismissed"].includes(item.state) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={pending.has(item.id)}
-                          onClick={() => void setArticleState(item.id, "new")}
+                        <ActionHint
+                          label="Move back to new discoveries"
+                          shortcut={
+                            singleKeys && item.state === "read"
+                              ? "R"
+                              : undefined
+                          }
+                          context={
+                            singleKeys && item.state === "read"
+                              ? "With this row focused"
+                              : undefined
+                          }
                         >
-                          Mark new
-                        </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={pending.has(item.id)}
+                            onClick={() => void setArticleState(item.id, "new")}
+                          >
+                            Mark new
+                          </Button>
+                        </ActionHint>
                       )}
                     </div>
                   </div>
@@ -1085,13 +1149,21 @@ function Owner({
           ))}
         {(view === "library" ? filtered.length : articles.length) > limit && (
           <div className="show-more">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setLimit((n) => n + 40)}
+            <ActionHint
+              label={
+                view === "library"
+                  ? "Show up to 40 more items"
+                  : "Show up to 40 more articles"
+              }
             >
-              Show more <Icon name="chevron" size={14} />
-            </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setLimit((n) => n + 40)}
+              >
+                Show more <Icon name="chevron" size={14} />
+              </Button>
+            </ActionHint>
           </div>
         )}
         {data?.dev_mode && (
@@ -1100,15 +1172,24 @@ function Owner({
             role="region"
             aria-label="Development tools"
           >
-            <span>Development · G then M</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              loading={pending.has("demo-data")}
-              onClick={() => void toggleDemoData()}
+            <span>Development{singleKeys ? " · G then M" : ""}</span>
+            <ActionHint
+              label={
+                data.dev_fixture_count
+                  ? "Remove the generated demo items"
+                  : "Add demo items for all nine media types"
+              }
+              shortcut={singleKeys ? "G then M" : undefined}
             >
-              {data.dev_fixture_count ? "Clear demo data" : "Load demo data"}
-            </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                loading={pending.has("demo-data")}
+                onClick={() => void toggleDemoData()}
+              >
+                {data.dev_fixture_count ? "Clear demo data" : "Load demo data"}
+              </Button>
+            </ActionHint>
           </div>
         )}
         <footer className="page-footer">
