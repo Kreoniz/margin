@@ -132,7 +132,7 @@
     @apply inline-flex items-center border-0 bg-transparent p-0 no-underline;
   }
   .logo {
-    @apply inline-flex items-center gap-1.5 leading-none text-u-ink;
+    @apply inline-flex items-center gap-2 leading-none text-u-ink;
   }
   .logo > span {
     @apply text-[31px] font-[640] tracking-[-1.7px];
