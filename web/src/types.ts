@@ -13,6 +13,7 @@ export type Kind = (typeof kinds)[number];
 export type Status = "pending" | "done";
 export type Visibility = "private" | "public";
 export interface Media {
+  needs_review?: boolean;
   id: string;
   title: string;
   author: string;
@@ -28,10 +29,10 @@ export interface Media {
   updated_at: string;
   completed_at?: string;
 }
-export type PublicMedia = Omit<Media, "notes">;
+export type PublicMedia = Omit<Media, "notes" | "needs_review">;
 export type MediaDraft = Omit<
   Media,
-  "id" | "created_at" | "updated_at" | "completed_at"
+  "id" | "created_at" | "updated_at" | "completed_at" | "needs_review"
 >;
 export interface InboxItem {
   id: string;

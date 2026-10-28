@@ -144,7 +144,7 @@ func (s *Store) submit(ctx context.Context, token string, m Media) (Media, bool,
 }
 func (s *Server) prepareMedia(ctx context.Context, in MediaInput) (Media, error) {
 	m := NewMedia()
-	if in.URL != nil && strings.TrimSpace(*in.URL) != "" {
+	if in.URL != nil && strings.TrimSpace(*in.URL) != "" && !(in.Title != nil && in.Author != nil && in.Kind != nil && in.CoverURL != nil && in.Description != nil) {
 		metadata, err := s.Fetcher.Metadata(ctx, *in.URL)
 		if err != nil {
 			return m, err
@@ -191,6 +191,7 @@ func (s *Server) submitItem(w http.ResponseWriter, r *http.Request) {
 		respond(w, 201, nil, err)
 		return
 	}
+	m.NeedsReview = true
 	m, created, err := s.Store.submit(r.Context(), token, m)
 	if errors.Is(err, errCredentials) {
 		writeJSON(w, 401, map[string]string{"error": "Submission token required"})

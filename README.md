@@ -12,7 +12,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Open **http://localhost:8787** and create your owner password. Alternatively set `APP_PASSWORD` (12+ characters) before starting. The password is securely hashed, and editing/private reads require an owner cookie session. There is one owner, no account platform.
+Open **http://localhost:8787** for the public Collection. Go directly to **http://localhost:8787/dashboard** to create your owner password or sign in. Alternatively set `APP_PASSWORD` (12+ characters) before starting. The password is securely hashed, and editing/private reads require an owner cookie session. There is one owner, no account platform.
 
 The library starts empty. Five default sources collect real articles into **Discover**: OpenAI, Anthropic, Thinking Machines Lab, Google DeepMind and Hugging Face. Discovery articles enter the personal list only when saved, or when explicitly opted into future auto-save. Counts reflect database contents; no sample library is generated.
 
@@ -30,7 +30,7 @@ For remote Docker hosting, secrets, HTTPS, backups and domain changes, see the [
 
 ## Use
 
-- **Library:** compact searchable rows, a quick done checkbox, media-type/tag filters, small optional covers and an edit action. Add a title or paste a URL; metadata fills editable details automatically. Optional tags and private notes help retrieval.
+- **Library:** searchable rows with larger uncropped previews, a quick done checkbox, media-type/tag filters, optional covers and an edit action. Add a title or paste a URL; metadata fills editable details automatically. Optional tags and private notes help retrieval.
 - **Discover:** open/read, save or dismiss articles from subscribed sources. Saved, read and dismissed states remain separate from library status. Source controls are secondary to the article list.
 - **Sources:** open directly from the compact navigation bar. Follow a feed or a website advertising RSS/Atom, change its interval or pause it. Auto-save is off by default. Enabling it saves only previously unseen, dated future articles as **private To read/watch** items. Existing discoveries, dismissed/read/deleted URLs and library metadata/visibility stay unchanged. Undated or update-only entries stay in Discover. OpenAI and Anthropic use locally served first-party publisher marks; their origins are recorded in `web/public/brands/README.txt`.
 - **Sharing:** mark individual items Public in the editor. `/shared` and `/shared/{id}` are read-only, with no private notes, subscriptions, inbox or private item counts. Switching an item back to Private removes it from public responses. Visitors cannot edit.
@@ -38,11 +38,11 @@ For remote Docker hosting, secrets, HTTPS, backups and domain changes, see the [
 
 Keyboard uses **[TanStack Hotkeys](https://tanstack.com/hotkeys/latest/docs/framework/react/quick-start)** (`@tanstack/react-hotkeys` 0.16.0). **↑/↓** or **J/K** select rows; **Home/End** reach the first/last item and navigation loads additional rows as needed. **Enter/O** opens the selected item. In Discover, **S** saves, **R** toggles read/unread and **X** dismisses; in Library, **D** toggles Done and **E** edits. **Ctrl/⌘ Z** undoes the last status change. Selection moves to a visible row after filtering or removal.
 
-**Ctrl/⌘ K** searches; **↓/Enter** leaves search for the first match. **Ctrl/⌘ Shift A** adds an item, and **Ctrl/⌘ Enter** saves the editor after normal form validation. **Alt+1/Alt+2** switch Library/Discover; **G then L/D** are quick-key alternatives. **[/]** cycle status filters, **Alt S** opens Sources, **Shift R** checks sources and **Ctrl/⌘ comma** opens Settings. **F1** opens the full guide, including from Settings. **Tab/Shift Tab** reach filters and individual actions; **Escape** closes dialogs and returns focus. Single-key shortcuts can be disabled in Settings; typing and dialogs retain their own keys.
+**Ctrl/⌘ K** searches; **↓/Enter** leaves search for the first match. **Ctrl/⌘ Shift A** adds an item, and **Ctrl/⌘ Enter** saves the editor after normal form validation. **G then L/D** switch Library/Discover. **[/]** cycle status filters, **G then S** opens Sources, **Shift R** checks sources and **Ctrl/⌘ comma** opens Settings. **F1** opens the full guide, including from Settings. **Tab/Shift Tab** reach filters and individual actions; **Escape** closes dialogs and returns focus. Single-key shortcuts can be disabled in Settings; typing and dialogs retain their own keys.
 
 Settings keeps Appearance and keyboard controls upfront; sharing, integration and sample maintenance are expandable. The theme choice persists. The first dark-default upgrade starts dark even if the old app automatically stored its light default; a new explicit light selection is respected thereafter.
 
-Rows fade in and reposition briefly after list changes; headings, controls and dialogs have restrained transitions. Native CSS and Web Animations handle motion without an animation dependency. The OS/browser reduced-motion preference disables it, including active row animations. Only theme and keyboard preferences are stored in the browser; library, owner sessions, sources and inbox live in PostgreSQL.
+Rows fade in and reposition briefly after list changes; headings, controls and dialogs have restrained transitions. Native CSS and Web Animations handle motion without an animation dependency. The OS/browser reduced-motion preference disables it, including active row animations. Uploaded images and explicit external-capture review flags are stored in PostgreSQL. Only theme and keyboard preferences are stored in the browser; library, owner sessions, sources and inbox live in PostgreSQL.
 
 ## Telegram / Hermes capture
 
@@ -109,3 +109,5 @@ TEST_DATABASE_URL='<disposable PostgreSQL URL>' go test -race -count=1 ./...
 Backend tests use isolated schemas, require explicit TEST_DATABASE_URL and never fall back to the application database. They cover fresh/upgrade migrations, legacy sample precision, auth/CSRF/limiting, sharing, token scope/concurrency/revocation, auto-save cutoffs/seen history, metadata/parsers and existing worker/storage behavior. See the backend guide for optional live-source checks.
 
 [Corrected product audit](docs/product-correction.md) · [Design research](docs/product-correction-research.md) · [API contract](docs/api-contract.md). Inter is self-hosted with its SIL Open Font License; Unlikely UI, TanStack and Tailwind license notices are retained under web/public/licenses.
+
+See [capture, book matching, images, export, and Collection changes](docs/capture-and-collection.md) and the [Helium extension setup](extension/README.md).

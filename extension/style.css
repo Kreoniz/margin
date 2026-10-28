@@ -1,0 +1,68 @@
+:root {
+  color-scheme: dark light;
+  font:
+    14px/1.5 system-ui,
+    sans-serif;
+}
+body {
+  margin: 0;
+  background: light-dark(#fbfaf7, #161c1a);
+  color: light-dark(#24352d, #e2e9e4);
+}
+main {
+  max-width: 480px;
+  margin: auto;
+  padding: 24px;
+}
+h1 {
+  font-size: 24px;
+  margin: 0 0 12px;
+}
+form,
+label {
+  display: grid;
+  gap: 8px;
+}
+form {
+  gap: 16px;
+}
+input,
+button {
+  font: inherit;
+  border: 1px solid #71867a;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+input {
+  min-width: 0;
+}
+button {
+  cursor: pointer;
+  background: #b6e4cd;
+  color: #173728;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+:focus-visible {
+  outline: 2px solid #76cda6;
+  outline-offset: 3px;
+}
+a {
+  color: light-dark(#276548, #b6e4cd);
+}
+p {
+  font-size: 12px;
+}
+.popup {
+  width: 320px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+}
+#options {
+  margin-top: 16px;
+  font-size: 12px;
+}

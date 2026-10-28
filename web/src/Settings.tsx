@@ -8,6 +8,7 @@ import { Modal } from "./components";
 import { Icon } from "./Icon";
 import type { Media } from "./types";
 import { publicPath } from "./utils";
+import { BrowserCaptureSettings } from "./BrowserCaptureSettings";
 import { KeyboardHelp } from "./KeyboardHelp";
 
 export function Settings({
@@ -268,6 +269,31 @@ export function Settings({
               marked To read/watch.
             </p>
           </details>
+        </div>
+      </details>
+      <BrowserCaptureSettings />
+      <details className="settings-disclosure">
+        <summary>
+          <span>
+            <Icon name="book" size={15} />
+            Export library
+          </span>
+          <Icon name="chevron" size={14} />
+        </summary>
+        <div className="settings-detail">
+          <p>
+            Download your library as JSON with uploaded images in a ZIP file.
+            Includes private notes; keep the archive private. External image
+            URLs are retained as links.
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            nativeButton={false}
+            render={<a href="/api/export" download="margin-export.zip" />}
+          >
+            Download library & images
+          </Button>
         </div>
       </details>
       {legacyCount > 0 && (

@@ -182,6 +182,7 @@ type FetchResult struct {
 	ContentType string
 }
 type Fetcher struct {
+	books      bookSearchState
 	client     *http.Client
 	resolve    func(context.Context, string) ([]netip.Addr, error)
 	dial       func(context.Context, string, string) (net.Conn, error)

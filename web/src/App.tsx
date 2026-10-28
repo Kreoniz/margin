@@ -5,15 +5,10 @@ import { Button } from "unlikely-ui/button";
 import { Checkbox } from "unlikely-ui/checkbox";
 import { Input } from "unlikely-ui/input";
 import { Toast } from "unlikely-ui/toast";
+import { Collection } from "./Collection";
 import { Access } from "./Access";
-import { api, ApiError, send } from "./api";
-import {
-  EmptyState,
-  MiniCover,
-  Picker,
-  SourceMark,
-  TypeLabel,
-} from "./components";
+import { api, send } from "./api";
+import { EmptyState, MiniCover, Picker, TypeLabel } from "./components";
 import { Editor } from "./Editor";
 import { Icon, Logo } from "./Icon";
 import { Settings } from "./Settings";
@@ -24,7 +19,6 @@ import {
   type Kind,
   type LibraryData,
   type Media,
-  type PublicMedia,
   type Session,
 } from "./types";
 import { hostname, relativeDate, safeURL, selectMedia } from "./utils";
@@ -45,6 +39,7 @@ export default function App() {
   const [session, setSession] = useState<Session>();
   const [error, setError] = useState("");
   const shared =
+    window.location.pathname === "/" ||
     window.location.pathname === "/shared" ||
     window.location.pathname.startsWith("/shared/");
   const refreshSession = useCallback(async () => {
@@ -56,12 +51,13 @@ export default function App() {
     }
   }, []);
   useEffect(() => {
+    if (shared) return;
     void refreshSession();
     const expired = () =>
       setSession({ authenticated: false, setup_required: false });
     window.addEventListener("margin-session-expired", expired);
     return () => window.removeEventListener("margin-session-expired", expired);
-  }, [refreshSession]);
+  }, [refreshSession, shared]);
   useEffect(() => {
     document.documentElement.dataset.appearance = appearance;
     try {
@@ -74,7 +70,7 @@ export default function App() {
     <Theme appearance={appearance} className="app-theme">
       <Toast.Provider timeout={3500}>
         {shared ? (
-          <Shared owner={session?.authenticated || false} />
+          <Collection />
         ) : session?.authenticated ? (
           <Owner
             appearance={appearance}
@@ -219,8 +215,6 @@ function Owner({
         callback: () => setEditor("new"),
         options: { enabled: shortcutsEnabled && singleKeys },
       },
-      { hotkey: "Alt+1", callback: () => navigate("library") },
-      { hotkey: "Alt+2", callback: () => navigate("discover") },
       {
         hotkey: ["G", "L"],
         callback: () => navigate("library"),
@@ -232,7 +226,11 @@ function Owner({
         options: { enabled: shortcutsEnabled && singleKeys },
       },
       { hotkey: "Mod+,", callback: () => setSettings(true) },
-      { hotkey: "Alt+S", callback: () => setSourcesOpen(true) },
+      {
+        hotkey: ["G", "S"],
+        callback: () => setSourcesOpen(true),
+        options: { enabled: shortcutsEnabled && singleKeys },
+      },
       { hotkey: "F1", callback: () => setHelpOpen(true) },
       {
         hotkey: "?",
@@ -266,9 +264,21 @@ function Owner({
   const inbox = data?.inbox || [];
   const sources = data?.sources || [];
   const filtered = useMemo(
-    () => selectMedia(media, { query, status, kind, tag }),
+    () =>
+      selectMedia(
+        status === "review" ? media.filter((item) => item.needs_review) : media,
+        { query, status: status === "review" ? "all" : status, kind, tag },
+      ),
     [media, query, status, kind, tag],
   );
+  useEffect(() => {
+    if (!data || !window.location.hash.startsWith("#edit=")) return;
+    const item = data.media.find((m) => m.id === window.location.hash.slice(6));
+    if (item) {
+      setEditor(item);
+      window.history.replaceState(null, "", "/dashboard#library");
+    }
+  }, [data]);
   const tags = [...new Set(media.flatMap((item) => item.tags))].sort((a, b) =>
     a.localeCompare(b),
   );
@@ -379,7 +389,7 @@ function Owner({
   function cycleStatus(direction: number) {
     const values =
       view === "library"
-        ? ["pending", "done", "all"]
+        ? ["pending", "done", "review", "all"]
         : ["new", "saved", "read", "dismissed"];
     const current = values.indexOf(view === "library" ? status : inboxState);
     const next = values[(current + direction + values.length) % values.length];
@@ -644,6 +654,10 @@ function Owner({
               ? [
                   { value: "pending", label: "To read/watch" },
                   { value: "done", label: "Done" },
+                  {
+                    value: "review",
+                    label: `To review (${media.filter((m) => m.needs_review).length})`,
+                  },
                   { value: "all", label: "All" },
                 ]
               : [
@@ -752,6 +766,28 @@ function Owner({
                       ))}
                     </div>
                   </div>
+                  {item.needs_review && (
+                    <Button
+                      className="review-button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={pending.has(item.id)}
+                      aria-label={"Mark reviewed: " + item.title}
+                      onClick={() =>
+                        void perform(
+                          item.id,
+                          () =>
+                            api(
+                              "/media/" + item.id,
+                              send("PATCH", { needs_review: false }),
+                            ),
+                          "Reviewed.",
+                        )
+                      }
+                    >
+                      Reviewed
+                    </Button>
+                  )}
                   <TypeLabel kind={item.kind} />
                   {item.visibility === "public" && (
                     <span
@@ -825,7 +861,7 @@ function Owner({
                   }
                   aria-label={item.title}
                 >
-                  <SourceMark name={item.source_name} />
+                  <MiniCover kind="article" url={item.cover_url} />
                   <div className="article-content">
                     <div className="article-meta">
                       <span>{item.source_name}</span>
@@ -978,7 +1014,6 @@ function Owner({
           }}
           onDelete={async (item) => {
             await api("/media/" + item.id, send("DELETE"));
-            setEditor(undefined);
             await refresh();
           }}
         />
@@ -1024,148 +1059,6 @@ function Owner({
           singleKeys={singleKeys}
         />
       )}
-    </div>
-  );
-}
-
-function Shared({ owner }: { owner: boolean }) {
-  const id = window.location.pathname.split("/").filter(Boolean)[1];
-  const [items, setItems] = useState<PublicMedia[]>();
-  const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
-  useEffect(() => {
-    document.title = "Shared reading — Margin";
-    let active = true;
-    void api<PublicMedia[] | PublicMedia>(
-      "/public/media" + (id ? "/" + encodeURIComponent(id) : ""),
-    )
-      .then((result) => {
-        if (active) setItems(Array.isArray(result) ? result : [result]);
-      })
-      .catch((e) => {
-        if (active)
-          setError(
-            e instanceof ApiError && e.status === 404
-              ? "This item is not shared."
-              : e.message,
-          );
-      });
-    return () => {
-      active = false;
-    };
-  }, [id]);
-  const filtered = selectMedia(items || [], {
-    query,
-    status: "all",
-    kind: "all",
-    tag: "",
-  });
-  return (
-    <div className="shared-page">
-      <header className="app-header">
-        <div className="header-inner">
-          <a href="/shared" className="brand-link" aria-label="Shared library">
-            <Logo small />
-          </a>
-          <span className="shared-label">
-            <Icon name="globe" size={14} />
-            Shared reading
-          </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            nativeButton={false}
-            render={<a href="/" />}
-          >
-            {owner ? "Your private library" : "Owner sign in"}
-          </Button>
-        </div>
-      </header>
-      <main className="content">
-        <div className="page-heading">
-          <div>
-            <h1>
-              {id ? "A little reading" : "Shared library"}
-              <span>.</span>
-            </h1>
-            <p>
-              Public by choice. A read-only collection of things worth a look.
-            </p>
-          </div>
-        </div>
-        {error ? (
-          <p className="notice error" role="alert">
-            {error}
-          </p>
-        ) : !items ? (
-          <p role="status" className="quiet">
-            Loading shared items…
-          </p>
-        ) : (
-          <>
-            {!id && items.length > 0 && (
-              <div className="search-box public-search">
-                <Icon name="search" size={16} />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  aria-label="Search shared items"
-                  placeholder="Find something to read or watch…"
-                />
-              </div>
-            )}
-            <div className="media-list shared-list">
-              {filtered.map((item) => (
-                <article className="media-row" key={item.id}>
-                  <MiniCover kind={item.kind} url={item.cover_url} />
-                  <div className="row-content">
-                    <a
-                      className="item-title"
-                      href={safeURL(item.url) || "/shared/" + item.id}
-                      target={safeURL(item.url) ? "_blank" : undefined}
-                      rel="noreferrer"
-                    >
-                      {item.title}
-                      {safeURL(item.url) && <Icon name="external" size={12} />}
-                    </a>
-                    <p className="item-meta">
-                      {item.author ||
-                        hostname(item.url) ||
-                        kindLabels[item.kind]}
-                    </p>
-                    {item.description && (
-                      <p className="shared-description">{item.description}</p>
-                    )}
-                    {item.tags.length > 0 && (
-                      <p className="shared-tags">{item.tags.join(" · ")}</p>
-                    )}
-                  </div>
-                  <TypeLabel kind={item.kind} />
-                  <span className="shared-status">
-                    {item.status === "done" ? "Done" : "To read/watch"}
-                  </span>
-                </article>
-              ))}
-            </div>
-            {!filtered.length && (
-              <div className="empty-state">
-                <span className="empty-icon">
-                  <Icon name="globe" size={27} />
-                </span>
-                <h2>{query ? "Nothing matches." : "Nothing shared yet."}</h2>
-                <p>
-                  Private items stay private. Only items explicitly made public
-                  appear here.
-                </p>
-              </div>
-            )}
-          </>
-        )}
-        <footer className="page-footer">
-          <Icon name="globe" size={13} />
-          Read-only. Editing belongs to the owner.
-        </footer>
-      </main>
     </div>
   );
 }

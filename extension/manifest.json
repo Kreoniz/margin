@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Margin capture",
+  "version": "1.0.0",
+  "description": "Save the current page to Margin or mark it Done, with independent shortcuts.",
+  "permissions": ["activeTab", "storage"],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "options_page": "options.html",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Margin capture"
+  },
+  "commands": {
+    "save-page": { "description": "Save current page to Margin" },
+    "done-page": { "description": "Mark current page Done in Margin" }
+  }
+}

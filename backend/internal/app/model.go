@@ -13,6 +13,7 @@ import (
 )
 
 type Media struct {
+	NeedsReview bool       `json:"needs_review"`
 	ID          string     `json:"id"`
 	Title       string     `json:"title"`
 	Author      string     `json:"author"`
@@ -51,6 +52,7 @@ func publicMedia(m Media) PublicMedia {
 }
 
 type MediaInput struct {
+	NeedsReview *bool     `json:"needs_review"`
 	Title       *string   `json:"title"`
 	Author      *string   `json:"author"`
 	Kind        *string   `json:"kind"`
@@ -68,6 +70,9 @@ func NewMedia() Media {
 }
 
 func (in MediaInput) Apply(m Media) (Media, error) {
+	if in.NeedsReview != nil {
+		m.NeedsReview = *in.NeedsReview
+	}
 	for _, p := range []struct {
 		dst *string
 		src *string
@@ -117,7 +122,7 @@ func (in MediaInput) Apply(m Media) (Media, error) {
 			return m, fmt.Errorf("url: %w", err)
 		}
 	}
-	if m.CoverURL != "" {
+	if m.CoverURL != "" && !isImagePath(m.CoverURL) {
 		m.CoverURL, err = CanonicalURL(m.CoverURL)
 		if err != nil {
 			return m, fmt.Errorf("cover_url: %w", err)

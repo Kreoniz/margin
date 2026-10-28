@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><title>Margin capture options</title
+  ><link rel="stylesheet" href="style.css" />
+  <body>
+    <main>
+      <h1>Margin capture</h1>
+      <p>
+        Use a browser capture token from Dashboard → Settings → Helium / browser
+        capture.
+      </p>
+      <form id="options">
+        <label
+          >Margin address<input
+            id="origin"
+            type="url"
+            required
+            placeholder="https://margin.example.com" /></label
+        ><label
+          >Browser token<input
+            id="token"
+            type="password"
+            required
+            autocomplete="off" /></label
+        ><button>Save connection</button>
+      </form>
+      <p id="status" role="status"></p>
+      <button id="shortcuts">Customize Save and Done shortcuts</button>
+      <p>
+        Only the chosen Margin site receives access. Captured items stay
+        private. Publishing and editing are available in the dashboard.
+      </p>
+    </main>
+    <script src="options.js" type="module"></script>
+  </body>
+</html>

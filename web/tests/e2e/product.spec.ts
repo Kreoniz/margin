@@ -13,7 +13,8 @@ const test = base.extend({
   },
 });
 let ownerState:
-  Awaited<ReturnType<APIRequestContext["storageState"]>> | undefined;
+  | Awaited<ReturnType<APIRequestContext["storageState"]>>
+  | undefined;
 const password = process.env.E2E_OWNER_PASSWORD || "qa-only-owner-password";
 const baseURL = process.env.BASE_URL || "http://127.0.0.1:5178";
 const ownedTitles = new Set<string>();
@@ -95,7 +96,7 @@ test("access: first-run setup or login, private empty list and logout", async ({
   request,
 }, info) => {
   const session = await (await request.get("/api/session")).json();
-  await page.goto("/");
+  await page.goto("/dashboard");
   if (session.setup_required) {
     await expect(
       page.getByRole("heading", { name: "Make it yours." }),
@@ -146,7 +147,7 @@ test("compact library supports title-only adding, two-state toggles, editing, se
   const name = title("reading list");
   const edited = name + " edited";
   ownedTitles.add(edited);
-  await page.goto("/");
+  await page.goto("/dashboard");
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page).getByRole("textbox", { name: "Title or URL" }).fill(name);
   await dialog(page)
@@ -176,6 +177,9 @@ test("compact library supports title-only adding, two-state toggles, editing, se
   await dialog(page)
     .getByRole("textbox", { name: "Title", exact: true })
     .fill(edited);
+  await dialog(page)
+    .getByText("Details, image & note", { exact: true })
+    .click();
   await dialog(page)
     .getByRole("textbox", { name: "Creator (optional)" })
     .fill("A test creator");
@@ -219,7 +223,7 @@ test("compact library supports title-only adding, two-state toggles, editing, se
   ).toBeVisible();
 });
 
-test("URL capture extracts editable metadata, preserves chosen type and uses canonical URL", async ({
+test("URL capture extracts editable metadata and preserves chosen type", async ({
   page,
 }) => {
   const name = title("URL capture");
@@ -238,14 +242,14 @@ test("URL capture extracts editable metadata, preserves chosen type and uses can
       },
     });
   });
-  await page.goto("/");
+  await page.goto("/dashboard");
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page)
     .getByRole("textbox", { name: "Title or URL" })
     .fill("https://example.com/qa-redirect");
   await expect(
     dialog(page).getByRole("button", { name: "Add to library", exact: true }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   await dialog(page)
     .getByRole("combobox", { name: "Type", exact: true })
     .click();
@@ -280,7 +284,7 @@ test("switching URL capture to a manual title clears fetched details and preserv
       },
     }),
   );
-  await page.goto("/");
+  await page.goto("/dashboard");
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page)
     .getByRole("textbox", { name: "Title or URL" })
@@ -288,7 +292,9 @@ test("switching URL capture to a manual title clears fetched details and preserv
   await expect(
     dialog(page).getByRole("textbox", { name: "Title", exact: true }),
   ).toHaveValue("Fetched test page");
-  await dialog(page).getByText("Details & note", { exact: true }).click();
+  await dialog(page)
+    .getByText("Details, image & note", { exact: true })
+    .click();
   await dialog(page)
     .getByRole("textbox", { name: "Creator (optional)" })
     .fill("My own creator");
@@ -371,7 +377,7 @@ test("private and public items have owner-only edits and notes never leak", asyn
     );
     await checkAccess(publicPage);
     await context.close();
-    await page.goto("/");
+    await page.goto("/dashboard");
     await page
       .getByRole("button", { name: "Edit " + publicTitle, exact: true })
       .click();
@@ -466,7 +472,7 @@ test("discovery remains separate while saving, dismissing and reading", async ({
     has: page.getByRole("link", { name: article.title, exact: true }),
   });
   try {
-    await page.goto("/#discover");
+    await page.goto("/dashboard#discover");
     await page
       .getByRole("searchbox", { name: "Search discoveries" })
       .fill(article.title);
@@ -525,7 +531,7 @@ test("source auto-save settings persist and dialogs are accessible on mobile and
     (s: { name: string }) => s.name === "Hugging Face",
   );
   try {
-    await page.goto("/#discover");
+    await page.goto("/dashboard#discover");
     await page.getByRole("button", { name: "Sources", exact: true }).click();
     const row = page.locator(".source-row").filter({
       has: page.getByRole("heading", { name: "Hugging Face", exact: true }),
@@ -578,7 +584,7 @@ test("empty library, real discoveries, keyboard navigation and two-state UI rema
 }, info) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(
     page.getByText("Something worth keeping?", { exact: true }),
   ).toBeVisible();
@@ -613,7 +619,7 @@ test("empty library, real discoveries, keyboard navigation and two-state UI rema
 test("TanStack shortcuts respect typing and dialogs and submit the editor once", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const search = page.getByRole("searchbox", { name: "Search library" });
   await expect(search).toBeVisible();
   const mod = (await page.locator(".search-box kbd").innerText()).includes("⌘")
@@ -660,7 +666,7 @@ test("TanStack shortcuts respect typing and dialogs and submit the editor once",
 test("single-key shortcuts can be disabled without disabling modifier shortcuts", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByRole("searchbox")).toBeVisible();
   const mod = (await page.locator(".search-box kbd").innerText()).includes("⌘")
     ? "Meta"
@@ -706,7 +712,7 @@ test("rows move smoothly and reduced motion removes movement and dialog transiti
     ids.push((await response.json()).id);
   }
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/");
+  await page.goto("/dashboard");
   const rows = page.locator(".media-row");
   await expect(rows).toHaveCount(2);
   const moving = rows.filter({ hasText: names[0] });
@@ -741,7 +747,7 @@ test("compact navigation exposes sources and source controls persist without ove
   page,
   request,
 }, info) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(
     page.getByRole("heading", { name: "Your library." }),
   ).toBeVisible();
@@ -847,7 +853,7 @@ test("keyboard-only library navigation supports opening, editing, completion, un
       ).status(),
     ).toBe(201);
   }
-  await page.goto("/");
+  await page.goto("/dashboard");
   const rows = page.locator(".media-row");
   await expect(rows).toHaveCount(3);
   const mod = await modifier(page);
@@ -932,7 +938,7 @@ test("keyboard navigation reaches items beyond the first page", async ({
       ).status(),
     ).toBe(201);
   }
-  await page.goto("/");
+  await page.goto("/dashboard");
   const rows = page.locator(".media-row");
   await expect(rows).toHaveCount(40);
   await page.keyboard.press("End");
@@ -1007,7 +1013,7 @@ test("keyboard-only discovery supports save, read, dismiss, undo and opening the
   );
   let savedURL: string | undefined;
   try {
-    await page.goto("/#discover");
+    await page.goto("/dashboard#discover");
     const rows = page.locator(".article-row");
     await expect(rows.first()).toBeVisible();
     await page.keyboard.press("ArrowDown");
@@ -1064,7 +1070,8 @@ test("keyboard-only discovery supports save, read, dismiss, undo and opening the
     await original.close();
     await page.bringToFront();
     await expect(page.locator(`[data-row-id="${openID}"]`)).toHaveCount(0);
-    await page.keyboard.press("Alt+s");
+    await page.keyboard.press("g");
+    await page.keyboard.press("s");
     await expect(
       page.getByRole("heading", { name: "Your sources" }),
     ).toBeVisible();
@@ -1090,7 +1097,7 @@ test("dark is the default, settings has a full hit area, and theme persists thro
   await page.addInitScript(() =>
     localStorage.setItem("margin-appearance", "light"),
   );
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.locator(".app-theme")).toHaveAttribute(
     "data-appearance",
     "dark",
@@ -1160,4 +1167,270 @@ test("dark is the default, settings has a full hit area, and theme persists thro
   );
   await page.keyboard.press("Enter");
   await checkAccess(page);
+});
+
+test("public root stays a Collection for visitors and signed-in owners", async ({
+  page,
+  request,
+  browser,
+}) => {
+  const name = title("Collection book");
+  await request.post("/api/media", {
+    data: { title: name, kind: "book", visibility: "public" },
+  });
+  for (const signedIn of [true, false]) {
+    const guest = signedIn ? undefined : await browser.newContext();
+    const surface = guest ? await guest.newPage() : page;
+    await surface.goto(baseURL + "/");
+    await expect(
+      surface.getByRole("heading", { name: "Collection." }),
+    ).toBeVisible();
+    await expect(surface.getByRole("link", { name })).toBeVisible();
+    await expect(
+      surface.getByRole("link", { name: /sign in|private library/i }),
+    ).toHaveCount(0);
+    await expect(
+      surface.getByRole("button", { name: "Settings", exact: true }),
+    ).toHaveCount(0);
+    const cover = surface.locator(".collection-card .mini-cover");
+    expect((await cover.boundingBox())!.height).toBeGreaterThanOrEqual(200);
+    await checkAccess(surface);
+    await guest?.close();
+  }
+});
+
+test("metadata lookup never blocks saving", async ({ page, request }) => {
+  const name = title("Fast capture");
+  await page.route("**/api/metadata", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    await route
+      .fulfill({
+        json: {
+          title: "Late metadata",
+          author: "Late creator",
+          kind: "article",
+          url: "https://example.com/fast",
+          cover_url: "",
+          description: "",
+        },
+      })
+      .catch(() => {});
+  });
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  await dialog(page)
+    .getByRole("textbox", { name: "Title or URL" })
+    .fill("https://example.com/fast-" + Date.now());
+  await dialog(page)
+    .getByRole("textbox", { name: "Title", exact: true })
+    .fill(name);
+  await expect(
+    dialog(page).getByRole("button", { name: "Add to library", exact: true }),
+  ).toBeEnabled();
+  await page.keyboard.press((await modifier(page)) + "+Enter");
+  await expect(dialog(page)).toHaveCount(0);
+  await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+  expect(
+    (await (await request.get("/api/media")).json()).find(
+      (m: { title: string }) => m.title === name,
+    ),
+  ).toBeTruthy();
+});
+
+test("book ISBN resolves automatically with an optional keyboard correction", async ({
+  page,
+  request,
+}) => {
+  const first = title("Automatic edition"),
+    second = title("Corrected edition");
+  await page.route("**/api/books/search", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            title: first,
+            author: "First writer",
+            kind: "book",
+            url: "https://openlibrary.org/books/OL1M",
+            cover_url: "",
+            description: "",
+          },
+          {
+            title: second,
+            author: "Second writer",
+            kind: "book",
+            url: "https://openlibrary.org/books/OL2M",
+            cover_url: "",
+            description: "",
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  await dialog(page)
+    .getByRole("textbox", { name: "Title or URL" })
+    .fill("9780132350884");
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Title", exact: true }),
+  ).toHaveValue(first);
+  await dialog(page)
+    .getByRole("button", { name: "Correct book match" })
+    .click();
+  const radio = dialog(page).getByRole("radio");
+  await expect(radio.first()).toBeChecked();
+  await radio.first().focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(radio.nth(1)).toBeChecked();
+  await page.keyboard.press((await modifier(page)) + "+Enter");
+  await expect(dialog(page)).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: second, exact: true }),
+  ).toBeVisible();
+  const item = (await (await request.get("/api/media")).json()).find(
+    (m: { title: string }) => m.title === second,
+  );
+  expect(item).toMatchObject({
+    kind: "book",
+    author: "Second writer",
+    url: "https://openlibrary.org/books/OL2M",
+  });
+});
+
+test("external captures are reviewed explicitly without changing completion", async ({
+  page,
+  request,
+}) => {
+  const name = title("External review");
+  const token = (await (await request.post("/api/integration/token")).json())
+    .token;
+  const receipt = await request.post("/api/integrations/items", {
+    headers: { Authorization: "Bearer " + token },
+    data: { title: name },
+  });
+  expect(receipt.status()).toBe(201);
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: /To review/ }).click();
+  const row = page.locator(".media-row").filter({ hasText: name });
+  await expect(row).toBeVisible();
+  await expect(row.getByRole("checkbox")).not.toBeChecked();
+  await page.reload();
+  await page.getByRole("button", { name: /To review/ }).click();
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: "Mark reviewed: " + name }).click();
+  await expect(row).toHaveCount(0);
+  const item = (await (await request.get("/api/media")).json()).find(
+    (m: { title: string }) => m.title === name,
+  );
+  expect(item).toMatchObject({ needs_review: false, status: "pending" });
+});
+
+test("local image uploads resize before sending and preserve private access", async ({
+  page,
+  request,
+  playwright,
+}) => {
+  const name = title("Custom image");
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  await dialog(page).getByRole("textbox", { name: "Title or URL" }).fill(name);
+  await page.keyboard.press((await modifier(page)) + "+Shift+d");
+  const fixture = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 3200;
+    canvas.height = 2400;
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = "#89cdb0";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  const upload = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === "/api/images",
+  );
+  await dialog(page)
+    .getByLabel("Upload image")
+    .setInputFiles({
+      name: "large-cover.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(fixture, "base64"),
+    });
+  const uploaded = await upload;
+  expect(uploaded.status()).toBe(201); // Server rejects unresized images over 1600px.
+  const path = (await uploaded.json()).url;
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Image URL (optional)" }),
+  ).toHaveValue(path);
+  await page.keyboard.press((await modifier(page)) + "+Enter");
+  await expect(dialog(page)).toHaveCount(0);
+  const row = page.locator(".media-row").filter({ hasText: name });
+  await expect(row.locator("img")).toBeVisible();
+  await expect
+    .poll(() =>
+      row
+        .locator("img")
+        .evaluate((image) => (image as HTMLImageElement).naturalWidth),
+    )
+    .toBe(1600);
+  const guest = await playwright.request.newContext({ baseURL });
+  expect((await guest.get(path)).status()).toBe(404);
+  expect((await request.get(path)).status()).toBe(200);
+  await guest.dispose();
+});
+
+test("late metadata preserves manual title and custom image edits", async ({
+  page,
+}) => {
+  const name = title("Manual metadata correction");
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let started!: () => void;
+  const requested = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  await page.route("**/api/metadata", async (route) => {
+    started();
+    await released;
+    await route.fulfill({
+      json: {
+        title: "Publisher title",
+        author: "Publisher creator",
+        kind: "article",
+        url: "https://example.com/manual",
+        cover_url: "https://example.com/publisher.jpg",
+        description: "Publisher description",
+      },
+    });
+  });
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  await dialog(page)
+    .getByRole("textbox", { name: "Title or URL" })
+    .fill("https://example.com/manual-" + Date.now());
+  await requested;
+  await dialog(page)
+    .getByRole("textbox", { name: "Title", exact: true })
+    .fill(name);
+  await page.keyboard.press((await modifier(page)) + "+Shift+d");
+  await dialog(page)
+    .getByRole("textbox", { name: "Image URL (optional)" })
+    .fill("https://example.com/custom.jpg");
+  const fetched = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/metadata",
+  );
+  release();
+  await fetched;
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Creator (optional)" }),
+  ).toHaveValue("Publisher creator");
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Title", exact: true }),
+  ).toHaveValue(name);
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Image URL (optional)" }),
+  ).toHaveValue("https://example.com/custom.jpg");
 });

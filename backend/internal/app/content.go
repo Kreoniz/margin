@@ -27,7 +27,7 @@ type Metadata struct {
 	Warning     string `json:"warning,omitempty"`
 }
 
-func (f *Fetcher) Metadata(ctx context.Context, raw string) (Metadata, error) {
+func (f *Fetcher) Metadata(ctx context.Context, raw string) (m Metadata, err error) {
 	u, err := CanonicalURL(raw)
 	if err != nil {
 		return Metadata{}, &ValidationError{err.Error()}
@@ -38,13 +38,50 @@ func (f *Fetcher) Metadata(ctx context.Context, raw string) (Metadata, error) {
 		if decoded, e := url.PathUnescape(name); e == nil {
 			name = decoded
 		}
-		title = strings.TrimSuffix(name, path.Ext(name))
+		title = name
+		if oneOf(strings.ToLower(path.Ext(name)), ".html", ".htm", ".pdf", ".php") {
+			title = strings.TrimSuffix(name, path.Ext(name))
+		}
 		title = strings.NewReplacer("-", " ", "_", " ").Replace(title)
 	}
-	m := Metadata{Title: clip(title, 1000), Kind: "article", URL: u}
+	m = Metadata{Title: clip(title, 1000), Kind: "article", URL: u}
+	if isBookHost(parsed.Hostname()) {
+		m.Kind = "book"
+	}
+	if parsed.Hostname() == "youtube.com" || strings.HasSuffix(parsed.Hostname(), ".youtube.com") || parsed.Hostname() == "youtu.be" || parsed.Hostname() == "vimeo.com" {
+		m.Kind = "video"
+	}
 	if strings.EqualFold(path.Ext(parsed.Path), ".pdf") {
 		m.Kind = "paper"
 	}
+	bookISBN := ""
+	structuredBook := false
+	defer func() {
+		if m.Kind != "book" || (m.Author != "" && m.CoverURL != "") {
+			return
+		}
+		query := m.Title
+		if bookISBN != "" {
+			query = bookISBN
+		}
+		for _, candidate := range isbnPattern.FindAllString(parsed.Path, -1) {
+			if isbn := validISBN(candidate); isbn != "" {
+				query = isbn
+				break
+			}
+		}
+		lookup, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		matches, e := f.Books(lookup, query, m.Author)
+		if e == nil && len(matches) > 0 {
+			best := matches[0]
+			if !structuredBook {
+				m.Title = best.Title
+			}
+			m.Author = first(m.Author, best.Author)
+			m.CoverURL = first(m.CoverURL, best.CoverURL)
+		}
+	}()
 	result, err := f.Get(ctx, u, 2<<20)
 	if err != nil {
 		m.Warning = "Could not retrieve metadata: " + clip(err.Error(), 300)
@@ -105,7 +142,27 @@ func (f *Fetcher) Metadata(ctx context.Context, raw string) (Metadata, error) {
 			m.URL = canonical
 		}
 	}
+	if values["og:type"] == "book" {
+		m.Kind = "book"
+	}
+	if strings.HasPrefix(values["og:type"], "video") {
+		m.Kind = "video"
+	}
+	if book, isbn, ok := bookFromJSONLD(doc, result.URL); ok {
+		bookISBN = isbn
+		structuredBook = book.Title != ""
+		m.Kind = "book"
+		m.Title = first(book.Title, m.Title)
+		m.Author = first(book.Author, m.Author)
+		m.CoverURL = first(book.CoverURL, m.CoverURL)
+		m.Description = first(book.Description, m.Description)
+	}
 	return m, nil
+}
+
+func isBookHost(host string) bool {
+	host = strings.TrimPrefix(strings.ToLower(host), "www.")
+	return oneOf(host, "goodreads.com", "oreilly.com", "learning.oreilly.com", "books.google.com", "openlibrary.org", "bookshop.org", "barnesandnoble.com")
 }
 
 func parseHTML(r FetchResult) (*html.Node, error) {

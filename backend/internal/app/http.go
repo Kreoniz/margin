@@ -66,6 +66,14 @@ func (s *Server) Handler() http.Handler {
 		respond(w, 204, nil, s.Store.DeleteMedia(r.Context(), r.PathValue("id")))
 	})
 	mux.HandleFunc("POST /api/metadata", s.metadata)
+	mux.HandleFunc("POST /api/books/search", s.searchBooks)
+	mux.HandleFunc("POST /api/images", s.uploadImage)
+	mux.HandleFunc("GET /api/images/{id}", s.image)
+	mux.HandleFunc("GET /api/export", s.exportLibrary)
+	mux.HandleFunc("GET /api/integration/browser-token", s.browserTokenStatus)
+	mux.HandleFunc("POST /api/integration/browser-token", s.rotateBrowserToken)
+	mux.HandleFunc("DELETE /api/integration/browser-token", s.revokeBrowserToken)
+	mux.HandleFunc("POST /api/integrations/capture", s.captureItem)
 	mux.HandleFunc("PATCH /api/inbox/{id}", s.patchInbox)
 	mux.HandleFunc("POST /api/inbox/{id}/save", func(w http.ResponseWriter, r *http.Request) {
 		if !requireID(w, r) {
@@ -308,7 +316,7 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 				writeJSON(w, 500, map[string]string{"error": "Internal server error"})
 			}
 		}()
-		if !oneOf(r.Method, "GET", "HEAD", "OPTIONS") && !sameOrigin(r) {
+		if !oneOf(r.Method, "GET", "HEAD", "OPTIONS") && r.URL.Path != "/api/integrations/capture" && !sameOrigin(r) {
 			writeJSON(w, 403, map[string]string{"error": "Mutation requests must come from the same origin"})
 			return
 		}
@@ -318,7 +326,7 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 			r = r.WithContext(ctx)
 		}
 		path := r.URL.Path
-		publicPath := path == "/api/health" || path == "/api/session" || path == "/api/setup" || path == "/api/login" || path == "/api/logout" || path == "/api/integrations/items" || strings.HasPrefix(path, "/api/public/")
+		publicPath := path == "/api/health" || path == "/api/session" || path == "/api/setup" || path == "/api/login" || path == "/api/logout" || path == "/api/integrations/items" || path == "/api/integrations/capture" || (strings.HasPrefix(path, "/api/images/") && oneOf(r.Method, "GET", "HEAD")) || strings.HasPrefix(path, "/api/public/")
 		if strings.HasPrefix(path, "/api/public/") && !oneOf(r.Method, "GET", "HEAD") {
 			writeJSON(w, 405, map[string]string{"error": "Public library is read-only"})
 			return

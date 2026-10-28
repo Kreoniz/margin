@@ -1,11 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "unlikely-ui/button";
 import { Dialog } from "unlikely-ui/dialog";
 import { Select } from "unlikely-ui/select";
 import { Field } from "unlikely-ui/field";
 import { Icon } from "./Icon";
 import { kindLabels, type Kind } from "./types";
-import { safeURL } from "./utils";
+import { imageURL } from "./utils";
 
 export function Picker<T extends string>({
   value,
@@ -68,6 +68,7 @@ export function Modal({
   onClose,
   className = "",
   busy = false,
+  closeRequested = false,
 }: {
   title: string;
   description?: string;
@@ -75,8 +76,12 @@ export function Modal({
   onClose: () => void;
   className?: string;
   busy?: boolean;
+  closeRequested?: boolean;
 }) {
   const [open, setOpen] = useState(true);
+  useEffect(() => {
+    if (closeRequested) setOpen(false);
+  }, [closeRequested]);
   // These dialogs can open from a shortcut, without a Dialog.Trigger.
   const [origin] = useState(() =>
     document.activeElement instanceof HTMLElement
@@ -125,7 +130,7 @@ export function Modal({
 export function MiniCover({ kind, url = "" }: { kind: Kind; url?: string }) {
   const [failed, setFailed] = useState("");
   const [loaded, setLoaded] = useState("");
-  const src = safeURL(url);
+  const src = imageURL(url);
   return (
     <span className={"mini-cover mini-" + kind} aria-hidden="true">
       <Icon name={kind} size={20} />

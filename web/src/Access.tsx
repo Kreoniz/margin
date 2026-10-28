@@ -94,8 +94,8 @@ export function Access({
             <Icon name="arrow" size={16} />
           </Button>
         </form>
-        <a href="/shared" className="text-link">
-          View shared items <Icon name="external" size={13} />
+        <a href="/" className="text-link">
+          View collection <Icon name="external" size={13} />
         </a>
       </div>
       <p className="access-footer">

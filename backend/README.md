@@ -109,3 +109,7 @@ GOCACHE="$PWD/.local/go-cache" GOTMPDIR="$PWD/.local/go-tmp" go test ./...
 `.local/` is ignored. There is no Redis, browser automation, or frontend-only library persistence. The API follows `../docs/api-contract.md`.
 
 `TRUSTED_PROXIES` optionally accepts comma-separated exact `/32` or `/128` proxy peers. Forwarded client addresses are ignored for other peers; the global login budget remains. Verify Caddy peer addresses after recreation.
+
+## Browser capture, images, and export
+
+Migration 004 adds the owner-only `needs_review` flag, uploaded-image bytes, and an independently revocable browser token. Existing records are already reviewed. Browser capture can create private items and complete an existing URL; add-only bot tokens retain their existing permissions. `/api/images/{id}` checks owner authentication or a public item reference on every request. The owner’s `/api/export` includes library JSON, notes, and attached uploads, with relative image paths; it excludes all credentials. See [the API contract](../docs/api-contract.md#capture-images-and-export-migration-004) for endpoints and limits.

@@ -82,13 +82,13 @@ func (s *Store) Migrate(ctx context.Context) error {
 	return tx.Commit(ctx)
 }
 
-const mediaColumns = "id::text,title,author,kind,status,url,cover_url,description,notes,tags,visibility,created_at,updated_at,completed_at"
+const mediaColumns = "id::text,title,author,kind,status,url,cover_url,description,notes,tags,visibility,created_at,updated_at,completed_at,needs_review"
 
 type scanner interface{ Scan(...any) error }
 
 func scanMedia(row scanner) (Media, error) {
 	var m Media
-	err := row.Scan(&m.ID, &m.Title, &m.Author, &m.Kind, &m.Status, &m.URL, &m.CoverURL, &m.Description, &m.Notes, &m.Tags, &m.Visibility, &m.CreatedAt, &m.UpdatedAt, &m.CompletedAt)
+	err := row.Scan(&m.ID, &m.Title, &m.Author, &m.Kind, &m.Status, &m.URL, &m.CoverURL, &m.Description, &m.Notes, &m.Tags, &m.Visibility, &m.CreatedAt, &m.UpdatedAt, &m.CompletedAt, &m.NeedsReview)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -124,9 +124,9 @@ func insertMedia(ctx context.Context, tx pgx.Tx, m Media) (Media, bool, error) {
 			return m, false, err
 		}
 	}
-	created, err := scanMedia(tx.QueryRow(ctx, `INSERT INTO media(id,title,author,kind,status,url,url_key,manual_key,cover_url,description,notes,tags,visibility,completed_at)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
- ON CONFLICT DO NOTHING RETURNING `+mediaColumns, newID(), m.Title, m.Author, m.Kind, m.Status, m.URL, u, mk, m.CoverURL, m.Description, m.Notes, m.Tags, m.Visibility, m.CompletedAt))
+	created, err := scanMedia(tx.QueryRow(ctx, `INSERT INTO media(id,title,author,kind,status,url,url_key,manual_key,cover_url,description,notes,tags,visibility,completed_at,needs_review)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+ ON CONFLICT DO NOTHING RETURNING `+mediaColumns, newID(), m.Title, m.Author, m.Kind, m.Status, m.URL, u, mk, m.CoverURL, m.Description, m.Notes, m.Tags, m.Visibility, m.CompletedAt, m.NeedsReview))
 	if !errors.Is(err, ErrNotFound) {
 		return created, err == nil, err
 	}
@@ -170,7 +170,7 @@ func (s *Store) PatchMedia(ctx context.Context, id string, in MediaInput) (Media
 			return m, err
 		}
 	}
-	_, err = tx.Exec(ctx, `UPDATE media SET title=$2,author=$3,kind=$4,status=$5,url=$6,url_key=$7,manual_key=$8,cover_url=$9,description=$10,notes=$11,tags=$12,visibility=$13,completed_at=$14,updated_at=now() WHERE id=$1`, id, m.Title, m.Author, m.Kind, m.Status, m.URL, u, mk, m.CoverURL, m.Description, m.Notes, m.Tags, m.Visibility, m.CompletedAt)
+	_, err = tx.Exec(ctx, `UPDATE media SET title=$2,author=$3,kind=$4,status=$5,url=$6,url_key=$7,manual_key=$8,cover_url=$9,description=$10,notes=$11,tags=$12,visibility=$13,completed_at=$14,needs_review=$15,updated_at=now() WHERE id=$1`, id, m.Title, m.Author, m.Kind, m.Status, m.URL, u, mk, m.CoverURL, m.Description, m.Notes, m.Tags, m.Visibility, m.CompletedAt, m.NeedsReview)
 	if isUnique(err) {
 		tx.Rollback(ctx)
 		var existing string
@@ -410,6 +410,7 @@ func (s *Store) FinishSource(ctx context.Context, src Source, token string, item
 				if err != nil {
 					return err
 				}
+				m.NeedsReview = true
 				m, _, err = insertMedia(ctx, tx, m)
 				if err != nil {
 					return err

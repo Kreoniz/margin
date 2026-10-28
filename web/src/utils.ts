@@ -70,4 +70,8 @@ export function selectMedia<
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
 }
 export const publicPath = (id?: string) =>
-  window.location.origin + "/shared" + (id ? "/" + id : "");
+  window.location.origin + (id ? "/shared" : "") + (id ? "/" + id : "");
+
+export function imageURL(value: string): string | undefined {
+  return /^\/api\/images\/[0-9a-f-]{36}$/i.test(value) ? value : safeURL(value);
+}
