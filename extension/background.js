@@ -1,4 +1,10 @@
+import { normalizeOrigin } from "./shared.js";
+
 chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
+
+function captureError(message, code) {
+  return Object.assign(new Error(message), { code });
+}
 
 // Runs only on the page the user explicitly captures via activeTab.
 export function readPageMetadata(expectedURL) {
@@ -40,17 +46,29 @@ export function readPageMetadata(expectedURL) {
 export async function capture(action, capturedTab) {
   if (!["save", "done"].includes(action))
     throw new Error("Unknown capture action.");
-  const { origin, token } = await chrome.storage.local.get(["origin", "token"]);
-  if (!origin || !token)
-    throw new Error(
-      "Set the Margin address and browser token in extension options.",
+  const saved = await chrome.storage.local.get(["origin", "token"]);
+  if (!saved.origin || !saved.token)
+    throw captureError(
+      "Connect to Margin in extension Settings first.",
+      "connection",
     );
+  let origin;
+  try {
+    origin = normalizeOrigin(saved.origin);
+  } catch {
+    throw captureError(
+      "Check your Margin address in extension Settings.",
+      "connection",
+    );
+  }
+  const token = saved.token;
   const allowed = await chrome.permissions.contains({
     origins: [origin + "/*"],
   });
   if (!allowed)
-    throw new Error(
-      "Grant access to the Margin address again in extension options.",
+    throw captureError(
+      "Grant access to your Margin site again in extension Settings.",
+      "connection",
     );
   const [tab] = capturedTab
     ? [capturedTab]
@@ -88,10 +106,35 @@ export async function capture(action, capturedTab) {
       ...(pageMetadata ? { page_metadata: pageMetadata } : {}),
     }),
     signal: AbortSignal.timeout(35_000),
+  }).catch((error) => {
+    throw captureError(
+      error.name === "TimeoutError"
+        ? "Margin took too long to respond. Try again."
+        : "Could not reach Margin. Check the address and whether the app is running.",
+      "connection",
+    );
   });
-  const result = await response.json();
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    throw captureError(
+      "That address did not return a Margin response. Check the connection in Settings.",
+      "connection",
+    );
+  }
   if (!response.ok)
-    throw new Error(result.error || "Margin could not capture this page.");
+    throw captureError(
+      [401, 403].includes(response.status)
+        ? "Your browser token was rejected. Update the connection in Settings."
+        : result?.error || "Margin could not capture this page.",
+      [401, 403].includes(response.status) ? "connection" : undefined,
+    );
+  if (typeof result?.id !== "string" || typeof result.created !== "boolean")
+    throw captureError(
+      "That address did not return a valid Margin receipt. Check Settings.",
+      "connection",
+    );
   const current = chrome.tabs.get
     ? await chrome.tabs.get(tab.id).catch(() => null)
     : tab;
@@ -121,10 +164,32 @@ export async function capture(action, capturedTab) {
     ...result,
   };
 }
-async function run(action) {
+async function run(action, expectedTab) {
   let tab;
   try {
-    [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    if (expectedTab) {
+      if (
+        !Number.isInteger(expectedTab.id) ||
+        typeof expectedTab.url !== "string"
+      )
+        throw captureError(
+          "Reopen Margin capture to choose the current page.",
+          "page_changed",
+        );
+      tab = { id: expectedTab.id, url: expectedTab.url };
+      const current = await chrome.tabs.get(tab.id).catch(() => null);
+      if (current?.url !== tab.url)
+        throw captureError(
+          "The page changed. Check the new page and try again.",
+          "page_changed",
+        );
+      tab = current;
+    } else {
+      [tab] = await chrome.tabs.query({
+        active: true,
+        lastFocusedWindow: true,
+      });
+    }
     return await capture(action, tab);
   } catch (error) {
     const current =
@@ -150,9 +215,9 @@ chrome.commands.onCommand.addListener((command) => {
 });
 chrome.runtime.onMessage.addListener((message, _sender, reply) => {
   if (message.type !== "capture") return;
-  void run(message.action).then(
+  void run(message.action, message.tab).then(
     (result) => reply({ result }),
-    (error) => reply({ error: error.message }),
+    (error) => reply({ error: error.message, code: error.code }),
   );
   return true;
 });

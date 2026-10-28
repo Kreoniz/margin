@@ -127,8 +127,10 @@ export function BrowserCaptureSettings() {
         <p>
           Load the repository’s <code>extension/</code> folder as an unpacked
           extension in Helium. Enter this site’s address and the browser token
-          in its options. Set separate Save and Done shortcuts in the browser’s
-          extension shortcut settings. New captures appear under To review.
+          in its Settings. Open capture from the toolbar or its browser
+          shortcut, then press S to save or D to mark done. Its Shortcuts button
+          shows your browser assignments, including optional direct Save and
+          Done commands. New captures appear under To review.
         </p>
         {error && (
           <p role="alert" className="notice error">

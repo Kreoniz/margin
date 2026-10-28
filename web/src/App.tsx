@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatForDisplay, useHotkeys } from "@tanstack/react-hotkeys";
+import {
+  formatForDisplay,
+  getHotkeyManager,
+  useHotkeys,
+} from "@tanstack/react-hotkeys";
 import { Theme } from "unlikely-ui/theme";
 import { Button } from "unlikely-ui/button";
 import { Checkbox } from "unlikely-ui/checkbox";
@@ -246,7 +250,20 @@ function Owner({
         callback: () => setSourcesOpen(true),
         options: { enabled: shortcutsEnabled && singleKeys },
       },
-      { hotkey: "F1", callback: () => setHelpOpen(true) },
+      {
+        hotkey: ["G", "G"],
+        callback: () => {
+          // The second G must not remain a fresh prefix for G L / G D / G S.
+          getHotkeyManager().resetSequenceProgress();
+          navigation.focusFirst();
+        },
+        options: { enabled: shortcutsEnabled && singleKeys },
+      },
+      {
+        hotkey: "F1",
+        callback: () => setHelpOpen(true),
+        options: { ignoreInputs: false },
+      },
       {
         hotkey: "?",
         callback: () => setHelpOpen(true),
@@ -270,6 +287,30 @@ function Owner({
       {
         hotkey: "]",
         callback: () => cycleStatus(1),
+        options: { enabled: shortcutsEnabled && singleKeys },
+      },
+      {
+        hotkey: "H",
+        callback: () => cycleStatus(-1),
+        options: { enabled: shortcutsEnabled && singleKeys },
+      },
+      {
+        hotkey: "L",
+        callback: () => cycleStatus(1),
+        options: { enabled: shortcutsEnabled && singleKeys },
+      },
+      {
+        hotkey: "Shift+H",
+        callback: () => {
+          if (view !== "library") navigate("library");
+        },
+        options: { enabled: shortcutsEnabled && singleKeys },
+      },
+      {
+        hotkey: "Shift+L",
+        callback: () => {
+          if (view !== "discover") navigate("discover");
+        },
         options: { enabled: shortcutsEnabled && singleKeys },
       },
     ],
@@ -535,6 +576,7 @@ function Owner({
             <ActionHint
               label="Library"
               shortcut={singleKeys ? "G then L" : undefined}
+              context={singleKeys ? "Shift+H opens Library" : undefined}
             >
               <button
                 aria-current={view === "library" ? "page" : undefined}
@@ -547,6 +589,7 @@ function Owner({
             <ActionHint
               label="Discover"
               shortcut={singleKeys ? "G then D" : undefined}
+              context={singleKeys ? "Shift+L opens Discover" : undefined}
             >
               <button
                 aria-current={view === "discover" ? "page" : undefined}
@@ -770,7 +813,7 @@ function Owner({
               <ActionHint
                 key={tab.value}
                 label={tab.hint}
-                shortcut={singleKeys ? "[ / ]" : undefined}
+                shortcut={singleKeys ? "h / l" : undefined}
                 context={singleKeys ? "Switch status filters" : undefined}
               >
                 <button
@@ -1202,7 +1245,9 @@ function Owner({
               className="ml-auto rounded border-0 bg-transparent px-2 py-1 text-[11px] text-[var(--u-muted)] hover:bg-[var(--u-well)]"
               onClick={() => setHelpOpen(true)}
             >
-              ↑↓ navigate · Enter open · F1 help
+              {singleKeys
+                ? "h/l tabs · j/k items · F1 help"
+                : "↑↓ navigate · Enter open · F1 help"}
             </button>
           </ActionHint>
         </footer>

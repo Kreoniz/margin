@@ -151,7 +151,9 @@ export function Settings({
           <Checkbox checked={singleKeys} onCheckedChange={onSingleKeys} />
           <span>
             Enable single-key shortcuts{" "}
-            <span className="text-u-muted">· / search · N add</span>
+            <span className="text-u-muted">
+              · h/l tabs · j/k items · / search
+            </span>
           </span>
         </label>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-1 text-[11px] text-u-muted">

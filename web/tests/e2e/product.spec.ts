@@ -700,6 +700,244 @@ test("single-key shortcuts can be disabled without disabling modifier shortcuts"
   await checkAccess(page);
 });
 
+test("Vim navigation moves through rows, tabs and pages without colliding with go sequences", async ({
+  page,
+  request,
+}) => {
+  const items = [];
+  for (let index = 0; index < 4; index++) {
+    const response = await request.post("/api/media", {
+      data: {
+        title: title("Vim navigation " + index),
+        status: index === 3 ? "done" : "pending",
+        needs_review: index === 1,
+      },
+    });
+    expect(response.status()).toBe(201);
+    items.push(await response.json());
+  }
+  await page.route("**/api/bootstrap", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: { ...(await response.json()), inbox: [] },
+    });
+  });
+  await page.goto("/dashboard");
+  const rows = page.locator(".media-row");
+  const tabs = page.locator(".list-tabs");
+  await expect(rows).toHaveCount(3);
+  await page.locator("main").focus();
+  await page.keyboard.press("j");
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press("j");
+  await expect(rows.nth(1)).toBeFocused();
+  await page.keyboard.press("k");
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press("Shift+G");
+  await expect(rows.last()).toBeFocused();
+  await page.keyboard.press("g");
+  await page.keyboard.press("g");
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press("l");
+  await expect(
+    tabs.getByRole("button", { name: "Done", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(rows).toHaveCount(1);
+  await page.keyboard.press("l");
+  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("l");
+  await expect(
+    tabs.getByRole("button", { name: "All", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(rows).toHaveCount(4);
+  await page.keyboard.press("h");
+  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("[");
+  await expect(
+    tabs.getByRole("button", { name: "Done", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("]");
+  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("Shift+L");
+  await expect(
+    page.getByRole("heading", { name: "Discover.", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("l");
+  await expect(
+    tabs.getByRole("button", { name: "Saved", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".article-row")).toHaveCount(0);
+  await page.keyboard.press("l");
+  await expect(
+    tabs.getByRole("button", { name: "Read", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("h");
+  await expect(
+    tabs.getByRole("button", { name: "Saved", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Shift+H");
+  await expect(
+    page.getByRole("heading", { name: "Your library.", exact: true }),
+  ).toBeVisible();
+  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("g");
+  await page.keyboard.press("d");
+  await expect(
+    page.getByRole("heading", { name: "Discover.", exact: true }),
+  ).toBeVisible();
+  await expect(
+    tabs.getByRole("button", { name: "Saved", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("g");
+  await page.keyboard.press("l");
+  await expect(
+    page.getByRole("heading", { name: "Your library.", exact: true }),
+  ).toBeVisible();
+  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("g");
+  await page.keyboard.press("s");
+  await expect(
+    dialog(page).getByRole("heading", { name: "Your sources", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+  const stored = await (await request.get("/api/media")).json();
+  for (const item of items)
+    expect(
+      stored.find((candidate: { id: string }) => candidate.id === item.id),
+    ).toMatchObject({ status: item.status, needs_review: item.needs_review });
+  await checkAccess(page);
+});
+
+test("Vim keys leave typing, widgets and dialogs alone and follow the shortcut preference", async ({
+  page,
+  request,
+}) => {
+  expect(
+    (
+      await request.post("/api/media", {
+        data: { title: title("Vim focus guard") },
+      })
+    ).status(),
+  ).toBe(201);
+  await page.goto("/dashboard");
+  const search = page.getByRole("searchbox", {
+    name: "Search library",
+    exact: true,
+  });
+  await search.click();
+  await search.pressSequentially("hlgg");
+  await page.keyboard.press("Shift+H");
+  await page.keyboard.press("Shift+L");
+  await expect(search).toHaveValue("hlggHL");
+  await expect(search).toBeFocused();
+  await search.fill("");
+  const type = page.getByRole("combobox", {
+    name: "Filter media type",
+    exact: true,
+  });
+  await type.click();
+  await page.keyboard.press("h");
+  await page.keyboard.press("l");
+  await page.keyboard.press("Shift+L");
+  await expect(
+    page.getByRole("heading", { name: "Your library.", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator(".list-tabs")
+      .getByRole("button", { name: "To read/watch", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await page.locator("main").focus();
+  await page.keyboard.press("n");
+  const capture = dialog(page).getByRole("textbox", {
+    name: "Title or URL",
+    exact: true,
+  });
+  await capture.pressSequentially("hlgg");
+  await page.keyboard.press("Shift+L");
+  await expect(capture).toHaveValue("hlggL");
+  const close = dialog(page).getByRole("button", {
+    name: "Close dialog",
+    exact: true,
+  });
+  await close.focus();
+  for (const key of ["h", "l", "Shift+H", "Shift+L", "Shift+G", "g", "g"])
+    await page.keyboard.press(key);
+  await expect(dialog(page)).toBeVisible();
+  await expect(capture).toHaveValue("hlggL");
+  await expect(page).not.toHaveURL(/#discover$/);
+  await dialog(page)
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await expect(dialog(page)).toHaveCount(0);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const quickKeys = dialog(page).getByRole("checkbox", {
+    name: /Enable single-key shortcuts/,
+  });
+  await quickKeys.click();
+  await expect(quickKeys).not.toBeChecked();
+  await dialog(page)
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
+  await expect(dialog(page)).toHaveCount(0);
+  await page.reload();
+  await expect(search).toBeVisible();
+  await page.locator("main").focus();
+  for (const key of [
+    "l",
+    "h",
+    "Shift+L",
+    "Shift+H",
+    "j",
+    "k",
+    "Shift+G",
+    "g",
+    "g",
+  ])
+    await page.keyboard.press(key);
+  await expect(page.locator("main")).toBeFocused();
+  await expect(
+    page
+      .locator(".list-tabs")
+      .getByRole("button", { name: "To read/watch", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page).not.toHaveURL(/#discover$/);
+  await page.keyboard.press((await modifier(page)) + "+k");
+  await expect(search).toBeFocused();
+  await page.keyboard.press("F1");
+  await expect(
+    dialog(page).getByRole("heading", {
+      name: "Keyboard shortcuts",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    dialog(page).getByText("Shift+H / Shift+L", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog(page).getByText("g then g / Shift+G", { exact: true }),
+  ).toBeVisible();
+  await checkAccess(page);
+});
+
 test("rows move smoothly and reduced motion removes movement and dialog transitions", async ({
   page,
   request,
@@ -943,8 +1181,13 @@ test("keyboard navigation reaches items beyond the first page", async ({
   await page.goto("/dashboard");
   const rows = page.locator(".media-row");
   await expect(rows).toHaveCount(40);
-  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+G");
   await expect(rows).toHaveCount(44);
+  await expect(rows.last()).toBeFocused();
+  await page.keyboard.press("g");
+  await page.keyboard.press("g");
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press("Shift+G");
   await expect(rows.last()).toBeFocused();
   if (info.project.name === "desktop") {
     const hiddenID = await rows.last().getAttribute("data-row-id");
@@ -1737,7 +1980,7 @@ test("secondary control hints explain review, filtering and editor details witho
   await page.keyboard.press("Tab");
   await reviewFilter.focus();
   await expect(hint).toContainText("Captured items waiting for your review");
-  await expect(hint.locator("kbd")).toHaveText("[ / ]");
+  await expect(hint.locator("kbd")).toHaveText("h / l");
   await page.keyboard.press("Escape");
   await row.getByRole("button", { name: "Edit " + name, exact: true }).click();
   const details = dialog(page)

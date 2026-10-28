@@ -139,9 +139,60 @@ test("late failures stay scoped to the original tab after focus changes", async 
       { id: 22, url: "https://publisher.example/new" },
     ];
     fail();
-    assert.match((await response).error, /Test connection failure/);
+    const result = await response;
+    assert.match(result.error, /Could not reach Margin/);
+    assert.equal(result.code, "connection");
     assert.ok(badges.every((value) => value.tabId === 21));
     assert.equal(badges.at(-1).text, "!");
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test("a popup capture is bound to the previewed page and refuses a changed tab", async () => {
+  const previousFetch = globalThis.fetch;
+  const badges = [];
+  let calls = 0;
+  chrome.tabs.get = async () => ({
+    id: 31,
+    url: "https://publisher.example/new",
+  });
+  chrome.action.setBadgeText = async (value) => badges.push(value);
+  globalThis.fetch = async (...args) => {
+    calls++;
+    return previousFetch(...args);
+  };
+  try {
+    const result = await new Promise((resolve) =>
+      message(
+        {
+          type: "capture",
+          action: "save",
+          tab: { id: 31, url: "https://publisher.example/previewed" },
+        },
+        {},
+        resolve,
+      ),
+    );
+    assert.equal(result.code, "page_changed");
+    assert.match(result.error, /page changed/);
+    assert.equal(calls, 0);
+    assert.deepEqual(badges, []);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test("rejected tokens return actionable connection feedback", async () => {
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  try {
+    await assert.rejects(
+      capture("save", { id: 31, url: "https://publisher.example/article" }),
+      (error) =>
+        error.code === "connection" && /token was rejected/.test(error.message),
+    );
   } finally {
     globalThis.fetch = previousFetch;
   }
