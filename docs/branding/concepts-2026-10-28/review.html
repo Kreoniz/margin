@@ -1,0 +1,1588 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Margin — identity studies</title>
+    <style>
+      :root {
+        --board-foreground: var(--foreground, #252c25);
+        --board-muted: var(--muted-foreground, #667067);
+        --board-card: var(--card, #f5f4ee);
+        --board-border: var(--border, #d4d9d1);
+        --board-primary: var(--primary, #45614b);
+        --board-radius: var(--radius, 14px);
+        --board-font-sans: var(
+          --font-sans,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif
+        );
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        color: var(--board-foreground);
+        font-family: var(--board-font-sans);
+      }
+      .board {
+        background: transparent;
+        padding: 0;
+      }
+      .intro {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 4px 0 20px;
+        border-bottom: 1px solid var(--board-border);
+      }
+      .intro p {
+        margin: 0;
+        max-width: 31rem;
+        line-height: 1.5;
+        font-size: 14px;
+        color: var(--board-muted);
+      }
+      .filters {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .filters button {
+        font: inherit;
+        font-size: 13px;
+        white-space: nowrap;
+        border: 1px solid var(--board-border);
+        border-radius: 999px;
+        background: transparent;
+        color: var(--board-foreground);
+        padding: 8px 13px;
+        cursor: pointer;
+      }
+      .filters button[aria-pressed="true"] {
+        background: var(--board-foreground);
+        color: var(--board-card);
+        border-color: var(--board-foreground);
+      }
+      button:focus-visible {
+        outline: 3px solid var(--board-primary);
+        outline-offset: 3px;
+      }
+      .concept {
+        padding: 28px 0 32px;
+        border-bottom: 1px solid var(--board-border);
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 24px;
+      }
+      .concept[hidden] {
+        display: none;
+      }
+      .concept-head {
+        grid-column: 1/-1;
+        display: flex;
+        gap: 14px;
+        align-items: baseline;
+        margin-bottom: 16px;
+      }
+      .number {
+        font-size: 12px;
+        color: var(--board-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .concept h2 {
+        font-size: 17px;
+        letter-spacing: -0.02em;
+        margin: 0;
+        font-weight: 650;
+      }
+      .kind {
+        margin: 3px 0 0;
+        color: var(--board-muted);
+        font-size: 12px;
+      }
+      .showcase {
+        min-height: 175px;
+        padding: 24px;
+        background: #e4e9db;
+        color: #26372b;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        border-radius: var(--board-radius);
+      }
+      .concept:nth-of-type(3n + 2) .showcase {
+        background: #28372e;
+        color: #e5efda;
+      }
+      .concept:nth-of-type(3n) .showcase {
+        background: #f0e9da;
+        color: #343b2e;
+      }
+      .lockup {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        flex-wrap: wrap;
+        margin: auto 0;
+      }
+      .hero-mark {
+        width: 55px;
+        height: 55px;
+        fill: currentColor;
+        flex: none;
+      }
+      .wordmark {
+        font-size: clamp(30px, 4.8vw, 43px);
+        font-weight: 650;
+        letter-spacing: -0.055em;
+        line-height: 1;
+      }
+      .word-space,
+      .word-nook,
+      .word-morrow {
+        font-family: Georgia, serif;
+        font-weight: 400;
+        letter-spacing: -0.04em;
+      }
+      .word-gather,
+      .word-folio {
+        letter-spacing: 0.015em;
+        font-weight: 500;
+      }
+      .word-note,
+      .word-tuck {
+        font-weight: 750;
+        letter-spacing: -0.07em;
+      }
+      .word-vela {
+        font-family: Georgia, serif;
+        font-style: italic;
+        font-weight: 400;
+      }
+      .showcase-caption,
+      .evidence-label {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        opacity: 0.7;
+      }
+      .details {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 18px;
+      }
+      .rationale {
+        font-size: 14px;
+        line-height: 1.55;
+        margin: 0;
+        max-width: 34em;
+      }
+      .evidence {
+        display: flex;
+        gap: 26px;
+        flex-wrap: wrap;
+      }
+      .evidence-label {
+        display: block;
+        color: var(--board-muted);
+        margin-bottom: 10px;
+      }
+      .sizes {
+        display: flex;
+        align-items: end;
+        gap: 15px;
+      }
+      .sample {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        color: var(--board-foreground);
+      }
+      .sample svg,
+      .mono svg {
+        fill: currentColor;
+        display: block;
+      }
+      .sample small {
+        color: var(--board-muted);
+        font-size: 10px;
+      }
+      .size-16 {
+        width: 16px;
+        height: 16px;
+      }
+      .size-24 {
+        width: 24px;
+        height: 24px;
+      }
+      .size-48 {
+        width: 48px;
+        height: 48px;
+      }
+      .mono {
+        display: flex;
+        gap: 5px;
+      }
+      .mono span {
+        width: 46px;
+        height: 46px;
+        display: grid;
+        place-items: center;
+        border-radius: 6px;
+      }
+      .mono-light {
+        background: #f4f2e9;
+        color: #202820;
+      }
+      .mono-dark {
+        background: #202820;
+        color: #f4f2e9;
+      }
+      .mono-mark {
+        width: 30px;
+        height: 30px;
+      }
+      .footnote {
+        font-size: 12px;
+        color: var(--board-muted);
+        line-height: 1.5;
+        padding: 20px 0 8px;
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      @media (max-width: 560px) {
+        .intro {
+          align-items: start;
+          flex-direction: column;
+          gap: 14px;
+        }
+        .concept {
+          grid-template-columns: 1fr;
+          gap: 16px;
+          padding: 24px 0;
+        }
+        .concept-head {
+          grid-column: auto;
+          margin: 0;
+        }
+        .showcase {
+          min-height: 155px;
+        }
+        .details {
+          gap: 18px;
+        }
+        .evidence {
+          gap: 30px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="board">
+      <div class="intro">
+        <p>
+          Twelve identity studies for a personal collection. Compare each mark
+          at working size and in one ink.
+        </p>
+        <div class="filters" role="group" aria-label="Filter concepts">
+          <button type="button" data-filter="all" aria-pressed="true">
+            All</button
+          ><button type="button" data-filter="margin" aria-pressed="false">
+            Margin</button
+          ><button type="button" data-filter="other" aria-pressed="false">
+            Other names
+          </button>
+        </div>
+      </div>
+      <p class="visually-hidden" id="result" aria-live="polite">
+        Showing 12 concepts
+      </p>
+      <article class="concept margin" data-group="margin">
+        <div class="concept-head">
+          <span class="number">01</span>
+          <div>
+            <h2>The quiet edge</h2>
+            <p class="kind">Margin · working name</p>
+          </div>
+        </div>
+        <div class="showcase">
+          <div class="lockup">
+            <svg
+              class="hero-mark"
+              viewBox="0 0 64 64"
+              aria-label="Margin mark"
+              role="img"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M9 8h7v48H9zM23 13h32v7H23zM23 29h25v7H23zM23 45h32v7H23z"
+              /></svg
+            ><span class="wordmark word-edge">margin</span>
+          </div>
+          <div class="showcase-caption">MARK + WORDMARK</div>
+        </div>
+        <div class="details">
+          <p class="rationale">
+            A bold edge and uneven lines make room for what matters, without
+            reducing the collection to a book.
+          </p>
+          <div class="evidence">
+            <div>
+              <span class="evidence-label">ACTUAL SIZE</span>
+              <div class="sizes">
+                <span class="sample"
+                  ><svg
+                    class="size-16"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 16 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M9 8h7v48H9zM23 13h32v7H23zM23 29h25v7H23zM23 45h32v7H23z"
+                    /></svg
+                  ><small>16px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-24"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 24 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M9 8h7v48H9zM23 13h32v7H23zM23 29h25v7H23zM23 45h32v7H23z"
+                    /></svg
+                  ><small>24px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-48"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 48 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M9 8h7v48H9zM23 13h32v7H23zM23 29h25v7H23zM23 45h32v7H23z"
+                    /></svg
+                  ><small>48px</small></span
+                >
+              </div>
+            </div>
+            <div>
+              <span class="evidence-label">ONE INK</span>
+              <div class="mono">
+                <span class="mono-light"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin dark on light"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M9 8h7v48H9zM23 13h32v7H23zM23 29h25v7H23zM23 45h32v7H23z"
+                    /></svg></span
+                ><span class="mono-dark"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin light on dark"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M9 8h7v48H9zM23 13h32v7H23zM23 29h25v7H23zM23 45h32v7H23z"
+                    /></svg
+                ></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="concept margin" data-group="margin">
+        <div class="concept-head">
+          <span class="number">02</span>
+          <div>
+            <h2>The held space</h2>
+            <p class="kind">Margin · working name</p>
+          </div>
+        </div>
+        <div class="showcase">
+          <div class="lockup">
+            <svg
+              class="hero-mark"
+              viewBox="0 0 64 64"
+              aria-label="Margin mark"
+              role="img"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M8 8h48v19h-8V16H16v32h32V37h8v19H8z"
+              />
+              <circle cx="48" cy="32" r="5" /></svg
+            ><span class="wordmark word-space">margin</span>
+          </div>
+          <div class="showcase-caption">MARK + WORDMARK</div>
+        </div>
+        <div class="details">
+          <p class="rationale">
+            A solid frame opens at one edge, suggesting a private place with
+            room for new discoveries.
+          </p>
+          <div class="evidence">
+            <div>
+              <span class="evidence-label">ACTUAL SIZE</span>
+              <div class="sizes">
+                <span class="sample"
+                  ><svg
+                    class="size-16"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 16 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M8 8h48v19h-8V16H16v32h32V37h8v19H8z"
+                    />
+                    <circle cx="48" cy="32" r="5" /></svg
+                  ><small>16px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-24"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 24 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M8 8h48v19h-8V16H16v32h32V37h8v19H8z"
+                    />
+                    <circle cx="48" cy="32" r="5" /></svg
+                  ><small>24px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-48"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 48 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M8 8h48v19h-8V16H16v32h32V37h8v19H8z"
+                    />
+                    <circle cx="48" cy="32" r="5" /></svg
+                  ><small>48px</small></span
+                >
+              </div>
+            </div>
+            <div>
+              <span class="evidence-label">ONE INK</span>
+              <div class="mono">
+                <span class="mono-light"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin dark on light"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M8 8h48v19h-8V16H16v32h32V37h8v19H8z"
+                    />
+                    <circle cx="48" cy="32" r="5" /></svg></span
+                ><span class="mono-dark"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin light on dark"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M8 8h48v19h-8V16H16v32h32V37h8v19H8z"
+                    />
+                    <circle cx="48" cy="32" r="5" /></svg
+                ></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="concept margin" data-group="margin">
+        <div class="concept-head">
+          <span class="number">03</span>
+          <div>
+            <h2>The gathering</h2>
+            <p class="kind">Margin · working name</p>
+          </div>
+        </div>
+        <div class="showcase">
+          <div class="lockup">
+            <svg
+              class="hero-mark"
+              viewBox="0 0 64 64"
+              aria-label="Margin mark"
+              role="img"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M8 14h11v37H8zM26 24h12v27H26zM45 9h11v42H45z" />
+              <path d="M8 55h48v3H8z" /></svg
+            ><span class="wordmark word-gather">margin</span>
+          </div>
+          <div class="showcase-caption">MARK + WORDMARK</div>
+        </div>
+        <div class="details">
+          <p class="rationale">
+            Three differently sized forms meet on a common baseline: many kinds
+            of media, kept together.
+          </p>
+          <div class="evidence">
+            <div>
+              <span class="evidence-label">ACTUAL SIZE</span>
+              <div class="sizes">
+                <span class="sample"
+                  ><svg
+                    class="size-16"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 16 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M8 14h11v37H8zM26 24h12v27H26zM45 9h11v42H45z" />
+                    <path d="M8 55h48v3H8z" /></svg
+                  ><small>16px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-24"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 24 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M8 14h11v37H8zM26 24h12v27H26zM45 9h11v42H45z" />
+                    <path d="M8 55h48v3H8z" /></svg
+                  ><small>24px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-48"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 48 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M8 14h11v37H8zM26 24h12v27H26zM45 9h11v42H45z" />
+                    <path d="M8 55h48v3H8z" /></svg
+                  ><small>48px</small></span
+                >
+              </div>
+            </div>
+            <div>
+              <span class="evidence-label">ONE INK</span>
+              <div class="mono">
+                <span class="mono-light"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin dark on light"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M8 14h11v37H8zM26 24h12v27H26zM45 9h11v42H45z" />
+                    <path d="M8 55h48v3H8z" /></svg></span
+                ><span class="mono-dark"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin light on dark"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M8 14h11v37H8zM26 24h12v27H26zM45 9h11v42H45z" />
+                    <path d="M8 55h48v3H8z" /></svg
+                ></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="concept margin" data-group="margin">
+        <div class="concept-head">
+          <span class="number">04</span>
+          <div>
+            <h2>The annotation</h2>
+            <p class="kind">Margin · working name</p>
+          </div>
+        </div>
+        <div class="showcase">
+          <div class="lockup">
+            <svg
+              class="hero-mark"
+              viewBox="0 0 64 64"
+              aria-label="Margin mark"
+              role="img"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M12 9h20v8H20v30h12v8H12z" />
+              <circle cx="45" cy="32" r="8" /></svg
+            ><span class="wordmark word-note">margin</span>
+          </div>
+          <div class="showcase-caption">MARK + WORDMARK</div>
+        </div>
+        <div class="details">
+          <p class="rationale">
+            A broad bracket and a single dot evoke a personal note in the margin
+            and a moment of attention.
+          </p>
+          <div class="evidence">
+            <div>
+              <span class="evidence-label">ACTUAL SIZE</span>
+              <div class="sizes">
+                <span class="sample"
+                  ><svg
+                    class="size-16"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 16 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M12 9h20v8H20v30h12v8H12z" />
+                    <circle cx="45" cy="32" r="8" /></svg
+                  ><small>16px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-24"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 24 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M12 9h20v8H20v30h12v8H12z" />
+                    <circle cx="45" cy="32" r="8" /></svg
+                  ><small>24px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-48"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 48 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M12 9h20v8H20v30h12v8H12z" />
+                    <circle cx="45" cy="32" r="8" /></svg
+                  ><small>48px</small></span
+                >
+              </div>
+            </div>
+            <div>
+              <span class="evidence-label">ONE INK</span>
+              <div class="mono">
+                <span class="mono-light"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin dark on light"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M12 9h20v8H20v30h12v8H12z" />
+                    <circle cx="45" cy="32" r="8" /></svg></span
+                ><span class="mono-dark"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin light on dark"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M12 9h20v8H20v30h12v8H12z" />
+                    <circle cx="45" cy="32" r="8" /></svg
+                ></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="concept margin" data-group="margin">
+        <div class="concept-head">
+          <span class="number">05</span>
+          <div>
+            <h2>The fold</h2>
+            <p class="kind">Margin · working name</p>
+          </div>
+        </div>
+        <div class="showcase">
+          <div class="lockup">
+            <svg
+              class="hero-mark"
+              viewBox="0 0 64 64"
+              aria-label="Margin mark"
+              role="img"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M7 13h50v38H45V29L32 42 19 29v22H7z" /></svg
+            ><span class="wordmark word-fold">margin</span>
+          </div>
+          <div class="showcase-caption">MARK + WORDMARK</div>
+        </div>
+        <div class="details">
+          <p class="rationale">
+            A folded corner makes a compact, memorable M-like silhouette from
+            one continuous shape.
+          </p>
+          <div class="evidence">
+            <div>
+              <span class="evidence-label">ACTUAL SIZE</span>
+              <div class="sizes">
+                <span class="sample"
+                  ><svg
+                    class="size-16"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 16 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M7 13h50v38H45V29L32 42 19 29v22H7z" /></svg
+                  ><small>16px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-24"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 24 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M7 13h50v38H45V29L32 42 19 29v22H7z" /></svg
+                  ><small>24px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-48"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 48 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M7 13h50v38H45V29L32 42 19 29v22H7z" /></svg
+                  ><small>48px</small></span
+                >
+              </div>
+            </div>
+            <div>
+              <span class="evidence-label">ONE INK</span>
+              <div class="mono">
+                <span class="mono-light"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin dark on light"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M7 13h50v38H45V29L32 42 19 29v22H7z" /></svg></span
+                ><span class="mono-dark"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin light on dark"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M7 13h50v38H45V29L32 42 19 29v22H7z" /></svg
+                ></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="concept margin" data-group="margin">
+        <div class="concept-head">
+          <span class="number">06</span>
+          <div>
+            <h2>The crossing</h2>
+            <p class="kind">Margin · working name</p>
+          </div>
+        </div>
+        <div class="showcase">
+          <div class="lockup">
+            <svg
+              class="hero-mark"
+              viewBox="0 0 64 64"
+              aria-label="Margin mark"
+              role="img"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M9 9h10v17h26V9h10v46H45V36H19v19H9z" />
+              <path d="M27 20h10v24H27z" /></svg
+            ><span class="wordmark word-cross">margin</span>
+          </div>
+          <div class="showcase-caption">MARK + WORDMARK</div>
+        </div>
+        <div class="details">
+          <p class="rationale">
+            A deliberate interruption in two broad paths hints at the meeting of
+            discovery and selection.
+          </p>
+          <div class="evidence">
+            <div>
+              <span class="evidence-label">ACTUAL SIZE</span>
+              <div class="sizes">
+                <span class="sample"
+                  ><svg
+                    class="size-16"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 16 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M9 9h10v17h26V9h10v46H45V36H19v19H9z" />
+                    <path d="M27 20h10v24H27z" /></svg
+                  ><small>16px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-24"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 24 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M9 9h10v17h26V9h10v46H45V36H19v19H9z" />
+                    <path d="M27 20h10v24H27z" /></svg
+                  ><small>24px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-48"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin mark at 48 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M9 9h10v17h26V9h10v46H45V36H19v19H9z" />
+                    <path d="M27 20h10v24H27z" /></svg
+                  ><small>48px</small></span
+                >
+              </div>
+            </div>
+            <div>
+              <span class="evidence-label">ONE INK</span>
+              <div class="mono">
+                <span class="mono-light"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin dark on light"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M9 9h10v17h26V9h10v46H45V36H19v19H9z" />
+                    <path d="M27 20h10v24H27z" /></svg></span
+                ><span class="mono-dark"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Margin light on dark"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M9 9h10v17h26V9h10v46H45V36H19v19H9z" />
+                    <path d="M27 20h10v24H27z" /></svg
+                ></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="concept other" data-group="other">
+        <div class="concept-head">
+          <span class="number">07</span>
+          <div>
+            <h2>The sieve</h2>
+            <p class="kind">Sift · alternative name</p>
+          </div>
+        </div>
+        <div class="showcase">
+          <div class="lockup">
+            <svg
+              class="hero-mark"
+              viewBox="0 0 64 64"
+              aria-label="Sift mark"
+              role="img"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M7 11h50v8H7zM13 25h38v8H13zM20 39h24v8H20zM27 53h10v5H27z"
+              /></svg
+            ><span class="wordmark word-sift">sift</span>
+          </div>
+          <div class="showcase-caption">MARK + WORDMARK</div>
+        </div>
+        <div class="details">
+          <p class="rationale">
+            A tapered set of bars suggests finding the few things worth keeping
+            in a wider stream.
+          </p>
+          <div class="evidence">
+            <div>
+              <span class="evidence-label">ACTUAL SIZE</span>
+              <div class="sizes">
+                <span class="sample"
+                  ><svg
+                    class="size-16"
+                    viewBox="0 0 64 64"
+                    aria-label="Sift mark at 16 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M7 11h50v8H7zM13 25h38v8H13zM20 39h24v8H20zM27 53h10v5H27z"
+                    /></svg
+                  ><small>16px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-24"
+                    viewBox="0 0 64 64"
+                    aria-label="Sift mark at 24 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M7 11h50v8H7zM13 25h38v8H13zM20 39h24v8H20zM27 53h10v5H27z"
+                    /></svg
+                  ><small>24px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-48"
+                    viewBox="0 0 64 64"
+                    aria-label="Sift mark at 48 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M7 11h50v8H7zM13 25h38v8H13zM20 39h24v8H20zM27 53h10v5H27z"
+                    /></svg
+                  ><small>48px</small></span
+                >
+              </div>
+            </div>
+            <div>
+              <span class="evidence-label">ONE INK</span>
+              <div class="mono">
+                <span class="mono-light"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Sift dark on light"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M7 11h50v8H7zM13 25h38v8H13zM20 39h24v8H20zM27 53h10v5H27z"
+                    /></svg></span
+                ><span class="mono-dark"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Sift light on dark"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M7 11h50v8H7zM13 25h38v8H13zM20 39h24v8H20zM27 53h10v5H27z"
+                    /></svg
+                ></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="concept other" data-group="other">
+        <div class="concept-head">
+          <span class="number">08</span>
+          <div>
+            <h2>The alcove</h2>
+            <p class="kind">Nook · alternative name</p>
+          </div>
+        </div>
+        <div class="showcase">
+          <div class="lockup">
+            <svg
+              class="hero-mark"
+              viewBox="0 0 64 64"
+              aria-label="Nook mark"
+              role="img"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M8 31a24 24 0 1 1 48 0v24H40v-8h8V31a16 16 0 1 0-32 0v16h8v8H8z"
+              />
+              <circle cx="32" cy="39" r="6" /></svg
+            ><span class="wordmark word-nook">nook</span>
+          </div>
+          <div class="showcase-caption">MARK + WORDMARK</div>
+        </div>
+        <div class="details">
+          <p class="rationale">
+            A rounded enclosure with a small opening makes a sheltered place
+            feel approachable rather than locked.
+          </p>
+          <div class="evidence">
+            <div>
+              <span class="evidence-label">ACTUAL SIZE</span>
+              <div class="sizes">
+                <span class="sample"
+                  ><svg
+                    class="size-16"
+                    viewBox="0 0 64 64"
+                    aria-label="Nook mark at 16 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M8 31a24 24 0 1 1 48 0v24H40v-8h8V31a16 16 0 1 0-32 0v16h8v8H8z"
+                    />
+                    <circle cx="32" cy="39" r="6" /></svg
+                  ><small>16px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-24"
+                    viewBox="0 0 64 64"
+                    aria-label="Nook mark at 24 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M8 31a24 24 0 1 1 48 0v24H40v-8h8V31a16 16 0 1 0-32 0v16h8v8H8z"
+                    />
+                    <circle cx="32" cy="39" r="6" /></svg
+                  ><small>24px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-48"
+                    viewBox="0 0 64 64"
+                    aria-label="Nook mark at 48 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M8 31a24 24 0 1 1 48 0v24H40v-8h8V31a16 16 0 1 0-32 0v16h8v8H8z"
+                    />
+                    <circle cx="32" cy="39" r="6" /></svg
+                  ><small>48px</small></span
+                >
+              </div>
+            </div>
+            <div>
+              <span class="evidence-label">ONE INK</span>
+              <div class="mono">
+                <span class="mono-light"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Nook dark on light"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M8 31a24 24 0 1 1 48 0v24H40v-8h8V31a16 16 0 1 0-32 0v16h8v8H8z"
+                    />
+                    <circle cx="32" cy="39" r="6" /></svg></span
+                ><span class="mono-dark"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Nook light on dark"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M8 31a24 24 0 1 1 48 0v24H40v-8h8V31a16 16 0 1 0-32 0v16h8v8H8z"
+                    />
+                    <circle cx="32" cy="39" r="6" /></svg
+                ></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="concept other" data-group="other">
+        <div class="concept-head">
+          <span class="number">09</span>
+          <div>
+            <h2>The stack</h2>
+            <p class="kind">Folio · alternative name</p>
+          </div>
+        </div>
+        <div class="showcase">
+          <div class="lockup">
+            <svg
+              class="hero-mark"
+              viewBox="0 0 64 64"
+              aria-label="Folio mark"
+              role="img"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M8 11h33v9H8zM15 27h41v9H15zM8 43h33v9H8z" />
+              <path d="M47 11h9v9h-9zM8 27h3v9H8zM47 43h9v9h-9z" /></svg
+            ><span class="wordmark word-folio">folio</span>
+          </div>
+          <div class="showcase-caption">MARK + WORDMARK</div>
+        </div>
+        <div class="details">
+          <p class="rationale">
+            Unequal overlapping planes suggest a varied collection without
+            relying on a literal book icon.
+          </p>
+          <div class="evidence">
+            <div>
+              <span class="evidence-label">ACTUAL SIZE</span>
+              <div class="sizes">
+                <span class="sample"
+                  ><svg
+                    class="size-16"
+                    viewBox="0 0 64 64"
+                    aria-label="Folio mark at 16 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M8 11h33v9H8zM15 27h41v9H15zM8 43h33v9H8z" />
+                    <path d="M47 11h9v9h-9zM8 27h3v9H8zM47 43h9v9h-9z" /></svg
+                  ><small>16px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-24"
+                    viewBox="0 0 64 64"
+                    aria-label="Folio mark at 24 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M8 11h33v9H8zM15 27h41v9H15zM8 43h33v9H8z" />
+                    <path d="M47 11h9v9h-9zM8 27h3v9H8zM47 43h9v9h-9z" /></svg
+                  ><small>24px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-48"
+                    viewBox="0 0 64 64"
+                    aria-label="Folio mark at 48 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M8 11h33v9H8zM15 27h41v9H15zM8 43h33v9H8z" />
+                    <path d="M47 11h9v9h-9zM8 27h3v9H8zM47 43h9v9h-9z" /></svg
+                  ><small>48px</small></span
+                >
+              </div>
+            </div>
+            <div>
+              <span class="evidence-label">ONE INK</span>
+              <div class="mono">
+                <span class="mono-light"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Folio dark on light"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M8 11h33v9H8zM15 27h41v9H15zM8 43h33v9H8z" />
+                    <path
+                      d="M47 11h9v9h-9zM8 27h3v9H8zM47 43h9v9h-9z"
+                    /></svg></span
+                ><span class="mono-dark"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Folio light on dark"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M8 11h33v9H8zM15 27h41v9H15zM8 43h33v9H8z" />
+                    <path d="M47 11h9v9h-9zM8 27h3v9H8zM47 43h9v9h-9z" /></svg
+                ></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="concept other" data-group="other">
+        <div class="concept-head">
+          <span class="number">10</span>
+          <div>
+            <h2>The horizon</h2>
+            <p class="kind">Morrow · alternative name</p>
+          </div>
+        </div>
+        <div class="showcase">
+          <div class="lockup">
+            <svg
+              class="hero-mark"
+              viewBox="0 0 64 64"
+              aria-label="Morrow mark"
+              role="img"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M6 44h52v9H6zM14 39a18 18 0 0 1 36 0H40a8 8 0 0 0-16 0z"
+              />
+              <path d="M28 8h8v9h-8z" /></svg
+            ><span class="wordmark word-morrow">morrow</span>
+          </div>
+          <div class="showcase-caption">MARK + WORDMARK</div>
+        </div>
+        <div class="details">
+          <p class="rationale">
+            A rising semicircle held below a horizon gives saved things a quiet
+            sense of future possibility.
+          </p>
+          <div class="evidence">
+            <div>
+              <span class="evidence-label">ACTUAL SIZE</span>
+              <div class="sizes">
+                <span class="sample"
+                  ><svg
+                    class="size-16"
+                    viewBox="0 0 64 64"
+                    aria-label="Morrow mark at 16 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M6 44h52v9H6zM14 39a18 18 0 0 1 36 0H40a8 8 0 0 0-16 0z"
+                    />
+                    <path d="M28 8h8v9h-8z" /></svg
+                  ><small>16px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-24"
+                    viewBox="0 0 64 64"
+                    aria-label="Morrow mark at 24 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M6 44h52v9H6zM14 39a18 18 0 0 1 36 0H40a8 8 0 0 0-16 0z"
+                    />
+                    <path d="M28 8h8v9h-8z" /></svg
+                  ><small>24px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-48"
+                    viewBox="0 0 64 64"
+                    aria-label="Morrow mark at 48 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M6 44h52v9H6zM14 39a18 18 0 0 1 36 0H40a8 8 0 0 0-16 0z"
+                    />
+                    <path d="M28 8h8v9h-8z" /></svg
+                  ><small>48px</small></span
+                >
+              </div>
+            </div>
+            <div>
+              <span class="evidence-label">ONE INK</span>
+              <div class="mono">
+                <span class="mono-light"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Morrow dark on light"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M6 44h52v9H6zM14 39a18 18 0 0 1 36 0H40a8 8 0 0 0-16 0z"
+                    />
+                    <path d="M28 8h8v9h-8z" /></svg></span
+                ><span class="mono-dark"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Morrow light on dark"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M6 44h52v9H6zM14 39a18 18 0 0 1 36 0H40a8 8 0 0 0-16 0z"
+                    />
+                    <path d="M28 8h8v9h-8z" /></svg
+                ></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="concept other" data-group="other">
+        <div class="concept-head">
+          <span class="number">11</span>
+          <div>
+            <h2>The pocket</h2>
+            <p class="kind">Tuck · alternative name</p>
+          </div>
+        </div>
+        <div class="showcase">
+          <div class="lockup">
+            <svg
+              class="hero-mark"
+              viewBox="0 0 64 64"
+              aria-label="Tuck mark"
+              role="img"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M7 13h50v39H7zm9 9v21h32V22L32 34z"
+              />
+              <path d="M27 8h10v10H27z" /></svg
+            ><span class="wordmark word-tuck">tuck</span>
+          </div>
+          <div class="showcase-caption">MARK + WORDMARK</div>
+        </div>
+        <div class="details">
+          <p class="rationale">
+            A folded-in pocket holds one small square: an easy metaphor for
+            putting something aside.
+          </p>
+          <div class="evidence">
+            <div>
+              <span class="evidence-label">ACTUAL SIZE</span>
+              <div class="sizes">
+                <span class="sample"
+                  ><svg
+                    class="size-16"
+                    viewBox="0 0 64 64"
+                    aria-label="Tuck mark at 16 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M7 13h50v39H7zm9 9v21h32V22L32 34z"
+                    />
+                    <path d="M27 8h10v10H27z" /></svg
+                  ><small>16px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-24"
+                    viewBox="0 0 64 64"
+                    aria-label="Tuck mark at 24 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M7 13h50v39H7zm9 9v21h32V22L32 34z"
+                    />
+                    <path d="M27 8h10v10H27z" /></svg
+                  ><small>24px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-48"
+                    viewBox="0 0 64 64"
+                    aria-label="Tuck mark at 48 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M7 13h50v39H7zm9 9v21h32V22L32 34z"
+                    />
+                    <path d="M27 8h10v10H27z" /></svg
+                  ><small>48px</small></span
+                >
+              </div>
+            </div>
+            <div>
+              <span class="evidence-label">ONE INK</span>
+              <div class="mono">
+                <span class="mono-light"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Tuck dark on light"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M7 13h50v39H7zm9 9v21h32V22L32 34z"
+                    />
+                    <path d="M27 8h10v10H27z" /></svg></span
+                ><span class="mono-dark"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Tuck light on dark"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M7 13h50v39H7zm9 9v21h32V22L32 34z"
+                    />
+                    <path d="M27 8h10v10H27z" /></svg
+                ></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="concept other" data-group="other">
+        <div class="concept-head">
+          <span class="number">12</span>
+          <div>
+            <h2>The waypoint</h2>
+            <p class="kind">Vela · alternative name</p>
+          </div>
+        </div>
+        <div class="showcase">
+          <div class="lockup">
+            <svg
+              class="hero-mark"
+              viewBox="0 0 64 64"
+              aria-label="Vela mark"
+              role="img"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M12 44 39 8v36zM43 17l10 27H43zM7 51h50v7H7z" /></svg
+            ><span class="wordmark word-vela">vela</span>
+          </div>
+          <div class="showcase-caption">MARK + WORDMARK</div>
+        </div>
+        <div class="details">
+          <p class="rationale">
+            A tilted sail and a grounded point imply movement between discovery
+            and a chosen destination.
+          </p>
+          <div class="evidence">
+            <div>
+              <span class="evidence-label">ACTUAL SIZE</span>
+              <div class="sizes">
+                <span class="sample"
+                  ><svg
+                    class="size-16"
+                    viewBox="0 0 64 64"
+                    aria-label="Vela mark at 16 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 44 39 8v36zM43 17l10 27H43zM7 51h50v7H7z"
+                    /></svg
+                  ><small>16px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-24"
+                    viewBox="0 0 64 64"
+                    aria-label="Vela mark at 24 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 44 39 8v36zM43 17l10 27H43zM7 51h50v7H7z"
+                    /></svg
+                  ><small>24px</small></span
+                ><span class="sample"
+                  ><svg
+                    class="size-48"
+                    viewBox="0 0 64 64"
+                    aria-label="Vela mark at 48 pixels"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 44 39 8v36zM43 17l10 27H43zM7 51h50v7H7z"
+                    /></svg
+                  ><small>48px</small></span
+                >
+              </div>
+            </div>
+            <div>
+              <span class="evidence-label">ONE INK</span>
+              <div class="mono">
+                <span class="mono-light"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Vela dark on light"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 44 39 8v36zM43 17l10 27H43zM7 51h50v7H7z"
+                    /></svg></span
+                ><span class="mono-dark"
+                  ><svg
+                    class="mono-mark"
+                    viewBox="0 0 64 64"
+                    aria-label="Vela light on dark"
+                    role="img"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 44 39 8v36zM43 17l10 27H43zM7 51h50v7H7z"
+                    /></svg
+                ></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <p class="footnote">
+        Concept studies, not final identities. Wordmarks use local system fonts;
+        standalone marks are editable SVGs. Names have not been cleared for
+        trademark or domain use.
+      </p>
+    </main>
+    <script>
+      document.querySelectorAll("[data-filter]").forEach((button) =>
+        button.addEventListener("click", () => {
+          const filter = button.dataset.filter;
+          document
+            .querySelectorAll("[data-filter]")
+            .forEach((b) =>
+              b.setAttribute("aria-pressed", String(b === button)),
+            );
+          let count = 0;
+          document.querySelectorAll("[data-group]").forEach((card) => {
+            card.hidden = filter !== "all" && card.dataset.group !== filter;
+            if (!card.hidden) count++;
+          });
+          document.getElementById("result").textContent =
+            `Showing ${count} concepts`;
+        }),
+      );
+    </script>
+  </body>
+</html>
