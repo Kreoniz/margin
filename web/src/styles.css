@@ -638,6 +638,15 @@
   .shortcut-list {
     @apply my-2 grid grid-cols-3 gap-2 text-[11px];
   }
+  .action-hint {
+    @apply flex max-w-[calc(100vw-32px)] flex-wrap items-center gap-x-2 gap-y-1 text-xs;
+  }
+  .action-hint > kbd {
+    @apply rounded border border-solid border-u-soft bg-u-well px-1 py-0.5 font-sans text-[10px] leading-none text-u-muted;
+  }
+  .action-hint > small {
+    @apply basis-full text-[10px] text-u-muted;
+  }
   .shortcut-list > div {
     @apply flex flex-col gap-1;
   }

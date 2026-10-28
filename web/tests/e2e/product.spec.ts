@@ -1569,6 +1569,128 @@ test("development shortcut loads all kinds once and clears only its fixtures", a
   }
 });
 
+test("action hints share one lazy popup across repeated rows and support hover, focus and Escape", async ({
+  page,
+  request,
+}, info) => {
+  for (let index = 0; index < 9; index++) {
+    expect(
+      (
+        await request.post("/api/media", {
+          data: { title: title("Hinted item " + index) },
+        })
+      ).status(),
+    ).toBe(201);
+  }
+  await page.goto("/dashboard");
+  const rows = page.locator(".media-row");
+  await expect(rows).toHaveCount(9);
+  const hints = page.getByRole("tooltip");
+  const floating = page.locator(".u-tooltip-theme");
+  const firstEdit = rows.first().getByRole("button", { name: /^Edit / });
+  await expect(floating).toHaveCount(0);
+  if (info.project.name === "desktop") {
+    await firstEdit.hover();
+    await expect(hints).toHaveCount(1);
+    await expect(hints).toContainText("Edit item");
+    await expect(hints.locator("kbd")).toHaveText("E");
+    await hints.hover();
+    // Exceed the 100ms close delay to verify the popup itself stays hoverable.
+    await page.waitForTimeout(200);
+    await expect(hints).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect(floating).toHaveCount(0);
+  } else {
+    await firstEdit.tap();
+    await expect(dialog(page)).toBeVisible();
+    await expect(floating).toHaveCount(0);
+    await dialog(page)
+      .getByRole("button", { name: "Cancel", exact: true })
+      .tap();
+    await expect(dialog(page)).toHaveCount(0);
+  }
+  await rows.first().focus();
+  await tabTo(page, firstEdit);
+  await expect(hints).toContainText("Edit item");
+  await expect(hints).toContainText("With this row focused");
+  const sharedID = (await hints.getAttribute("id"))!;
+  await expect(firstEdit).toHaveAttribute("aria-describedby", sharedID);
+  await page.keyboard.press("Escape");
+  await expect(floating).toHaveCount(0);
+  await expect(firstEdit).toBeFocused();
+  await expect(firstEdit).not.toHaveAttribute("aria-describedby");
+
+  const lastEdit = rows.last().getByRole("button", { name: /^Edit / });
+  await rows.last().focus();
+  await tabTo(page, lastEdit);
+  await expect(hints).toHaveCount(1);
+  await expect(hints).toHaveAttribute("id", sharedID);
+  await expect(lastEdit).toHaveAttribute("aria-describedby", sharedID);
+  await expect(firstEdit).not.toHaveAttribute("aria-describedby");
+  await expect(floating).toHaveCount(1);
+  await checkAccess(page);
+  await page.screenshot({
+    path: "test-results/action-hint-" + info.project.name + ".png",
+    animations: "disabled",
+  });
+  await lastEdit.press("Enter");
+  await expect(dialog(page)).toBeVisible();
+  const close = dialog(page).getByRole("button", {
+    name: "Close dialog",
+    exact: true,
+  });
+  await tabTo(page, close);
+  await expect(hints).toContainText("Close dialog");
+  await expect(hints.locator("kbd")).toHaveText("Esc");
+  await checkAccess(page);
+  await page.keyboard.press("Escape");
+  await expect(floating).toHaveCount(0);
+  await expect(dialog(page)).toBeVisible();
+  await expect(close).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+});
+
+test("action hints omit disabled quick keys and keep modifier shortcuts", async ({
+  page,
+  request,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("margin-single-key-shortcuts", "off"),
+  );
+  expect(
+    (
+      await request.post("/api/media", {
+        data: { title: title("Hint preferences") },
+      })
+    ).status(),
+  ).toBe(201);
+  await page.goto("/dashboard");
+  const row = page.locator(".media-row");
+  await row.focus();
+  const edit = row.getByRole("button", { name: /^Edit / });
+  await tabTo(page, edit);
+  const hint = page.getByRole("tooltip");
+  await expect(hint).toHaveText("Edit item");
+  await expect(hint.locator("kbd")).toHaveCount(0);
+  await expect(hint.locator("small")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  const settings = page.getByRole("button", { name: "Settings", exact: true });
+  await settings.focus();
+  await expect(hint).toContainText("Settings");
+  await expect(hint.locator("kbd")).toContainText(",");
+  await expect(settings).not.toHaveAttribute("title");
+  await checkAccess(page);
+  await settings.press("Enter");
+  await expect(dialog(page)).toBeVisible();
+  await expect(
+    dialog(page).getByRole("heading", { name: "Settings", exact: true }),
+  ).toBeFocused();
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+});
+
 test("whole public cards open from covers, copy, padding and keyboard", async ({
   page,
   context,

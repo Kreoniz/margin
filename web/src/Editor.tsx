@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "unlikely-ui/button";
+import { ActionHint } from "./ActionHint";
 import { Checkbox } from "unlikely-ui/checkbox";
 import { Input } from "unlikely-ui/input";
 import { Textarea } from "unlikely-ui/textarea";
@@ -280,6 +281,7 @@ export function Editor({
       }
       busy={busy}
       closeRequested={closing}
+      focusTitle={false}
       onClose={() => (result.current ? onSaved(result.current) : onClose())}
     >
       <form ref={formRef} onSubmit={submit}>
@@ -740,19 +742,23 @@ export function Editor({
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              loading={saving}
-              disabled={uploading || closing}
-              title={`Save (${formatForDisplay("Mod+Enter")})`}
-              aria-keyshortcuts="Control+Enter Meta+Enter"
+            <ActionHint
+              label="Save item"
+              shortcut={formatForDisplay("Mod+Enter")}
             >
-              {item
-                ? item.needs_review && markReviewed
-                  ? "Save & review"
-                  : "Save changes"
-                : "Add to library"}
-            </Button>
+              <Button
+                type="submit"
+                loading={saving}
+                disabled={uploading || closing}
+                aria-keyshortcuts="Control+Enter Meta+Enter"
+              >
+                {item
+                  ? item.needs_review && markReviewed
+                    ? "Save & review"
+                    : "Save changes"
+                  : "Add to library"}
+              </Button>
+            </ActionHint>
           </div>
         </div>
       </form>

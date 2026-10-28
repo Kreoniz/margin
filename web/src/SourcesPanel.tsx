@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "unlikely-ui/button";
+import { ActionHint } from "./ActionHint";
 import { Checkbox } from "unlikely-ui/checkbox";
 import { Input } from "unlikely-ui/input";
 import { api, send } from "./api";
@@ -99,33 +100,39 @@ export function SourcesPanel({
               <span className="source-format">
                 {source.parser === "rss" ? "RSS" : "Web parser"}
               </span>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={
-                  (source.enabled ? "Pause " : "Resume ") + source.name
-                }
-                disabled={pending.has(source.id)}
-                onClick={() =>
-                  void perform(source.id, () =>
-                    api(
-                      "/sources/" + source.id,
-                      send("PATCH", { enabled: !source.enabled }),
-                    ),
-                  )
-                }
+              <ActionHint
+                label={source.enabled ? "Pause source" : "Resume source"}
               >
-                <Icon name={source.enabled ? "pause" : "sync"} size={15} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={"Remove " + source.name}
-                disabled={pending.has(source.id)}
-                onClick={() => setRemoving(source.id)}
-              >
-                <Icon name="close" size={16} />
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={
+                    (source.enabled ? "Pause " : "Resume ") + source.name
+                  }
+                  disabled={pending.has(source.id)}
+                  onClick={() =>
+                    void perform(source.id, () =>
+                      api(
+                        "/sources/" + source.id,
+                        send("PATCH", { enabled: !source.enabled }),
+                      ),
+                    )
+                  }
+                >
+                  <Icon name={source.enabled ? "pause" : "sync"} size={15} />
+                </Button>
+              </ActionHint>
+              <ActionHint label="Remove source">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={"Remove " + source.name}
+                  disabled={pending.has(source.id)}
+                  onClick={() => setRemoving(source.id)}
+                >
+                  <Icon name="close" size={16} />
+                </Button>
+              </ActionHint>
             </div>
             <div className="source-options">
               <label className="source-auto-save">

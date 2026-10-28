@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "unlikely-ui/button";
 import { Dialog } from "unlikely-ui/dialog";
 import { Select } from "unlikely-ui/select";
@@ -6,6 +6,7 @@ import { Field } from "unlikely-ui/field";
 import { Icon } from "./Icon";
 import { kindLabels, type Kind } from "./types";
 import { imageURL } from "./utils";
+import { ActionHint, HintScope } from "./ActionHint";
 
 export function Picker<T extends string>({
   value,
@@ -69,6 +70,7 @@ export function Modal({
   className = "",
   busy = false,
   closeRequested = false,
+  focusTitle = true,
 }: {
   title: string;
   description?: string;
@@ -77,8 +79,11 @@ export function Modal({
   className?: string;
   busy?: boolean;
   closeRequested?: boolean;
+  focusTitle?: boolean;
 }) {
   const [open, setOpen] = useState(true);
+  // Avoid opening the Close tooltip as a side effect of dialog autofocus.
+  const titleRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (closeRequested) setOpen(false);
   }, [closeRequested]);
@@ -100,29 +105,40 @@ export function Modal({
     >
       <Dialog.Content
         className={"app-modal " + className}
+        initialFocus={focusTitle ? titleRef : undefined}
         finalFocus={() => (origin?.isConnected ? origin : true)}
       >
-        <div className="modal-header">
-          <div>
-            <Dialog.Title>{title}</Dialog.Title>
-            {description && (
-              <Dialog.Description>{description}</Dialog.Description>
-            )}
-          </div>
-          <Dialog.Close
-            render={
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Close dialog"
+        <HintScope>
+          <div className="modal-header">
+            <div>
+              <Dialog.Title
+                ref={titleRef}
+                tabIndex={focusTitle ? -1 : undefined}
+              >
+                {title}
+              </Dialog.Title>
+              {description && (
+                <Dialog.Description>{description}</Dialog.Description>
+              )}
+            </div>
+            <ActionHint label="Close dialog" shortcut="Esc">
+              <Dialog.Close
                 disabled={busy}
-              />
-            }
-          >
-            <Icon name="close" size={18} />
-          </Dialog.Close>
-        </div>
-        {children}
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Close dialog"
+                    disabled={busy}
+                  />
+                }
+              >
+                <Icon name="close" size={18} />
+              </Dialog.Close>
+            </ActionHint>
+          </div>
+          {children}
+        </HintScope>
       </Dialog.Content>
     </Dialog.Root>
   );

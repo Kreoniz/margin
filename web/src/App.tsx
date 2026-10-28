@@ -25,6 +25,7 @@ import { hostname, relativeDate, safeURL, selectMedia } from "./utils";
 import { useListMotion } from "./useListMotion";
 import { useListNavigation } from "./useListNavigation";
 import { KeyboardHelp } from "./KeyboardHelp";
+import { ActionHint, HintScope } from "./ActionHint";
 
 export default function App() {
   const [appearance, setAppearance] = useState<"light" | "dark">(() => {
@@ -509,7 +510,7 @@ function Owner({
       "Checking your sources. New articles appear automatically.",
     );
   }
-  return (
+  const content = (
     <div className="owner-shell">
       <a
         className="skip-link"
@@ -531,59 +532,78 @@ function Owner({
             <Logo small />
           </button>
           <nav className="main-nav" aria-label="Main navigation">
-            <button
-              aria-current={view === "library" ? "page" : undefined}
-              onClick={() => navigate("library")}
+            <ActionHint
+              label="Library"
+              shortcut={singleKeys ? "G then L" : undefined}
             >
-              <Icon name="book" size={16} />
-              Library
-            </button>
-            <button
-              aria-current={view === "discover" ? "page" : undefined}
-              onClick={() => navigate("discover")}
+              <button
+                aria-current={view === "library" ? "page" : undefined}
+                onClick={() => navigate("library")}
+              >
+                <Icon name="book" size={16} />
+                Library
+              </button>
+            </ActionHint>
+            <ActionHint
+              label="Discover"
+              shortcut={singleKeys ? "G then D" : undefined}
             >
-              <Icon name="inbox" size={16} />
-              Discover
-              {inbox.some((item) => item.state === "new") && (
-                <span
-                  className="new-dot"
-                  role="img"
-                  aria-label="New discoveries"
-                />
-              )}
-            </button>
-            <button
-              onClick={() => setSourcesOpen(true)}
-              aria-haspopup="dialog"
-              aria-expanded={sourcesOpen}
-              title="Manage sources and automatic collection"
+              <button
+                aria-current={view === "discover" ? "page" : undefined}
+                onClick={() => navigate("discover")}
+              >
+                <Icon name="inbox" size={16} />
+                Discover
+                {inbox.some((item) => item.state === "new") && (
+                  <span
+                    className="new-dot"
+                    role="img"
+                    aria-label="New discoveries"
+                  />
+                )}
+              </button>
+            </ActionHint>
+            <ActionHint
+              label="Manage sources"
+              shortcut={singleKeys ? "G then S" : undefined}
             >
-              <Icon name="rss" size={16} />
-              Sources
-            </button>
+              <button
+                onClick={() => setSourcesOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={sourcesOpen}
+              >
+                <Icon name="rss" size={16} />
+                Sources
+              </button>
+            </ActionHint>
           </nav>
           <div className="header-actions">
-            <Button
-              onClick={() => setEditor("new")}
-              size="sm"
-              title={`Add item (${formatForDisplay("Mod+Shift+A")}${singleKeys ? " or N" : ""})`}
-              aria-keyshortcuts="Control+Shift+A Meta+Shift+A"
-              aria-label="Add item"
+            <ActionHint
+              label="Add item"
+              shortcut={formatForDisplay("Mod+Shift+A")}
             >
-              <Icon name="plus" size={16} />
-              <span>Add item</span>
-            </Button>
-            <Button
-              variant="secondary"
-              size="icon"
-              aria-label="Settings"
-              aria-haspopup="dialog"
-              aria-expanded={settings}
-              title={`Settings (${formatForDisplay("Mod+,")})`}
-              onClick={() => setSettings(true)}
-            >
-              <Icon name="settings" size={18} />
-            </Button>
+              <Button
+                onClick={() => setEditor("new")}
+                size="sm"
+                aria-keyshortcuts="Control+Shift+A Meta+Shift+A"
+                aria-label="Add item"
+              >
+                <Icon name="plus" size={16} />
+                <span>Add item</span>
+              </Button>
+            </ActionHint>
+            <ActionHint label="Settings" shortcut={formatForDisplay("Mod+,")}>
+              <Button
+                variant="secondary"
+                size="icon"
+                aria-label="Settings"
+                aria-haspopup="dialog"
+                aria-expanded={settings}
+                onClick={() => setSettings(true)}
+              >
+                <Icon name="settings" size={18} />
+              </Button>
+            </ActionHint>
           </div>
         </div>
       </header>
@@ -614,15 +634,20 @@ function Owner({
           </div>
           {view === "discover" && (
             <div className="discovery-controls">
-              <Button
-                variant="ghost"
-                size="sm"
-                loading={pending.has("sync")}
-                onClick={() => void checkSources()}
+              <ActionHint
+                label="Check sources"
+                shortcut={singleKeys ? "Shift+R" : undefined}
               >
-                <Icon name="sync" size={15} />
-                Check now
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  loading={pending.has("sync")}
+                  onClick={() => void checkSources()}
+                >
+                  <Icon name="sync" size={15} />
+                  Check now
+                </Button>
+              </ActionHint>
             </div>
           )}
         </div>
@@ -775,16 +800,26 @@ function Owner({
                   }
                   aria-label={item.title}
                 >
-                  <Checkbox
-                    checked={item.status === "done"}
-                    disabled={pending.has(item.id)}
-                    aria-label={
-                      (item.status === "done"
-                        ? "Mark to read/watch: "
-                        : "Mark done: ") + item.title
+                  <ActionHint
+                    label={
+                      item.status === "done"
+                        ? "Move to read/watch"
+                        : "Mark done"
                     }
-                    onCheckedChange={() => void toggle(item)}
-                  />
+                    shortcut={singleKeys ? "D" : undefined}
+                    context={singleKeys ? "With this row focused" : undefined}
+                  >
+                    <Checkbox
+                      checked={item.status === "done"}
+                      disabled={pending.has(item.id)}
+                      aria-label={
+                        (item.status === "done"
+                          ? "Mark to read/watch: "
+                          : "Mark done: ") + item.title
+                      }
+                      onCheckedChange={() => void toggle(item)}
+                    />
+                  </ActionHint>
                   <MiniCover kind={item.kind} url={item.cover_url} />
                   <div className="row-content">
                     {safeURL(item.url) ? (
@@ -861,14 +896,20 @@ function Owner({
                     </Button>
                   )}
                   <TypeLabel kind={item.kind} />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={"Edit " + item.title}
-                    onClick={() => setEditor(item)}
+                  <ActionHint
+                    label="Edit item"
+                    shortcut={singleKeys ? "E" : undefined}
+                    context={singleKeys ? "With this row focused" : undefined}
                   >
-                    <Icon name="edit" size={16} />
-                  </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={"Edit " + item.title}
+                      onClick={() => setEditor(item)}
+                    >
+                      <Icon name="edit" size={16} />
+                    </Button>
+                  </ActionHint>
                 </article>
               ))}
             </div>
@@ -957,15 +998,23 @@ function Owner({
                           Saved to library
                         </span>
                       ) : (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          disabled={pending.has(item.id)}
-                          onClick={() => void saveArticle(item.id)}
+                        <ActionHint
+                          label="Save to library"
+                          shortcut={singleKeys ? "S" : undefined}
+                          context={
+                            singleKeys ? "With this row focused" : undefined
+                          }
                         >
-                          <Icon name="plus" size={13} />
-                          Save
-                        </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={pending.has(item.id)}
+                            onClick={() => void saveArticle(item.id)}
+                          >
+                            <Icon name="plus" size={13} />
+                            Save
+                          </Button>
+                        </ActionHint>
                       )}
                       {item.state === "new" && (
                         <Button
@@ -998,15 +1047,23 @@ function Owner({
                     </div>
                   </div>
                   {!["saved", "dismissed"].includes(item.state) && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={"Dismiss " + item.title}
-                      disabled={pending.has(item.id)}
-                      onClick={() => void setArticleState(item.id, "dismissed")}
+                    <ActionHint
+                      label="Dismiss article"
+                      shortcut={singleKeys ? "X" : undefined}
+                      context={singleKeys ? "With this row focused" : undefined}
                     >
-                      <Icon name="close" size={17} />
-                    </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={"Dismiss " + item.title}
+                        disabled={pending.has(item.id)}
+                        onClick={() =>
+                          void setArticleState(item.id, "dismissed")
+                        }
+                      >
+                        <Icon name="close" size={17} />
+                      </Button>
+                    </ActionHint>
                   )}
                 </article>
               ))}
@@ -1059,13 +1116,14 @@ function Owner({
           {view === "library"
             ? "Private by default. Yours to curate."
             : "Collected automatically. Saved by choice."}
-          <button
-            className="ml-auto rounded border-0 bg-transparent px-2 py-1 text-[11px] text-[var(--u-muted)] hover:bg-[var(--u-well)]"
-            onClick={() => setHelpOpen(true)}
-            title="Keyboard shortcuts (F1)"
-          >
-            ↑↓ navigate · Enter open · F1 help
-          </button>
+          <ActionHint label="Keyboard shortcuts" shortcut="F1">
+            <button
+              className="ml-auto rounded border-0 bg-transparent px-2 py-1 text-[11px] text-[var(--u-muted)] hover:bg-[var(--u-well)]"
+              onClick={() => setHelpOpen(true)}
+            >
+              ↑↓ navigate · Enter open · F1 help
+            </button>
+          </ActionHint>
         </footer>
       </main>
       {editor && (
@@ -1161,4 +1219,5 @@ function Owner({
       )}
     </div>
   );
+  return <HintScope disabled={!shortcutsEnabled}>{content}</HintScope>;
 }

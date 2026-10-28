@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "unlikely-ui/button";
+import { ActionHint } from "./ActionHint";
 import { Input } from "unlikely-ui/input";
 import { Checkbox } from "unlikely-ui/checkbox";
 import { formatForDisplay, useHotkey } from "@tanstack/react-hotkeys";
@@ -264,23 +265,31 @@ export function Settings({
                   value={token}
                   aria-label="New submission token"
                 />
-                <Button
-                  variant="secondary"
-                  size="icon-sm"
-                  aria-label={
-                    copied ? "Submission token copied" : "Copy submission token"
-                  }
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(token);
-                      setCopied(true);
-                    } catch {
-                      setError("Select the token field and copy it manually.");
-                    }
-                  }}
+                <ActionHint
+                  label={copied ? "Token copied" : "Copy submission token"}
                 >
-                  <Icon name={copied ? "check" : "copy"} size={15} />
-                </Button>
+                  <Button
+                    variant="secondary"
+                    size="icon-sm"
+                    aria-label={
+                      copied
+                        ? "Submission token copied"
+                        : "Copy submission token"
+                    }
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(token);
+                        setCopied(true);
+                      } catch {
+                        setError(
+                          "Select the token field and copy it manually.",
+                        );
+                      }
+                    }}
+                  >
+                    <Icon name={copied ? "check" : "copy"} size={15} />
+                  </Button>
+                </ActionHint>
               </div>
               <p className="quiet" role={copied ? "status" : undefined}>
                 {copied
