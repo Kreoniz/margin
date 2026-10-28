@@ -1193,7 +1193,8 @@ test("public root stays a Collection for visitors and signed-in owners", async (
       surface.getByRole("button", { name: "Settings", exact: true }),
     ).toHaveCount(0);
     const cover = surface.locator(".collection-card .mini-cover");
-    expect((await cover.boundingBox())!.height).toBeGreaterThanOrEqual(200);
+    expect((await cover.boundingBox())!.height).toBeGreaterThanOrEqual(96);
+    expect((await cover.boundingBox())!.height).toBeLessThanOrEqual(160);
     await checkAccess(surface);
     await guest?.close();
   }
@@ -1483,6 +1484,24 @@ test("development shortcut loads all kinds once and clears only its fixtures", a
       await expect(
         publicPage.locator(".collection-card").filter({ hasText: "[Demo]" }),
       ).toHaveCount(9);
+      const compactWidths =
+        (page.viewportSize()?.width || 1440) < 600 ? [320, 390] : [1440];
+      for (const width of compactWidths) {
+        await publicPage.setViewportSize({ width, height: 844 });
+        const cards = publicPage.locator(".collection-card");
+        for (const card of await cards.all()) {
+          const bounds = (await card.boundingBox())!;
+          expect(bounds.height).toBeLessThanOrEqual(width < 600 ? 220 : 360);
+          if (width < 600) {
+            const cover = (await card.locator(".mini-cover").boundingBox())!;
+            const copy = (await card
+              .locator(".collection-copy")
+              .boundingBox())!;
+            expect(copy.x).toBeGreaterThanOrEqual(cover.x + cover.width);
+          }
+        }
+        await checkAccess(publicPage);
+      }
       const images = publicPage.locator(".collection-card img");
       for (const image of await images.all()) {
         await image.scrollIntoViewIfNeeded();

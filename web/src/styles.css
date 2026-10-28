@@ -1027,32 +1027,38 @@
     @apply h-8 min-h-8 w-auto min-w-0 px-2 text-[10px];
   }
   .collection-grid {
-    @apply grid gap-6;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+    @apply grid items-start gap-4;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
   }
   .collection-card {
     @apply min-w-0 overflow-hidden rounded-xl border border-solid border-u-soft bg-u-surface;
   }
   .collection-card > .mini-cover {
-    @apply h-64 w-full min-w-0 rounded-none;
+    @apply h-40 w-full min-w-0 rounded-none;
   }
   .collection-copy {
-    @apply grid gap-2 p-4;
+    @apply grid min-w-0 gap-1.5 p-3;
   }
   .collection-copy .type-label {
     @apply m-0;
   }
   .collection-copy h2 {
-    @apply m-0 text-base;
+    @apply m-0 text-sm leading-snug;
   }
   .collection-copy .item-title {
-    @apply text-base;
+    @apply line-clamp-2 text-sm leading-snug;
+  }
+  .collection-copy .item-meta {
+    @apply m-0 text-[11px] leading-snug;
   }
   .collection-copy .shared-description {
-    @apply m-0 line-clamp-4;
+    @apply m-0 line-clamp-2 leading-snug;
+  }
+  .collection-copy .shared-tags {
+    @apply m-0 truncate text-[10px] leading-snug;
   }
   .collection-copy .shared-status {
-    @apply text-left;
+    @apply m-0 text-left leading-snug;
   }
   .book-lookup {
     @apply my-3 grid gap-2 rounded-md border border-solid border-u-soft p-3;
@@ -1126,8 +1132,35 @@
     .media-row .row-content {
       @apply basis-[calc(100%-160px)];
     }
+    .shared-page .list-toolbar {
+      @apply grid grid-cols-[minmax(0,1fr)_auto] gap-2;
+    }
+    .shared-page .search-box {
+      @apply min-w-0;
+    }
+    .shared-page .search-box > .u-text-control {
+      @apply pr-2;
+    }
+    .shared-page .list-toolbar > .u-select-trigger {
+      @apply min-h-10 max-w-28 text-xs;
+    }
+    .collection-grid {
+      @apply grid-cols-1 gap-3;
+    }
+    .collection-card {
+      @apply grid grid-cols-[80px_minmax(0,1fr)] items-start gap-3 rounded-lg p-3;
+    }
     .collection-card > .mini-cover {
-      @apply h-64 w-full min-w-0;
+      @apply h-28 w-full min-w-0 rounded;
+    }
+    .collection-copy {
+      @apply gap-1 p-0;
+    }
+    .collection-copy .shared-tags {
+      @apply mt-0 truncate;
+    }
+    .collection-copy .shared-status {
+      @apply mt-0;
     }
     .collection-copy .type-label {
       @apply inline-flex;
