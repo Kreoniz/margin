@@ -820,6 +820,10 @@
     .toolbar-filters > .u-select-trigger {
       @apply h-9 min-h-9 min-w-28 max-w-1/2;
     }
+    .list-tabs-row,
+    .list-tabs {
+      @apply gap-2;
+    }
     .list-tabs > button {
       @apply min-h-11 text-[11px];
     }
@@ -1033,8 +1037,20 @@
   .collection-card {
     @apply flex flex-col min-w-0 overflow-hidden rounded-xl border border-solid border-u-soft bg-u-surface;
   }
-  .collection-card > .mini-cover {
-    @apply h-40 w-full min-w-0 rounded-none;
+  .collection-card-link {
+    @apply flex min-w-0 flex-1 flex-col text-inherit no-underline outline-none;
+  }
+  .collection-card-link[href] {
+    @apply cursor-pointer;
+  }
+  .collection-card-link[href]:focus-visible {
+    @apply outline-2 -outline-offset-2 outline-u-focus;
+  }
+  .collection-card-link[href]:hover .item-title {
+    @apply underline decoration-u-line;
+  }
+  .collection-card-link > .mini-cover {
+    @apply h-32 w-full min-w-0 rounded-none;
   }
   .collection-copy {
     @apply grid min-w-0 flex-1 content-start gap-1.5 p-3;
@@ -1151,9 +1167,12 @@
       @apply grid-cols-1 gap-3;
     }
     .collection-card {
-      @apply grid grid-cols-[80px_minmax(0,1fr)] items-start gap-3 rounded-lg p-3;
+      @apply rounded-lg;
     }
-    .collection-card > .mini-cover {
+    .collection-card-link {
+      @apply grid grid-cols-[80px_minmax(0,1fr)] items-start gap-3 p-3;
+    }
+    .collection-card-link > .mini-cover {
       @apply h-28 w-full min-w-0 rounded;
     }
     .collection-copy {
@@ -1181,12 +1200,61 @@
   .metadata-warning {
     @apply mt-1 block border-0 bg-transparent p-0 text-left text-[11px] text-u-warning hover:underline;
   }
+  /* The title's native link/button owns the row; independent controls sit above it. */
+  .owner-shell .media-row {
+    @apply relative min-h-16 gap-3 py-2;
+  }
+  .owner-shell .media-row > .mini-cover {
+    @apply h-16 w-20 min-w-20;
+  }
+  .owner-shell .media-row > .mini-cover[data-empty] {
+    @apply h-9 bg-transparent;
+  }
+  .owner-shell .media-row .row-primary-action {
+    @apply static line-clamp-2;
+  }
+  .owner-shell .media-row .item-meta {
+    @apply flex-nowrap overflow-hidden;
+  }
+  .owner-shell .media-row .item-meta > span,
+  .owner-shell .media-row .inline-tag {
+    @apply min-w-0 truncate;
+  }
+  .owner-shell .media-row .item-meta > .public-marker {
+    @apply inline-flex shrink-0;
+  }
+  @media (max-width: 360px) {
+    .owner-shell .result-count {
+      @apply sr-only;
+    }
+  }
+  .row-primary-action::after {
+    @apply absolute inset-0 z-1 cursor-pointer rounded-[inherit] content-[''];
+  }
+  .row-primary-action:focus-visible::after {
+    @apply outline-2 -outline-offset-2 outline-u-focus;
+  }
+  .owner-shell .media-row > .u-choice,
+  .owner-shell .media-row > .u-button,
+  .owner-shell .media-row .inline-tag,
+  .owner-shell .media-row .metadata-warning {
+    @apply relative z-2;
+  }
+  @media (hover: hover) {
+    .owner-shell .media-row:hover,
+    .collection-card:has(.collection-card-link[href]:hover) {
+      @apply bg-u-well/40;
+    }
+  }
   @media (max-width: 600px) {
     .owner-shell .media-row {
-      @apply grid grid-cols-[24px_64px_minmax(0,1fr)_32px] items-center gap-x-2 gap-y-1;
+      @apply grid grid-cols-[24px_48px_minmax(0,1fr)_32px] items-center gap-x-2 gap-y-1;
     }
     .owner-shell .media-row > .mini-cover {
-      @apply col-start-2 row-start-1 h-22 w-16 min-w-16;
+      @apply col-start-2 row-start-1 h-14 w-12 min-w-12;
+    }
+    .owner-shell .media-row > .mini-cover[data-empty] {
+      @apply h-8;
     }
     .owner-shell .media-row > .u-choice {
       @apply col-start-1 row-start-1 min-w-0;
@@ -1203,18 +1271,8 @@
     .owner-shell .media-row > .type-label {
       @apply hidden;
     }
-    .owner-shell .media-row > .public-marker {
-      @apply col-start-4 row-start-2 justify-center;
-    }
     .modal-footer {
       @apply flex-wrap gap-y-2;
-    }
-  }
-}
-@layer components {
-  @media (max-width: 600px) {
-    .owner-shell .media-row > .mini-cover[data-empty] {
-      @apply h-16 w-12 min-w-12 justify-self-center;
     }
   }
 }

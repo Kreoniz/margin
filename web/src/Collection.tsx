@@ -96,46 +96,49 @@ export function Collection() {
             <div className="collection-grid">
               {filtered.map((item) => (
                 <article className="collection-card" key={item.id}>
-                  <MiniCover kind={item.kind} url={item.cover_url} />
-                  <div className="collection-copy">
-                    <TypeLabel kind={item.kind} />
-                    <h2>
-                      <a
-                        className="item-title"
-                        href={
-                          safeURL(item.url) ||
-                          (id ? undefined : "/shared/" + item.id)
-                        }
-                        target={safeURL(item.url) ? "_blank" : undefined}
-                        rel="noreferrer"
+                  <a
+                    className="collection-card-link"
+                    aria-label={item.title}
+                    href={
+                      safeURL(item.url) ||
+                      (id ? undefined : "/shared/" + item.id)
+                    }
+                    target={safeURL(item.url) ? "_blank" : undefined}
+                    rel="noreferrer"
+                  >
+                    <MiniCover kind={item.kind} url={item.cover_url} />
+                    <div className="collection-copy">
+                      <TypeLabel kind={item.kind} />
+                      <h2>
+                        <span className="item-title">
+                          {item.title}
+                          {safeURL(item.url) && (
+                            <Icon name="external" size={12} />
+                          )}
+                        </span>
+                      </h2>
+                      <p className="item-meta">
+                        {item.author ||
+                          hostname(item.url) ||
+                          kindLabels[item.kind]}
+                      </p>
+                      <p
+                        className="shared-description"
+                        aria-hidden={!item.description || undefined}
                       >
-                        {item.title}
-                        {safeURL(item.url) && (
-                          <Icon name="external" size={12} />
-                        )}
-                      </a>
-                    </h2>
-                    <p className="item-meta">
-                      {item.author ||
-                        hostname(item.url) ||
-                        kindLabels[item.kind]}
-                    </p>
-                    <p
-                      className="shared-description"
-                      aria-hidden={!item.description || undefined}
-                    >
-                      {item.description}
-                    </p>
-                    <p
-                      className="shared-tags"
-                      aria-hidden={!item.tags.length || undefined}
-                    >
-                      {item.tags.join(" · ")}
-                    </p>
-                    <span className="shared-status">
-                      {item.status === "done" ? "Done" : "To read/watch"}
-                    </span>
-                  </div>
+                        {item.description}
+                      </p>
+                      <p
+                        className="shared-tags"
+                        aria-hidden={!item.tags.length || undefined}
+                      >
+                        {item.tags.join(" · ")}
+                      </p>
+                      <span className="shared-status">
+                        {item.status === "done" ? "Done" : "To read/watch"}
+                      </span>
+                    </div>
+                  </a>
                 </article>
               ))}
             </div>

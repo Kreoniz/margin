@@ -789,7 +789,7 @@ function Owner({
                   <div className="row-content">
                     {safeURL(item.url) ? (
                       <a
-                        className="item-title"
+                        className="item-title row-primary-action"
                         href={safeURL(item.url)}
                         target="_blank"
                         rel="noreferrer"
@@ -799,7 +799,7 @@ function Owner({
                       </a>
                     ) : (
                       <button
-                        className="item-title"
+                        className="item-title row-primary-action"
                         onClick={() => setEditor(item)}
                       >
                         {item.title}
@@ -820,6 +820,15 @@ function Owner({
                           {t}
                         </button>
                       ))}
+                      {item.visibility === "public" && (
+                        <span
+                          className="public-marker"
+                          role="img"
+                          aria-label="Public item"
+                        >
+                          <Icon name="globe" size={15} />
+                        </span>
+                      )}
                     </div>
                     {item.metadata_state === "pending" && (
                       <p
@@ -832,9 +841,10 @@ function Owner({
                     {item.metadata_state === "partial" && (
                       <button
                         className="metadata-warning"
+                        aria-label={"Edit missing details: " + item.title}
                         onClick={() => setEditor(item)}
                       >
-                        Details incomplete · Open editor
+                        Missing details · Edit
                       </button>
                     )}
                   </div>
@@ -851,15 +861,6 @@ function Owner({
                     </Button>
                   )}
                   <TypeLabel kind={item.kind} />
-                  {item.visibility === "public" && (
-                    <span
-                      className="public-marker"
-                      role="img"
-                      aria-label="Public item"
-                    >
-                      <Icon name="globe" size={15} />
-                    </span>
-                  )}
                   <Button
                     variant="ghost"
                     size="icon"

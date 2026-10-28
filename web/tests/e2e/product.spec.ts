@@ -1442,7 +1442,7 @@ test("development shortcut loads all kinds once and clears only its fixtures", a
   page,
   request,
   browser,
-}) => {
+}, info) => {
   const bootstrap = await (await request.get("/api/bootstrap")).json();
   test.skip(
     !bootstrap.dev_mode,
@@ -1466,6 +1466,32 @@ test("development shortcut loads all kinds once and clears only its fixtures", a
     await expect(
       page.locator(".media-row").filter({ hasText: "[Demo]" }),
     ).toHaveCount(9);
+    const compactWidths =
+      (page.viewportSize()?.width || 1440) < 600 ? [320, 390] : [1440];
+    for (const width of compactWidths) {
+      await page.setViewportSize({ width, height: 844 });
+      for (const row of await page.locator(".media-row").all()) {
+        expect((await row.boundingBox())!.height).toBeLessThanOrEqual(
+          width < 600 ? 120 : 96,
+        );
+      }
+      expect(
+        await page
+          .locator(".list-tabs")
+          .evaluate((tabs) => tabs.scrollWidth - tabs.clientWidth),
+      ).toBeLessThanOrEqual(1);
+    }
+    await page
+      .getByRole("button", { name: "Dismiss notification", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Dismiss notification", exact: true }),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: "test-results/populated-library-" + info.project.name + ".png",
+      fullPage: true,
+      animations: "disabled",
+    });
     const loaded = await (await request.get("/api/bootstrap")).json();
     expect(loaded.dev_fixture_count).toBe(9);
     expect(
@@ -1486,8 +1512,6 @@ test("development shortcut loads all kinds once and clears only its fixtures", a
       await expect(
         publicPage.locator(".collection-card").filter({ hasText: "[Demo]" }),
       ).toHaveCount(9);
-      const compactWidths =
-        (page.viewportSize()?.width || 1440) < 600 ? [320, 390] : [1440];
       for (const width of compactWidths) {
         await publicPage.setViewportSize({ width, height: 844 });
         const cards = publicPage.locator(".collection-card");
@@ -1503,6 +1527,11 @@ test("development shortcut loads all kinds once and clears only its fixtures", a
           }
         }
         await checkAccess(publicPage);
+        await publicPage.screenshot({
+          path: "test-results/populated-collection-" + width + ".png",
+          fullPage: true,
+          animations: "disabled",
+        });
       }
       const images = publicPage.locator(".collection-card img");
       for (const image of await images.all()) {
@@ -1538,6 +1567,178 @@ test("development shortcut loads all kinds once and clears only its fixtures", a
   } finally {
     await request.delete("/api/dev/fixtures");
   }
+});
+
+test("whole public cards open from covers, copy, padding and keyboard", async ({
+  page,
+  context,
+  request,
+}) => {
+  const name = title("Whole public card");
+  const manualName = title("Public card without a URL");
+  const url = "https://reader.example/article";
+  await context.route("https://reader.example/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<h1>Original article</h1>",
+    }),
+  );
+  for (const data of [
+    {
+      title: name,
+      url,
+      description: "Read the whole story.",
+      author: "Writer",
+    },
+    { title: manualName },
+  ]) {
+    expect(
+      (
+        await request.post("/api/media", {
+          data: { ...data, kind: "article", visibility: "public" },
+        })
+      ).status(),
+    ).toBe(201);
+  }
+  await page.goto("/");
+  const card = page.locator(".collection-card").filter({ hasText: name });
+  const open = async (click: () => Promise<unknown>) => {
+    const popup = page.waitForEvent("popup");
+    await click();
+    const original = await popup;
+    await expect(original).toHaveURL(url);
+    await original.close();
+  };
+  await open(() => card.locator(".mini-cover").click());
+  await open(() => card.getByText("Read the whole story.").click());
+  await open(() => card.click({ position: { x: 3, y: 3 } }));
+  await card.getByRole("link", { name, exact: true }).focus();
+  await open(() => page.keyboard.press("Enter"));
+  await checkAccess(page);
+  await page
+    .locator(".collection-card")
+    .filter({ hasText: manualName })
+    .locator(".mini-cover")
+    .click();
+  await expect(page).toHaveURL(/\/shared\/[a-z0-9-]+$/);
+  await expect(page.getByRole("heading", { name: manualName })).toBeVisible();
+});
+
+test("compact library rows open from covers and whitespace while controls stay independent", async ({
+  page,
+  context,
+  request,
+}) => {
+  const name = title("Whole library row");
+  const manualName = title("Library row without a URL");
+  const url = "https://reader.example/article";
+  await context.route("https://reader.example/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<h1>Original article</h1>",
+    }),
+  );
+  for (const data of [
+    {
+      title: name,
+      url,
+      author: "Writer",
+      tags: ["reading"],
+      needs_review: true,
+    },
+    { title: manualName },
+  ]) {
+    expect((await request.post("/api/media", { data })).status()).toBe(201);
+  }
+  await page.goto("/dashboard");
+  await page
+    .locator(".list-tabs")
+    .getByRole("button", { name: "All", exact: true })
+    .click();
+  const row = page.locator(".media-row").filter({ hasText: name });
+  const manual = page.locator(".media-row").filter({ hasText: manualName });
+  // Use real pointer coordinates: the native stretched link covers these elements.
+  const clickBody = async (target: Locator, x = 0.5, y = 0.5) => {
+    await target.scrollIntoViewIfNeeded();
+    const bounds = (await target.boundingBox())!;
+    await page.mouse.click(
+      bounds.x + bounds.width * x,
+      bounds.y + bounds.height * y,
+    );
+  };
+  const open = async (click: () => Promise<unknown>) => {
+    const popup = page.waitForEvent("popup");
+    await click();
+    const original = await popup;
+    await expect(original).toHaveURL(url);
+    await original.close();
+  };
+  await expect(row).toBeVisible();
+  expect((await row.boundingBox())!.height).toBeLessThanOrEqual(
+    (page.viewportSize()?.width || 1440) < 600 ? 140 : 96,
+  );
+  expect((await manual.boundingBox())!.height).toBeLessThanOrEqual(96);
+  await open(() => clickBody(row.locator(".mini-cover")));
+  await open(() => clickBody(row.locator(".item-meta > span")));
+  await open(() => clickBody(row, 0.65, 0.95));
+  await row.getByRole("link", { name, exact: true }).focus();
+  await open(() => page.keyboard.press("Enter"));
+  const popups: Page[] = [];
+  page.on("popup", (popup) => popups.push(popup));
+  const checkbox = row.getByRole("checkbox");
+  await checkbox.click();
+  await expect(checkbox).toBeChecked();
+  await checkbox.press("Space");
+  await expect(checkbox).not.toBeChecked();
+  const edit = row.getByRole("button", { name: "Edit " + name, exact: true });
+  await edit.click();
+  await expect(dialog(page)).toBeVisible();
+  await dialog(page)
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await expect(dialog(page)).toHaveCount(0);
+  await edit.press("Enter");
+  await expect(dialog(page)).toBeVisible();
+  await dialog(page)
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await expect(dialog(page)).toHaveCount(0);
+  await row
+    .getByRole("button", { name: "Edit missing details: " + name })
+    .click();
+  await expect(dialog(page)).toBeVisible();
+  await dialog(page)
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await expect(dialog(page)).toHaveCount(0);
+  if ((page.viewportSize()?.width || 1440) >= 600) {
+    await row.getByRole("button", { name: "reading", exact: true }).click();
+  } else {
+    await page
+      .getByRole("combobox", { name: "Filter tag", exact: true })
+      .click();
+    await page.getByRole("option", { name: "reading", exact: true }).click();
+  }
+  await expect(manual).toHaveCount(0);
+  await row.getByRole("button", { name: "Mark reviewed: " + name }).click();
+  await expect(row.getByRole("button", { name: /Mark reviewed/ })).toHaveCount(
+    0,
+  );
+  expect(popups).toHaveLength(0);
+  await page.reload();
+  await page
+    .locator(".list-tabs")
+    .getByRole("button", { name: "All", exact: true })
+    .click();
+  await clickBody(manual.locator(".mini-cover"));
+  await expect(
+    dialog(page).getByRole("textbox", { name: "Title", exact: true }),
+  ).toHaveValue(manualName);
+  await dialog(page)
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  expect(popups).toHaveLength(0);
+  await checkAccess(page);
 });
 
 test("public cards align across wrapped titles and missing details", async ({
