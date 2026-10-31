@@ -2,7 +2,7 @@
 
 A small personal reading/watch list with an automatic article inbox. Two library states: **To read/watch** and **Done**. No progress counters, ratings, favorites or habit tracking.
 
-Go + PostgreSQL + React/TypeScript, using the published **[Unlikely UI](https://www.npmjs.com/package/unlikely-ui)** package (`0.1.0-alpha.2`, pinned in pnpm-lock.yaml). The application imports its Theme, Button, Checkbox, Input, Select, Dialog, Field, Textarea and Toast components and compiled CSS. App styling uses **Tailwind CSS 4.3.3**, the Vite plugin and Unlikely UI's published Tailwind token adapter. Dark is the default, with mint accents and an optional light theme.
+Go + PostgreSQL + React/TypeScript, using the published **[Unlikely UI](https://www.npmjs.com/package/unlikely-ui)** package (`0.1.0-alpha.3`, pinned in pnpm-lock.yaml). The application imports its Theme, Button, Checkbox, Input, Select, Dialog, Field, Textarea and Toast components and compiled CSS. App styling uses **Tailwind CSS 4.3.3**, the Vite plugin and Unlikely UI's published Tailwind token adapter. Dark is the default, with mint accents and an optional light theme.
 
 ## Run
 

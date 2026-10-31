@@ -104,6 +104,7 @@ export function Modal({
       }}
     >
       <Dialog.Content
+        showCloseButton={false}
         className={"app-modal " + className}
         initialFocus={focusTitle ? titleRef : undefined}
         finalFocus={() => (origin?.isConnected ? origin : true)}
