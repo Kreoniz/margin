@@ -34,7 +34,7 @@ test("natural Library artwork hugs mixed source aspects without colored gutters 
   for (const width of [320, 390, 768, 1440]) for (const theme of ["dark", "light"]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.addInitScript(theme => localStorage.setItem("margin-theme", theme), theme);
-    await page.goto("http://margin.test/dashboard");
+    await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
     const rows = page.locator(".media-row");
     await expect(rows).toHaveCount(7);
     for (const image of await page.locator('.media-row:not([data-row-id="missing"]) img').all()) {
@@ -86,7 +86,7 @@ test("reserved natural-art footprint holds rows and text stationary through succ
   const controls = await fixture(page, data);
   await page.emulateMedia({ reducedMotion: "reduce" });
   controls.holdImage();
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".mini-cover[data-loading]")).toHaveCount(2);
   await page.evaluate(() => document.fonts.ready);
   const measure = () => page.locator(".media-row").evaluateAll(elements => elements.map(element => {
@@ -107,7 +107,7 @@ test("reserved natural-art footprint holds rows and text stationary through succ
 test("400ms mouse hints dwell on entry, sibling handoff and reentry while focus and touch stay useful", async ({ page }, info) => {
   await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   const row = page.locator(".media-row").first();
   const edit = row.getByRole("button", { name: /^Edit / });
   const remove = row.getByRole("button", { name: /^Remove / });

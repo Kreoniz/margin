@@ -95,7 +95,12 @@ func scanMedia(row scanner) (Media, error) {
 	return m, err
 }
 func (s *Store) ListMedia(ctx context.Context) ([]Media, error) {
-	rows, err := s.Pool.Query(ctx, "SELECT "+mediaColumns+" FROM media WHERE NOT is_demo ORDER BY created_at DESC,id DESC")
+	return listMedia(ctx, s.Pool)
+}
+func listMedia(ctx context.Context, db interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}) ([]Media, error) {
+	rows, err := db.Query(ctx, "SELECT "+mediaColumns+" FROM media WHERE NOT is_demo ORDER BY created_at DESC,id DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +161,9 @@ func (s *Store) PatchMedia(ctx context.Context, id string, in MediaInput) (Media
 		return Media{}, err
 	}
 	defer tx.Rollback(ctx)
+	if _, err = lockUpNext(ctx, tx); err != nil {
+		return Media{}, err
+	}
 	m, err := scanMedia(tx.QueryRow(ctx, "SELECT "+mediaColumns+" FROM media WHERE id=$1 AND NOT is_demo FOR UPDATE", id))
 	if err != nil {
 		return m, err
@@ -192,6 +200,11 @@ func (s *Store) PatchMedia(ctx context.Context, id string, in MediaInput) (Media
 	if err != nil {
 		return m, mediaWriteError(err)
 	}
+	if m.Status == "done" {
+		if err = removeUpNext(ctx, tx, id); err != nil {
+			return m, err
+		}
+	}
 	m, err = scanMedia(tx.QueryRow(ctx, "SELECT "+mediaColumns+" FROM media WHERE id=$1", id))
 	if err != nil {
 		return m, err
@@ -218,6 +231,9 @@ func (s *Store) DeleteMedia(ctx context.Context, id string) error {
 		return err
 	}
 	defer tx.Rollback(ctx)
+	if _, err = lockUpNext(ctx, tx); err != nil {
+		return err
+	}
 	// Block new foreign-key links before resetting existing ones. Use media_id
 	// rather than URL: the library URL may have changed since the inbox save.
 	var lockedID string
@@ -227,6 +243,9 @@ func (s *Store) DeleteMedia(ctx context.Context, id string) error {
 		return err
 	}
 	if _, err = tx.Exec(ctx, "UPDATE inbox SET state='read',media_id=NULL WHERE media_id=$1", id); err != nil {
+		return err
+	}
+	if err = removeUpNext(ctx, tx, id); err != nil {
 		return err
 	}
 	if _, err = tx.Exec(ctx, "DELETE FROM media WHERE id=$1", id); err != nil {

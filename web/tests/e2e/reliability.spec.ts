@@ -28,7 +28,7 @@ async function create(request: APIRequestContext, values: Record<string, unknown
 
 test("stale editor preserves newer privacy, completion and notes and reconciles overlapping edits", async ({ page, request, playwright }) => {
   const item = await create(request, { title: "[Test] Stale privacy", visibility: "public", notes: "Old notes" });
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit " + item.title, exact: true }).click();
   await request.patch("/api/media/" + item.id, { data: { visibility: "private", status: "done", notes: "New notes" } });
   await page.getByRole("textbox", { name: "Title", exact: true }).fill("[Test] Independent title edit");
@@ -55,7 +55,7 @@ test("stale editor preserves newer privacy, completion and notes and reconciles 
 
 test("Vim completion, undo and dd removal are distinct and row removal works", async ({ page, request }) => {
   const item = await create(request, { title: "[Test] Vim removal" });
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   const row = page.locator(`[data-row-id="${item.id}"]`);
   await row.focus();
   await page.keyboard.press("d");
@@ -90,7 +90,7 @@ test("a keyboard save failure exposes recovery and the expanded editor fits at 3
   await page.setViewportSize({ width: 320, height: 740 });
   for (const theme of ["dark", "light"]) {
     const item = await create(request, { title: "[Test] Narrow editor " + theme, kind: "article", description: "Details worth keeping. ".repeat(50) });
-    await page.goto("/dashboard");
+    await page.goto(`/dashboard?test=${Date.now()}#library`);
     await page.evaluate(value => localStorage.setItem("margin-theme", value), theme);
     await page.reload();
     await page.getByRole("button", { name: "Edit " + item.title, exact: true }).click();
@@ -136,7 +136,7 @@ test("automatic additions can be hidden persistently and source logos replace em
     body.media = body.media.map((m: { id: string }) => m.id === automatic.id ? { ...m, auto_added: true } : m);
     await route.fulfill({ response, json: body });
   });
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   const row = page.locator(`[data-row-id="${automatic.id}"]`);
   await expect(row.locator(".mini-cover img")).toHaveAttribute("src", "/brands/openai.svg");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
@@ -164,7 +164,7 @@ test("direct public details expose full text and valid long passwords can be ent
     expect(route.request().postDataJSON().password).toBe("x".repeat(129));
     await route.fulfill({ status: 401, json: { error: "Test login received" } });
   });
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("textbox", { name: "Password", exact: true }).fill("x".repeat(129));
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveText("Test login received");
@@ -173,7 +173,7 @@ test("direct public details expose full text and valid long passwords can be ent
 test("a final Show more keyboard activation focuses the first new row", async ({ page, request }) => {
   const items = [];
   for (let i = 0; i < 41; i++) items.push(await create(request, { title: "[Test] Final batch " + i }));
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Show more", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("button", { name: "Show more", exact: true })).toHaveCount(0);
@@ -224,7 +224,7 @@ test("empty Discover distinguishes paused, failed and initial source collection"
 test("retrying metadata preserves an explicit Article type", async ({ page, request }) => {
   const item = await create(request, { title: "[Test] Explicit article", kind: "article", url: "https://publisher.example/type", author: "", description: "", cover_url: "" });
   await page.route("**/api/metadata", route => route.fulfill({ json: { title: "Fetched video", author: "Channel", kind: "video", description: "A fetched description", cover_url: "", url: item.url } }));
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit " + item.title, exact: true }).click();
   const metadata = page.waitForResponse(r => new URL(r.url()).pathname === "/api/metadata");
   await page.getByRole("button", { name: "Find missing details", exact: true }).click();
@@ -239,7 +239,7 @@ test("retrying metadata preserves an explicit Article type", async ({ page, requ
 
 test("session expiry hides private UI and restores the in-memory draft after sign-in", async ({ page, request }) => {
   const item = await create(request, { title: "[Test] Reauthentication", notes: "Stored note" });
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit " + item.title, exact: true }).click();
   await dialog(page).locator("summary").filter({ hasText: "Details, image & note" }).click();
   await page.getByRole("textbox", { name: "Title", exact: true }).fill(item.title + " edited");
@@ -270,7 +270,7 @@ test("browser-token mutations wait for a known status and failed reads can be re
     if (phase === "pending") await wait;
     return route.fulfill(phase === "failed" ? { status: 503, json: { error: "Status unavailable" } } : { json: { configured: true } });
   });
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByText("Helium / browser capture", { exact: true }).click();
   await expect(page.getByRole("button", { name: "Checking browser token…", exact: true })).toBeDisabled();
@@ -293,7 +293,7 @@ test("browser-token mutations wait for a known status and failed reads can be re
 
 test("Ctrl+d/u keep search focus and a new URL capture has one URL authority", async ({ page, request }) => {
   await create(request, { title: "[Test] Input focus" });
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   const search = page.getByRole("searchbox");
   for (const query of ["", "Input"]) {
     await search.fill(query);
@@ -399,7 +399,7 @@ test("submission-token status has truthful failure and retry with mutations gate
     if (phase === "pending") await pending;
     return route.fulfill(phase === "failed" ? { status: 503, json: { error: "Status temporarily unavailable" } } : { json: { configured: true } });
   });
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByText("Telegram & Hermes", { exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Submission token status unavailable");

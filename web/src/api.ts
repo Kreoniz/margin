@@ -1,12 +1,15 @@
+import type { UpNext } from "./types";
 export class ApiError extends Error {
   status: number;
   existingId?: string;
   code?: string;
-  constructor(message: string, status: number, existingId?: string, code?: string) {
+  upNext?: UpNext;
+  constructor(message: string, status: number, existingId?: string, code?: string, upNext?: UpNext) {
     super(message);
     this.status = status;
     this.existingId = existingId;
     this.code = code;
+    this.upNext = upNext;
   }
 }
 export async function api<T>(
@@ -44,6 +47,7 @@ export async function api<T>(
       response.status,
       body.existing_id,
       body.code,
+      body.up_next,
     );
   }
   return response.status === 204 ? (undefined as T) : response.json();

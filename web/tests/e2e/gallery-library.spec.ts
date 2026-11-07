@@ -23,7 +23,7 @@ const output = fileURLToPath(new URL("../../../.local/current-refinement/compati
 test("switching Shelves and List preserves item identities, filters and browser preference", async ({ page }) => {
   await fixture(page, mixed());
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   const gallery = page.getByRole("button", { name: "Shelves view", exact: true });
   const list = page.getByRole("button", { name: "List view", exact: true });
   await gallery.click();
@@ -41,15 +41,15 @@ test("switching Shelves and List preserves item identities, filters and browser 
   await expect(search).toHaveValue("Refactoring");
   await expect(page.locator(".media-row")).toHaveCount(1);
   await search.fill("");
-  await page.locator(".list-tabs").getByRole("button", { name: "To review (2)", exact: true }).click();
+  await page.locator(".list-tabs").getByRole("button", { name: "Needs attention (2)", exact: true }).click();
   await list.click();
   await expect(page.locator(".media-row")).toHaveCount(2);
-  await expect(page.locator(".list-tabs").getByRole("button", { name: "To review (2)", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".list-tabs").getByRole("button", { name: "Needs attention (2)", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.reload();
   await expect(list).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".media-row")).toHaveCount(7);
   expect(await page.evaluate(() => localStorage.getItem("margin-library-layout"))).toBe("list");
-  await page.locator(".main-nav > button").nth(1).click();
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: /Discover/ }).click();
   await expect(page.locator(".article-row")).toHaveCount(40);
   await expect(page.getByRole("group", { name: "Library view", exact: true })).toHaveCount(0);
   await page.goto("http://margin.test/shared");
@@ -60,7 +60,7 @@ test("switching Shelves and List preserves item identities, filters and browser 
 test("invalid or unavailable browser storage leaves both layouts usable", async ({ page }) => {
   await fixture(page, mixed());
   await page.addInitScript(() => { try { localStorage.setItem("margin-library-layout", "masonry"); } catch { /* Later navigation also probes unavailable storage. */ } });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.getByRole("button", { name: "Side by side view", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.addInitScript(() => {
     const originalGet = Storage.prototype.getItem, originalSet = Storage.prototype.setItem;
@@ -79,7 +79,7 @@ test("retained List keeps ordered Vim actions, native Tab, modal return and the 
   const data = Array.from({ length: 55 }, (_, index) => make(index, index % 2 ? "book" : "article", { cover_url: index % 2 ? "https://images.test/book.svg" : "" }));
   const controls = await fixture(page, data);
   await page.addInitScript(() => localStorage.setItem("margin-library-layout", "list"));
-  await page.emulateMedia({ reducedMotion: "reduce" }); await page.goto("http://margin.test/dashboard");
+  await page.emulateMedia({ reducedMotion: "reduce" }); await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(40);
   await page.keyboard.press("j"); await page.keyboard.press("j");
   const selected = page.locator('[data-row-id="gallery-1"]'); await expect(selected).toBeFocused();
@@ -111,7 +111,7 @@ test("gallery artwork, text and actions remain contained in both themes and narr
   for (const width of [320, 390, 768, 1440]) for (const theme of ["dark", "light"]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.addInitScript(theme => localStorage.setItem("margin-theme", theme), theme);
-    await page.goto("http://margin.test/dashboard");
+    await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
     await expect(page.locator(".media-row")).toHaveCount(7);
     await page.evaluate(() => document.fonts.ready);
     for (const image of await page.locator('.media-row:not([data-row-id="gallery-5"]) img').all()) {
@@ -162,7 +162,7 @@ test("gallery image success and failure leave neighboring content stationary and
   const controls = await fixture(page, mixed().slice(0, 2));
   await page.emulateMedia({ reducedMotion: "reduce" });
   controls.holdImage();
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".mini-cover[data-loading]")).toHaveCount(2);
   await page.evaluate(() => document.fonts.ready);
   const measure = () => page.locator(".media-row").evaluateAll(rows => rows.map(row => {

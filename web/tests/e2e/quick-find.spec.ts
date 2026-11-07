@@ -32,7 +32,7 @@ async function setup(page: Page, media = items()) {
       writeText: async (value: string) => { state.copied.push(value); },
     } });
   });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.getByRole("heading", { name: "Your library." })).toBeVisible();
   return controls;
 }
@@ -193,7 +193,7 @@ test("Quick Find excludes recorded fixtures without hiding same-named real items
     media, inbox: [], sources: [], inbox_counts: { new: 0, read: 0, saved: 0, dismissed: 0 },
     legacy_sample_count: 0, dev_fixture_ids: ["recorded-fixture"],
   } }));
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.getByRole("button", { name: "Edit Shared title", exact: true })).toHaveCount(2);
   await page.getByRole("button", { name: "Quick Find", exact: true }).click();
   await query(page).fill("Shared title");

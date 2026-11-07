@@ -82,7 +82,7 @@ func TestCapturePermissionsReviewDuplicatesAndCompletion(t *testing.T) {
 		t.Fatal("capture receipt exposed library data")
 	}
 	m, err := scanMedia(s.Pool.QueryRow(context.Background(), "SELECT "+mediaColumns+" FROM media WHERE id=$1", id))
-	if err != nil || !m.NeedsReview || m.Status != "pending" || m.Visibility != "private" {
+	if err != nil || m.NeedsReview || m.Status != "pending" || m.Visibility != "private" {
 		t.Fatalf("capture %+v %v", m, err)
 	}
 	requireCode(t, c.request("PATCH", "/api/media/"+id, `{"title":"Owner correction","notes":"Private note","needs_review":false,"visibility":"public"}`), 200)

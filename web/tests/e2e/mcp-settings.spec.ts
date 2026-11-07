@@ -21,7 +21,7 @@ test("MCP grants require explicit consent, stay separate and protect in-flight c
     grants.push({ scope, created_at: "2026-11-02T00:00:00Z" });
     return route.fulfill({ json: { scope, token: scope[0].repeat(43) } });
   });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const settings = page.getByRole("dialog", { name: "Settings", exact: true });
   const panel = settings.locator("details").filter({ has: page.locator("summary", { hasText: "Marvin / MCP connection" }) });
@@ -59,7 +59,7 @@ test("unavailable MCP grant status disables mutations until a successful retry",
     if (route.request().method() !== "GET") mutations++;
     return route.fulfill(failed ? { status: 503, json: { error: "Synthetic grant status unavailable" } } : { json: [] });
   });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const settings = page.getByRole("dialog", { name: "Settings", exact: true });
   await settings.getByText("Marvin / MCP connection", { exact: true }).click();

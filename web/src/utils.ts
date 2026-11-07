@@ -52,6 +52,7 @@ export function selectMedia<
 >(
   media: T[],
   filters: { query: string; status: string; kinds: readonly Kind[]; tags: readonly string[]; channels?: readonly string[] },
+  preserveOrder = false,
 ) {
   const terms = filters.query
     .toLocaleLowerCase()
@@ -81,7 +82,7 @@ export function selectMedia<
             .includes(term),
         ),
     )
-    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    .sort((a, b) => preserveOrder ? 0 : Date.parse(b.created_at) - Date.parse(a.created_at));
 }
 export function youtubeChannelName(item: Pick<Media, "kind" | "url" | "author">): string | undefined {
   if (item.kind !== "video" || !item.author.trim()) return undefined;
@@ -126,4 +127,10 @@ export function isFallbackTitle(title: string, raw: string): boolean {
   } catch {
     return false;
   }
+}
+
+// Resolve IDs before filtering; never group kinds or sort a deliberate queue.
+export function selectUpNext(media: Media[], ids: readonly string[], filters: Parameters<typeof selectMedia>[1]) {
+  const byID = new Map(media.map(item => [item.id, item]));
+  return selectMedia(ids.flatMap(id => { const item = byID.get(id); return item?.status === "pending" ? [item] : []; }), filters, true);
 }

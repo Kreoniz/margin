@@ -22,7 +22,7 @@ test("phone List compacts only settled absence and retains large pending, loadin
   ]);
   await page.addInitScript(() => localStorage.setItem("margin-library-layout", "list"));
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(5);
   await mkdir(output, { recursive: true });
   const evidence = [];
@@ -71,7 +71,7 @@ test("failed Gallery preview gains a legible mark and label within its unchanged
   ]);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 390, height: 1000 });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(5);
   await mkdir(output, { recursive: true });
   const evidence = [];

@@ -38,7 +38,7 @@ use HTTPS. See also [SDK v1.8.0 release notes](https://github.com/modelcontextpr
 In existing Settings → Marvin / MCP connection, deliberately issue either:
 
 - **Read:** search all real saved items, including private items; explicitly retrieve private owner notes and selected excerpts.
-- **Save:** add private Pending items for review; no read, edit, delete, publishing, bulk or administration tools.
+- **Save:** add private Pending saved items; no read, edit, delete, publishing, bulk or administration tools.
 
 There is one independent credential per grant. Each is displayed only on issue,
 kept in component memory until Settings closes, and stored only as a hash on the
@@ -104,7 +104,7 @@ bootstrap includes those existing recorded IDs as `dev_fixture_ids`.
 and durable operation as A's submission route. URL or title is required. It
 commits before any publisher fetching; enrichment uses the existing durable
 worker and explicit title/author intent flags. New records are private/Pending
-and need review. The only receipt fields are `{id,created}`. Duplicate matching
+without a blanket review obligation. Concrete unresolved identity problems still carry a review flag. Saves never add to Up next. The only receipt fields are `{id,created}`. Duplicate matching
 never merges notes, overwrites a record, or exposes an existing record's details.
 The read credential has no save tool; the save credential has no read tools.
 

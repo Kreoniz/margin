@@ -62,6 +62,8 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
 	})
 	mux.HandleFunc("GET /api/bootstrap", s.bootstrap)
+	mux.HandleFunc("GET /api/up-next", s.upNext)
+	mux.HandleFunc("POST /api/up-next", s.upNext)
 	mux.HandleFunc("GET /api/media", func(w http.ResponseWriter, r *http.Request) {
 		items, err := s.Store.ListMedia(r.Context())
 		respond(w, 200, items, err)
@@ -117,12 +119,12 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
-	// The inbox is bounded; the personal library and subscriptions are complete.
-	media, err := s.Store.ListMedia(r.Context())
+	media, queue, err := s.Store.librarySnapshot(r.Context())
 	if err != nil {
-		respond(w, 200, nil, err)
+		respond(w, 500, nil, err)
 		return
 	}
+	// The inbox is bounded; the personal library and subscriptions are complete.
 	inbox, err := s.Store.ListInbox(r.Context(), true)
 	if err != nil {
 		respond(w, 200, nil, err)
@@ -157,6 +159,7 @@ func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, 200, struct {
+		UpNext            UpNext         `json:"up_next"`
 		DevMode           bool           `json:"dev_mode"`
 		DevFixtureIDs     []string       `json:"dev_fixture_ids"`
 		DevFixtureCount   int            `json:"dev_fixture_count"`
@@ -165,7 +168,7 @@ func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 		Inbox             []InboxItem    `json:"inbox"`
 		Sources           []Source       `json:"sources"`
 		InboxCounts       map[string]int `json:"inbox_counts"`
-	}{s.DevMode, fixtureIDs, fixtureCount, count, media, inbox, sources, counts})
+	}{queue, s.DevMode, fixtureIDs, fixtureCount, count, media, inbox, sources, counts})
 }
 func (s *Server) createMedia(w http.ResponseWriter, r *http.Request) {
 	var in MediaInput

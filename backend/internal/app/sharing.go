@@ -248,7 +248,6 @@ func (s *Server) prepareSubmission(ctx context.Context, in submissionInput) (Med
 	if err != nil {
 		return m, &ValidationError{err.Error()}
 	}
-	m.NeedsReview = true
 	m.TitleExplicit, m.AuthorExplicit = in.Title != nil, in.Author != nil
 	return m, nil
 }

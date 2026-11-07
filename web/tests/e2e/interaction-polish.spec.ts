@@ -27,7 +27,7 @@ async function motion(page: Page, selector: string, trigger: string, closing = f
 test("conditionally mounted dialogs animate both ways and honor reduced motion", async ({ page }) => {
   await fixture(page);
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   const sources = page.getByRole("button", { name: "Sources", exact: true });
   await sources.waitFor();
   const trigger = await sources.evaluate(element => { element.id = "sources-motion-trigger"; return "#" + element.id; });
@@ -50,7 +50,7 @@ test("conditionally mounted dialogs animate both ways and honor reduced motion",
 test("auto-save toggle leaves source rows and following content stationary", async ({ page }) => {
   await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Sources", exact: true }).click();
   const boxes = () => page.locator(".source-row").evaluateAll(elements => elements.map(element => { const box = element.getBoundingClientRect(); return { top: box.top, height: box.height }; }));
   const before = await boxes();
@@ -66,7 +66,7 @@ test("auto-save toggle leaves source rows and following content stationary", asy
 test("select menus and keyboard tooltips keep opening and closing transitions", async ({ page }) => {
   await fixture(page);
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).waitFor();
   const selectOpen = await motion(page, ".library-filter-panel", '[aria-label="Filter types"]');
   expect(selectOpen.some(value => value > 0 && value < 1)).toBe(true);
@@ -108,7 +108,7 @@ test("video previews reserve Library geometry through loading and failure while 
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   controls.holdImage();
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   const preview = page.locator(".mini-video").first();
   await expect(preview).toHaveAttribute("data-loading", "true");
   await page.evaluate(() => document.fonts.ready);
@@ -228,7 +228,7 @@ test("initial Discover failure offers a usable direct retry with an unknown coun
 test("source writes reconcile before a failed refresh and in-dialog retry does not repeat the write", async ({ page }) => {
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Sources", exact: true }).click();
   controls.failBootstrap();
   const row = page.locator('.source-row[aria-label="OpenAI"]');
@@ -248,7 +248,7 @@ test("source writes reconcile before a failed refresh and in-dialog retry does n
 test("follow and unfollow acknowledgements survive refresh failure", async ({ page }) => {
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Sources", exact: true }).click();
   controls.failBootstrap();
   await page.getByRole("textbox", { name: "Follow a website or RSS/Atom feed" }).fill("https://publisher.example/feed");
@@ -307,7 +307,7 @@ test("real Tab traversal reveals complete fields and focus rings at both modal s
   await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: page.viewportSize()!.width < 600 ? 320 : 1440, height: 900 });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit A landscape video", exact: true }).click();
   await page.getByText("Details, image & note", { exact: true }).click();
   const tags = page.getByRole("textbox", { name: "Tags (optional)", exact: true });
@@ -347,7 +347,7 @@ test("real Tab traversal reveals complete fields and focus rings at both modal s
 test("removal cancellation and success use animated close completion with useful final focus", async ({ page }) => {
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   const remove = page.getByRole("button", { name: "Remove A landscape video", exact: true });
   const modal = page.getByRole("dialog", { name: "Remove from library?", exact: true });
   await remove.click();
@@ -382,7 +382,7 @@ test("rounded status and main navigation selections keep every button and neighb
   await fixture(page);
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.setViewportSize({ width: page.viewportSize()!.width < 600 ? 320 : 1440, height: 900 });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.locator(".list-tabs > button").first().waitFor();
   await page.evaluate(() => document.fonts.ready);
   const measure = (selector: string) => page.locator(selector).evaluateAll(elements => elements.map(element => {
@@ -404,7 +404,7 @@ test("rounded status and main navigation selections keep every button and neighb
   }, selector);
   const navBaseline = await measure(".main-nav > button");
   expect(navBaseline.every(button => button.radius > 0)).toBe(true);
-  for (const view of [0, 1]) {
+  for (const view of [1, 2]) {
     await page.locator(".main-nav > button").nth(view).click();
     await expect(page.locator(".main-nav > button").nth(view)).toHaveAttribute("aria-current", "page");
     const baseline = await measure(".list-tabs > button");
@@ -423,7 +423,7 @@ test("rounded status and main navigation selections keep every button and neighb
       expect(focus.radius).toBeGreaterThan(0);
     }
   }
-  for (const view of [0, 1, 0]) {
+  for (const view of [1, 2, 1]) {
     await page.locator(".main-nav > button").nth(view).click();
     await expect(page.locator(".main-nav > button").nth(view)).toHaveAttribute("aria-current", "page");
     for (const sample of await frames(".main-nav > button")) expect(sample).toEqual(navBaseline);
@@ -446,7 +446,7 @@ async function recoverReadOnly(page: Page, controls: Awaited<ReturnType<typeof f
 test("Editor create and update acknowledgements remain visible when bootstrap fails", async ({ page }) => {
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(4);
   controls.failBootstrap();
   await page.getByRole("button", { name: "Add item", exact: true }).click();
@@ -473,11 +473,11 @@ test("Editor create and update acknowledgements remain visible when bootstrap fa
 test("Editor deletion removes the acknowledged row, restores focus and invalidates old undo despite failed bootstrap", async ({ page }) => {
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(4);
   controls.failBootstrap();
   await page.getByRole("checkbox", { name: "Mark done: An unavailable preview", exact: true }).click();
-  await expect(page.getByText("Marked done.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Marked done. Undo returns to unfinished without restoring Up next.", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Edit A landscape video", exact: true }).click();
   const modal = page.locator(".app-modal");
   await modal.getByRole("button", { name: "Remove", exact: true }).click();
@@ -499,23 +499,23 @@ test("Library completion, review and their undo actions reconcile authoritative 
   const controls = await fixture(page);
   controls.review("video-1");
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(4);
   controls.failBootstrap();
   await page.getByRole("checkbox", { name: "Mark done: A landscape video", exact: true }).click();
-  await expect(page.getByText("Marked done.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Marked done. Undo returns to unfinished without restoring Up next.", { exact: true })).toBeVisible();
   await expect(page.locator('.media-row[data-row-id="video-1"]')).toHaveCount(0);
   await page.locator(".list-tabs").getByRole("button", { name: "Done", exact: true }).click();
   await expect(page.getByRole("checkbox", { name: "Mark to read/watch: A landscape video", exact: true })).toBeChecked();
   await page.keyboard.press("u");
   await expect(page.locator(".media-row")).toHaveCount(0);
-  await page.locator(".list-tabs").getByRole("button", { name: "To read/watch", exact: true }).click();
+  await page.locator(".list-tabs").getByRole("button", { name: "Unfinished", exact: true }).click();
   await expect(page.getByRole("checkbox", { name: "Mark done: A landscape video", exact: true })).not.toBeChecked();
-  await page.locator(".list-tabs").getByRole("button", { name: "To review (1)", exact: true }).click();
+  await page.locator(".list-tabs").getByRole("button", { name: "Needs attention (1)", exact: true }).click();
   await page.getByRole("button", { name: "Mark reviewed: A landscape video", exact: true }).click();
   await expect(page.getByText("Marked reviewed.", { exact: true })).toBeVisible();
   await expect(page.locator(".media-row")).toHaveCount(0);
-  await expect(page.locator(".list-tabs").getByRole("button", { name: "To review (0)", exact: true })).toBeVisible();
+  await expect(page.locator(".list-tabs").getByRole("button", { name: "Needs attention (0)", exact: true })).toBeVisible();
   await page.keyboard.press("u");
   await expect(page.locator('.media-row[data-row-id="video-1"]')).toBeVisible();
   expect(controls.requests.mediaPatches).toBe(4);
@@ -545,7 +545,7 @@ test("Discover Save reconciles Library and the current scoped count and cursor w
   expect(controls.requests.inboxSaves).toBe(1);
   await recoverReadOnly(page, controls);
   expect(controls.requests.inboxSaves).toBe(1);
-  await page.locator(".main-nav > button").nth(1).click();
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: /Discover/ }).click();
   await page.locator(".list-tabs").getByRole("button", { name: "Saved", exact: true }).click();
   const saved = page.locator('.article-row[data-row-id="inbox-0"]');
   await expect(saved).toContainText("Saved to library");
@@ -620,7 +620,7 @@ for (const filter of ["source", "query"] as const) test(`an in-flight Discover a
 test("keyboard Unfollow focuses the next source and then the Follow field when none remain", async ({ page }) => {
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Sources", exact: true }).click();
   await expect(page.locator(".source-row")).toHaveCount(2);
   controls.failBootstrap();
@@ -639,7 +639,7 @@ test("keyboard Unfollow focuses the next source and then the Follow field when n
 test("failed Unfollow preserves confirmation focus and removing the last row chooses the previous source", async ({ page }) => {
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Sources", exact: true }).click();
   controls.failSourceDelete();
   const row = page.locator('.source-row[aria-label="Second source"]');
@@ -660,7 +660,7 @@ test("failed Unfollow preserves confirmation focus and removing the last row cho
 test("a late Unfollow does not steal focus moved elsewhere or after the panel closed", async ({ page }) => {
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Sources", exact: true }).click();
   controls.holdSourceDelete();
   const first = page.locator('.source-row[aria-label="OpenAI"]');
@@ -692,7 +692,7 @@ test("narrow Library titles omit the orphan external icon while preserving their
   await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 320, height: 900 });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   const link = page.locator('.media-row[data-row-id="video-2"] .row-primary-action');
   await expect(link).toHaveAttribute("href", "https://www.youtube.com/watch?v=AAAAAAAAAAA");
   await expect(link).toHaveAttribute("target", "_blank");
@@ -709,7 +709,7 @@ test("narrow Library titles omit the orphan external icon while preserving their
 test("Vim row focus clears outside the list and shortcut dialogs keep semantic heading focus without an outline", async ({ page }) => {
   await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(4);
   await page.keyboard.press("j");
   await page.keyboard.press("j");
@@ -747,7 +747,7 @@ test("Vim row focus clears outside the list and shortcut dialogs keep semantic h
 test("a shortcut dialog opened from BODY does not manufacture a Skip-link focus target", async ({ page }) => {
   await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(4);
   expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
   await page.keyboard.press("g");
@@ -768,7 +768,7 @@ test("a shortcut dialog opened from BODY does not manufacture a Skip-link focus 
 test("Tab shows one Library title indicator and retains independent control focus", async ({ page }) => {
   await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(4);
   await page.keyboard.press("j");
   const row = page.locator('.media-row[data-row-id="video-1"]');
@@ -811,7 +811,7 @@ test("mixed-type Library routine controls stay centered with visible metadata an
   await page.emulateMedia({ reducedMotion: "reduce" });
   const mobile = page.viewportSize()!.width < 600;
   await page.setViewportSize({ width: mobile ? 320 : 1440, height: 900 });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(4);
   await page.evaluate(() => document.fonts.ready);
   const rows = await page.locator(".media-row").evaluateAll(elements => elements.map(element => {

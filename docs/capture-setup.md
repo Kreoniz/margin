@@ -9,7 +9,7 @@ You can save from the browser extension or ask Marvin in Telegram. They connect 
 | Helium / Chromium extension | Helium / browser capture → Create browser token | Save a page or mark its URL Done |
 | Marvin / Hermes / Telegram | Telegram & Hermes → Create submission token | Add private items for later |
 
-Both create private items flagged **To review**. Neither token grants access to browse your library, notes, sources or sharing settings. Review and completion are separate actions.
+Both create private saved items. Deliberate saves do not automatically require review; unresolved identity/details remain editable. Neither token grants access to browse your library, notes, sources or sharing settings. Review and completion are separate actions.
 
 ## Browser: four steps
 
@@ -18,7 +18,7 @@ Both create private items flagged **To review**. Neither token grants access to 
 3. Open the extension's **Settings**. Enter that Margin site's address and the browser token, click **Save connection**, and allow access to that site. Current laptop preview: `http://localhost:18790`; deployed site: `https://margin.kreoniz.ru`. Tokens belong to the instance that created them.
 4. Visit a page and open the Margin icon, or press **Ctrl+Shift+Y**. Press **s** to save or **d** to mark Done. If the browser shortcut is occupied, change it at `chrome://extensions/shortcuts`.
 
-A saved receipt confirms capture; details may still be loading. Open Margin to retry incomplete metadata. New items appear in **To review**; marking Done does not automatically mark reviewed. A full dashboard URL is accepted by extension setup and reduced to the site address.
+A saved receipt confirms capture; details may still be loading. Open Margin to retry incomplete metadata. New items appear in Library; choose explicitly which unfinished items to add to Up next. Done removes queue membership and preserves any existing review flag. A full dashboard URL is accepted by extension setup and reduced to the site address.
 
 ## Marvin in Telegram: connect once
 
@@ -35,7 +35,7 @@ Marvin already is your Hermes agent. This project does not need a second Telegra
 
    Or ask: “Save Designing Data-Intensive Applications by Martin Kleppmann in Margin as a book, tagged systems.”
 
-The helper reports a receipt only after the server responds: **Saved privately** for a new item, **Already in Margin** for a duplicate. Errors stop without automatic retries. Check **To review** in Margin after your first deliberate save. A title-only book submission does not run the editor's interactive edition picker; its title is saved for later refinement.
+The helper reports a receipt only after the server responds: **Saved privately** for a new item, **Already in Margin** for a duplicate. Errors stop without automatic retries. Check Library in Margin after your first deliberate save. A title-only book submission does not run the editor's interactive edition picker; its title is saved for later refinement.
 
 The installed SDK accepts both `/margin_save` and `/margin-save`; the underscore form fits Telegram's command syntax. `/reload-skills` refreshes the skill catalogue without reloading native plugins.
 

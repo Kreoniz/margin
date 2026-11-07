@@ -80,7 +80,7 @@ func TestSubmissionPersistsBeforePublisherAndDuplicatesDoNotFetch(t *testing.T) 
 
 	id := requireSubmissionReceipt(t, submit(`{"url":"https://publisher.example/story#section"}`), 201, "")
 	m := submissionMedia(t, s, id)
-	if m.URL != "https://publisher.example/story#section" || m.Title == "" || m.MetadataState != "pending" || m.Status != "pending" || m.Visibility != "private" || !m.NeedsReview || m.AutoAdded || m.CompletedAt != nil || calls.Load() != 0 {
+	if m.URL != "https://publisher.example/story#section" || m.Title == "" || m.MetadataState != "pending" || m.Status != "pending" || m.Visibility != "private" || m.NeedsReview || m.AutoAdded || m.CompletedAt != nil || calls.Load() != 0 {
 		t.Fatalf("receipt preceded durable private pending capture: %+v, publisher calls=%d", m, calls.Load())
 	}
 	select {
@@ -127,7 +127,7 @@ func TestSubmissionEnrichmentPreservesHintsAndConcurrentOwnerEdits(t *testing.T)
 	id := requireSubmissionReceipt(t, submitter.request("POST", "/api/integrations/items", `{"url":"https://publisher.example/hints","title":"Explicit title","author":"Explicit author","kind":"other","tags":["hint"],"notes":"Submitted note"}`), 201, "")
 	NewWorker(s, f).enrichPending(context.Background())
 	m := submissionMedia(t, s, id)
-	if m.Title != "Explicit title" || m.Author != "Explicit author" || m.Kind != "other" || !m.KindExplicit || m.Description != "Publisher description" || m.CoverURL != "https://publisher.example/publisher.jpg" || m.MetadataState != "ready" || m.Notes != "Submitted note" || !reflect.DeepEqual(m.Tags, []string{"hint"}) || m.Status != "pending" || m.Visibility != "private" || !m.NeedsReview {
+	if m.Title != "Explicit title" || m.Author != "Explicit author" || m.Kind != "other" || !m.KindExplicit || m.Description != "Publisher description" || m.CoverURL != "https://publisher.example/publisher.jpg" || m.MetadataState != "ready" || m.Notes != "Submitted note" || !reflect.DeepEqual(m.Tags, []string{"hint"}) || m.Status != "pending" || m.Visibility != "private" || m.NeedsReview {
 		t.Fatalf("enrichment replaced explicit hints or failed to fill missing fields: %+v", m)
 	}
 
@@ -236,7 +236,7 @@ func TestSubmissionPublisherFailureRemainsAvailableAndRetryable(t *testing.T) {
 	// A fresh worker must find the persisted job without an in-memory trigger.
 	NewWorker(s, f).enrichPending(context.Background())
 	m := submissionMedia(t, s, id)
-	if calls != 1 || m.MetadataState != "partial" || m.MetadataWarning == "" || m.Title == "" || m.Status != "pending" || m.Visibility != "private" || !m.NeedsReview {
+	if calls != 1 || m.MetadataState != "partial" || m.MetadataWarning == "" || m.Title == "" || m.Status != "pending" || m.Visibility != "private" || m.NeedsReview {
 		t.Fatalf("failed publisher did not leave an editable incomplete item: %+v calls=%d", m, calls)
 	}
 	requireCode(t, owner.request("GET", "/api/media", ""), 200)

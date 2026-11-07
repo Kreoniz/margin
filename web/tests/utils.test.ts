@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isFallbackTitle, safeURL, selectMedia, youtubeChannelName } from "../src/utils.ts";
+import { isFallbackTitle, safeURL, selectMedia, selectUpNext, youtubeChannelName } from "../src/utils.ts";
 import type { Media } from "../src/types.ts";
 
 test("known YouTube placeholders are recoverable without replacing real titles", () => {
@@ -112,3 +112,14 @@ test("channel filters use trimmed case-insensitive YouTube creator names only", 
   assert.equal(youtubeChannelName({ ...video, kind: "book" }), undefined);
   assert.equal(youtubeChannelName({ ...video, author: " " }), undefined);
 });
+
+ test("Up next preserves deliberate mixed order through filters and excludes done/missing items", () => {
+  const media = [item({ id: "book", kind: "book", created_at: "2026-11-01T00:00:00Z" }), item({ id: "video", kind: "video" }), item({ id: "game", kind: "game" }), item({ id: "done", status: "done" })];
+  const ids = ["game", "done", "video", "missing", "book"];
+  const filters = { query: "", status: "pending", kinds: [], tags: [] };
+  assert.deepEqual(selectUpNext(media, ids, filters).map(m => m.id), ["game", "video", "book"]);
+  assert.deepEqual(selectUpNext(media, ids, { ...filters, kinds: ["book", "game"] }).map(m => m.id), ["game", "book"]);
+  assert.deepEqual(selectUpNext(media, ids, { ...filters, query: "no match" }), []);
+  assert.deepEqual(selectUpNext(media, [], filters), []);
+  assert.deepEqual(ids, ["game", "done", "video", "missing", "book"]);
+ });

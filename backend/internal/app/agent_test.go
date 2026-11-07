@@ -91,7 +91,7 @@ func TestAgentGrantsToolsAndRevocation(t *testing.T) {
 		t.Fatal(item)
 	}
 	m := submissionMedia(t, s, id)
-	if m.Visibility != "private" || m.Status != "pending" || !m.NeedsReview || m.MetadataState != "pending" || !m.TitleExplicit {
+	if m.Visibility != "private" || m.Status != "pending" || m.NeedsReview || m.MetadataState != "pending" || !m.TitleExplicit {
 		t.Fatalf("save defaults: %+v", m)
 	}
 	duplicate := agentCall(t, owner.handler, save, "save_item", map[string]any{"url": "https://source.example/document#another", "notes": "Do not replace", "title": "Wrong"})

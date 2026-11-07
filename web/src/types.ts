@@ -80,7 +80,9 @@ export interface Source {
   last_error: string;
   item_count: number;
 }
+export interface UpNext { version: number; ids: string[] }
 export interface LibraryData {
+  up_next?: UpNext;
 	 inbox_counts: Record<string, number>;
   dev_mode?: boolean;
   dev_fixture_count?: number;

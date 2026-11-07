@@ -37,7 +37,7 @@ test("illustrated Library has meaningful contained art and usable controls in bo
   for (const width of [320, 390, 768, 1440]) for (const theme of ["dark", "light"]) {
     await page.setViewportSize({ width, height: 900 });
     await page.addInitScript(theme => localStorage.setItem("margin-theme", theme), theme);
-    await page.goto("http://margin.test/dashboard");
+    await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
     await expect(page.locator(".media-row")).toHaveCount(11);
     await page.evaluate(() => document.fonts.ready);
     await expect.poll(() => page.locator('.media-row[data-row-id="art-0"] img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
@@ -98,7 +98,7 @@ test("Library image loading and failure keep kind-specific frames and neighborin
   const controls = await fixture(page, data);
   await page.emulateMedia({ reducedMotion: "reduce" });
   controls.holdImage();
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(2);
   await page.evaluate(() => document.fonts.ready);
   const measure = () => page.locator(".media-row").evaluateAll(elements => elements.map(element => {
@@ -114,18 +114,18 @@ test("Library image loading and failure keep kind-specific frames and neighborin
 test("populated Library chrome stays stable across filters and other image consumers retain their dimensions", async ({ page }) => {
   await fixture(page, mixed());
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(11);
   const before = await page.locator(".page-heading").boundingBox();
   await page.locator(".list-tabs").getByRole("button", { name: "Done", exact: true }).click();
   expect(await page.locator(".page-heading").boundingBox()).toEqual(before);
   await expect(page.locator(".page-heading p")).toHaveCount(0);
-  await page.locator(".list-tabs").getByRole("button", { name: "To read/watch", exact: true }).click();
+  await page.locator(".list-tabs").getByRole("button", { name: "Unfinished", exact: true }).click();
   await page.getByRole("button", { name: "Edit A wide idea worth watching", exact: true }).click();
   await page.getByText("Details, image & note", { exact: true }).click();
   expect(await page.locator(".editor-image .mini-video").evaluate(element => { const rect = element.getBoundingClientRect(); return { width: rect.width, height: rect.height }; })).toEqual({ width: 80, height: 45 });
   await page.locator(".app-modal").getByRole("button", { name: "Close dialog", exact: true }).click();
-  await page.locator(".main-nav > button").nth(1).click();
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: /Discover/ }).click();
   await page.locator(".article-row").first().waitFor();
   expect(await page.locator(".article-row .mini-cover").first().evaluate(element => element.getBoundingClientRect().width)).toBe(page.viewportSize()!.width < 600 ? 48 : 72);
   await page.goto("http://margin.test/shared/art-0");
@@ -138,7 +138,7 @@ test("illustrated rows preserve native Tab order, distinct review, shortcuts and
   const data = mixed();
   const controls = await fixture(page, data);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(11);
   await page.keyboard.press("j");
   const first = page.locator('.media-row[data-row-id="art-0"]');
@@ -177,7 +177,7 @@ test("half-page navigation uses mixed row positions and can cross the forty-item
   const data = Array.from({ length: 55 }, (_, index) => make(index, index % 2 ? "book" : "article", { title: `Mixed item ${index}`, cover_url: index % 2 ? "https://images.test/book.svg" : "" }));
   await fixture(page, data);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(40);
   await page.keyboard.press("j");
   const position = () => page.evaluate(() => { const element = document.activeElement!.closest(".media-row")!; return { id: element.getAttribute("data-row-id"), top: element.getBoundingClientRect().top + scrollY }; });

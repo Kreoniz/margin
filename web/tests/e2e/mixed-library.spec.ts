@@ -22,7 +22,7 @@ const view = (page: Page, label: string) => page.getByRole("button", { name: `${
 
 test("three Library views preserve global filters and preference, and migrate the gallery preference", async ({ page }) => {
   await fixture(page, content()); await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(view(page, "Side by side")).toHaveAttribute("aria-pressed", "true");
   for (const label of ["Shelves", "List", "Side by side"]) {
     await view(page, label).click();
@@ -30,7 +30,7 @@ test("three Library views preserve global filters and preference, and migrate th
     await expect(page.locator(".media-row")).toHaveCount(1); await expect(row(page, 2)).toBeVisible();
     await page.getByRole("searchbox", { name: "Search library", exact: true }).fill("");
   }
-  await page.locator(".list-tabs").getByRole("button", { name: "To review (2)", exact: true }).click();
+  await page.locator(".list-tabs").getByRole("button", { name: "Needs attention (2)", exact: true }).click();
   for (const label of ["Shelves", "List", "Side by side"]) {
     await view(page, label).click(); await expect(page.locator(".media-row")).toHaveCount(2);
   }
@@ -40,7 +40,7 @@ test("three Library views preserve global filters and preference, and migrate th
   await page.evaluate(() => localStorage.setItem("margin-library-layout", "gallery"));
   await page.reload(); await expect(view(page, "Shelves")).toHaveAttribute("aria-pressed", "true");
   expect(await page.evaluate(() => localStorage.getItem("margin-library-layout"))).toBe("shelves");
-  await page.locator(".main-nav > button").nth(1).click();
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: /Discover/ }).click();
   await expect(page.getByRole("group", { name: "Library view", exact: true })).toHaveCount(0);
   await expect(page.locator(".article-row")).toHaveCount(40);
 });
@@ -52,7 +52,7 @@ test("mixed layouts contain full titles, artwork and 44px controls across widths
   for (const width of [320, 390, 768, 1024, 1440]) for (const theme of ["dark", "light"]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.addInitScript(theme => localStorage.setItem("margin-theme", theme), theme);
-    await page.goto("http://margin.test/dashboard"); await expect(row(page, 0)).toBeVisible();
+    await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`); await expect(row(page, 0)).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     for (const label of ["Side by side", "Shelves", "List"]) {
       await view(page, label).click();
@@ -84,7 +84,7 @@ test("Vim follows the grid, status keys stay separate, and view shortcuts preser
   await page.setViewportSize({ width: 1440, height: 1000 });
   const data=Array.from({length:9},(_,index)=>make(index,"video",{cover_url:"https://images.test/wide.svg"}));
   data.push(make(20,"article"),make(21,"article"),make(22,"video",{status:"done"}));
-  await fixture(page,data); await page.emulateMedia({reducedMotion:"reduce"}); await page.goto("http://margin.test/dashboard");
+  await fixture(page,data); await page.emulateMedia({reducedMotion:"reduce"}); await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(row(page,0)).toBeVisible();
   await page.keyboard.press("v"); await page.keyboard.press("s"); await expect(view(page,"Shelves")).toHaveAttribute("aria-pressed","true");
   await page.keyboard.press("j"); await expect(row(page,0)).toBeFocused();
@@ -115,7 +115,7 @@ test("paging reveals a complete spatial row while keeping articles available, an
   await page.setViewportSize({width:1440,height:1000});
   const data=Array.from({length:55},(_,index)=>make(index,"video",{cover_url:"https://images.test/wide.svg"}));
   data.push(make(60,"article"),make(61,"article"));
-  await fixture(page,data); await page.emulateMedia({reducedMotion:"reduce"}); await page.goto("http://margin.test/dashboard");
+  await fixture(page,data); await page.emulateMedia({reducedMotion:"reduce"}); await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(42); await expect(row(page,60)).toBeVisible();
   const columns = await row(page,0).evaluate(el => { const top=el.getBoundingClientRect().top; return [...el.parentElement!.children].filter(c=>Math.abs(c.getBoundingClientRect().top-top)<1).length; });
   await row(page,37).focus(); await page.keyboard.press("j");
@@ -130,7 +130,7 @@ test("paging reveals a complete spatial row while keeping articles available, an
 test("directions remeasure after resizing and completing the last item retains the nearest visible item", async ({ page }) => {
   await page.setViewportSize({width:1440,height:1000});
   await fixture(page, Array.from({length:9},(_,index)=>make(index,"video",{cover_url:"https://images.test/wide.svg"})));
-  await page.emulateMedia({reducedMotion:"reduce"}); await page.goto("http://margin.test/dashboard");
+  await page.emulateMedia({reducedMotion:"reduce"}); await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(row(page,0)).toBeVisible();
   const columns = await row(page,0).evaluate(el => { const top=el.getBoundingClientRect().top; return [...el.parentElement!.children].filter(c=>Math.abs(c.getBoundingClientRect().top-top)<1).length; });
   await row(page,0).focus(); await page.keyboard.press("ArrowRight"); await expect(row(page,1)).toBeFocused();
@@ -158,7 +158,7 @@ test("Discover keyboard paging still focuses the first item returned by the serv
 test("top shortcuts and upward item navigation reveal the heading and filters without taking editing keys", async ({ page }) => {
   await fixture(page, Array.from({length:24},(_,index)=>make(index,"video",{cover_url:"https://images.test/wide.svg"})));
   await page.emulateMedia({reducedMotion:"reduce"}); await page.setViewportSize({width:1440,height:800});
-  await page.goto("http://margin.test/dashboard"); await expect(row(page,0)).toBeVisible();
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`); await expect(row(page,0)).toBeVisible();
   for (const label of ["Side by side","Shelves","List"]) {
     await view(page,label).click();
     for (const shortcut of ["Home","Control+Home","gg"]) {
@@ -202,7 +202,7 @@ test("reading rows share tags and actions, retain full touch targets and use str
   for (const width of [320,390,1440]) for (const theme of ["dark","light"]) {
     await page.setViewportSize({width,height:1000});
     await page.addInitScript(theme=>localStorage.setItem("margin-theme",theme),theme);
-    await page.goto("http://margin.test/dashboard"); await expect(row(page,20)).toBeVisible();
+    await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`); await expect(row(page,20)).toBeVisible();
     for (const label of ["Side by side","Shelves"]) {
       await view(page,label).click();
       const readings=await page.locator(".library-reading-list .media-row").evaluateAll(rows=>rows.map(row=>{
@@ -213,7 +213,7 @@ test("reading rows share tags and actions, retain full touch targets and use str
           targets:[...row.querySelectorAll(".row-controls .u-choice,.row-actions button")].map(el=>{const b=el.getBoundingClientRect();return {width:b.width,height:b.height,contained:b.x>=r.x&&b.right<=r.right&&b.y>=r.y&&b.bottom<=r.bottom};})};
       }));
       for (const r of readings) {
-        expect(r.height).toBeLessThanOrEqual(r.review?150:124);
+        expect(r.height).toBeLessThanOrEqual(r.review?194:168);
         expect(r.border).toBe("0px");expect(r.line).toBe("1px");expect(r.lineRadius).toBe("0px");
         expect(r.artInset).toBeGreaterThanOrEqual(8);
         for (const t of r.targets) {expect(t.width).toBeGreaterThanOrEqual(44);expect(t.height).toBeGreaterThanOrEqual(44);expect(t.contained).toBe(true);}

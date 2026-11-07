@@ -114,7 +114,6 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		m.SelectedText, m.SelectedTextSourceURL = selection.Text, selection.SourceURL
-		m.NeedsReview = true
 	}
 	tx, err := s.Store.Pool.Begin(r.Context())
 	if err != nil {
@@ -138,6 +137,11 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 		respond(w, 500, nil, err)
 		return
 	}
+	// Token and URL gates precede the queue; every queue writer locks it before media.
+	if _, err = lockUpNext(r.Context(), tx); err != nil {
+		respond(w, 500, nil, err)
+		return
+	}
 	current, err := scanMedia(tx.QueryRow(r.Context(), "SELECT "+mediaColumns+" FROM media WHERE NOT is_demo AND url_key=$1 FOR UPDATE", urlKey(canonical)))
 	created := false
 	if errors.Is(err, ErrNotFound) {
@@ -154,6 +158,9 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.Action == "done" {
 		_, err = tx.Exec(r.Context(), "UPDATE media SET status='done',completed_at=COALESCE(completed_at,now()),updated_at=now() WHERE id=$1", current.ID)
+		if err == nil {
+			err = removeUpNext(r.Context(), tx, current.ID)
+		}
 	}
 	if err == nil {
 		err = tx.Commit(r.Context())

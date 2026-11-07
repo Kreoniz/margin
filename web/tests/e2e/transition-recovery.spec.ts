@@ -11,7 +11,7 @@ for (const mode of ["create", "update"] as const) for (const field of ["input", 
 test(`first natural keyboard retry submits once after held ${mode} failure from ${field}`, async ({ page }) => {
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   if (mode === "create") {
     await page.getByRole("button", { name: "Add item", exact: true }).click();
     await editor(page).getByRole("textbox", { name: "Title or URL", exact: true }).fill("Natural retry title");
@@ -52,7 +52,7 @@ test(`first natural keyboard retry submits once after held ${mode} failure from 
 test("holding the failed-save chord does not retry until it is released and deliberately pressed again", async ({ page }) => {
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit A landscape video", exact: true }).click();
   const title = editor(page).getByRole("textbox", { name: "Title", exact: true });
   await title.fill("Held keys");
@@ -85,7 +85,7 @@ test("conflict reload locks every draft path and preserves failed drafts before 
     reads++; await gate;
     return failReload ? route.fulfill({ status: 503, json: { error: "Synthetic reload unavailable" } }) : route.fulfill({ json: [latest] });
   });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit Original title", exact: true }).click();
   await editor(page).getByText("Details, image & note", { exact: true }).click();
   const title = editor(page).getByRole("textbox", { name: "Title", exact: true });
@@ -133,7 +133,7 @@ for (const dismissal of ["Escape", "Close"] as const) test(`${dismissal} locks E
   await page.emulateMedia({ reducedMotion: "no-preference" });
   const observations = [];
   for (const delay of [8, 56, 109]) {
-    await page.goto("http://margin.test/dashboard");
+    await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
     const origin = page.getByRole("button", { name: "Edit A landscape video", exact: true });
     await origin.click();
     const title = editor(page).getByRole("textbox", { name: "Title", exact: true });
@@ -166,7 +166,7 @@ test("browser token create, replace and revoke keep Settings mounted through suc
     configured = route.request().method() !== "DELETE";
     return configured ? route.fulfill({ json: { token: `SYNTHETIC-ONLY-BROWSER-TOKEN-${++serial}` } }) : route.fulfill({ status: 204 });
   });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   const origin = page.getByRole("button", { name: "Settings", exact: true });
   await origin.click();
   const settings = page.getByRole("dialog", { name: "Settings", exact: true });

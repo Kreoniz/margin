@@ -21,7 +21,7 @@ test("only displayed settled Shelves preview captions enter the accessibility tr
   ]);
   await page.emulateMedia({ reducedMotion: "reduce" });
   controls.holdImage();
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(5);
   await page.evaluate(() => document.fonts.ready);
   const row = (index: number) => page.locator(`[data-row-id="semantic-${index}"]`);

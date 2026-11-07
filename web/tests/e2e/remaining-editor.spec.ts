@@ -13,7 +13,7 @@ const stored = (): Media => ({
 
 test("a different existing URL requires an explicit metadata choice before saving", async ({ page }) => {
   const controls = await fixture(page, [stored()]);
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit Original work A", exact: true }).click();
   await editor(page).getByRole("textbox", { name: "URL (optional)", exact: true }).fill("https://example.com/work-b");
   await editor(page).getByRole("button", { name: "Save changes", exact: true }).click();
@@ -39,7 +39,7 @@ test("replacement details require explicit application and preserve private fiel
     expect(route.request().postDataJSON()).toEqual({ url: "https://example.com/work-b#new" });
     await route.fulfill({ json: { title: "New work B", author: "New creator B", kind: "video", description: "New description B", cover_url: "https://images.test/video.svg" } });
   });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit Original work A", exact: true }).click();
   const modal = editor(page);
   await modal.getByText("Details, image & note", { exact: true }).click();
@@ -69,7 +69,7 @@ test("replacement failure keeps owner text and permits an explicit keep or retry
   await page.route("**/api/metadata", route => route.fulfill(fail
     ? { status: 503, json: { error: "Synthetic publisher unavailable" } }
     : { json: { title: "Recovered B", author: "", kind: "paper", description: "", cover_url: "" } }));
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit Original work A", exact: true }).click();
   const modal = editor(page);
   await modal.getByRole("textbox", { name: "URL (optional)", exact: true }).fill("https://example.com/work-b");
@@ -97,7 +97,7 @@ test("held B replacement cannot apply to C or silently start another lookup", as
     await gate;
     await route.fulfill({ json: { title: "Late work B", author: "Late creator B", description: "Late B", cover_url: "", kind: "video" } });
   });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit Original work A", exact: true }).click();
   const modal = editor(page);
   const url = modal.getByRole("textbox", { name: "URL (optional)", exact: true });
@@ -120,7 +120,7 @@ test("held B replacement cannot apply to C or silently start another lookup", as
 
 test("ordinary anchor corrections retain details without a replacement prompt", async ({ page }) => {
   const controls = await fixture(page, [stored()]);
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit Original work A", exact: true }).click();
   await editor(page).getByRole("textbox", { name: "URL (optional)", exact: true }).fill("https://example.com/work-a#another-section");
   await expect(editor(page).getByRole("region", { name: "New link details", exact: true })).toHaveCount(0);
@@ -134,7 +134,7 @@ test("ordinary anchor corrections retain details without a replacement prompt", 
 test("a pending fragment correction preserves enrichment and omits unchanged metadata", async ({ page }) => {
   const item = { ...stored(), title: "paper.pdf", author: "", url: "https://example.com/paper.pdf#page=2", metadata_state: "pending" as const };
   const controls = await fixture(page, [item]);
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit paper.pdf", exact: true }).click();
   await editor(page).getByRole("textbox", { name: "URL (optional)", exact: true }).fill("https://example.com/paper.pdf#page=12");
   await expect(editor(page).getByRole("region", { name: "New link details", exact: true })).toHaveCount(0);
@@ -153,7 +153,7 @@ test("neutral duplicates retain a new note until explicit discard and navigation
     attempts++;
     return route.fulfill({ status: 409, json: { error: "Duplicate error must not be shown", existing_id: stored().id } });
   });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await editor(page).getByRole("textbox", { name: "Title or URL", exact: true }).fill(stored().url);
   await editor(page).getByText("Details, image & note", { exact: true }).click();
@@ -179,7 +179,7 @@ test("neutral duplicates retain a new note until explicit discard and navigation
 
 test("a dismissed dirty note is resumable, discardable and never stored in browser storage", async ({ page }) => {
   await fixture(page, [stored()]);
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit Original work A", exact: true }).click();
   await editor(page).getByText("Details, image & note", { exact: true }).click();
   await editor(page).getByRole("textbox", { name: "Private note", exact: true }).fill("Unsaved recovery note");
@@ -204,7 +204,7 @@ test("a dismissed dirty note is resumable, discardable and never stored in brows
 test("a failed save retains its draft on dismissal and clears recovery after a successful retry", async ({ page }) => {
   const controls = await fixture(page, [stored()]);
   controls.failMedia();
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit Original work A", exact: true }).click();
   await editor(page).getByRole("textbox", { name: "Title", exact: true }).fill("Retried owner title");
   await editor(page).getByRole("button", { name: "Save changes", exact: true }).click();
@@ -229,7 +229,7 @@ test("new Save as Done stays private and does not wait for held metadata or acce
     await route.fulfill({ json: { title: "Stale metadata A", author: "Stale author A", kind: "video", description: "Stale A", cover_url: "" } });
   });
   await page.setViewportSize({ width: 320, height: 812 });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   const capture = editor(page).getByRole("textbox", { name: "Title or URL", exact: true });
   await capture.fill("https://example.com/capture-a");
@@ -254,7 +254,7 @@ test("session expiry hides a private draft and restores it after sign-in", async
     authenticated = false;
     return route.fulfill({ status: 401, json: { error: "Session expired" } });
   });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit Original work A", exact: true }).click();
   await editor(page).getByText("Details, image & note", { exact: true }).click();
   await editor(page).getByRole("textbox", { name: "Private note", exact: true }).fill("Private expiry recovery");
@@ -278,7 +278,7 @@ test("a new capture keeps B metadata when held A finishes and keyboard Save stay
     await route.fulfill({ json: { title: old ? "Work A" : "Work B", author: old ? "Writer A" : "Writer B", kind: "article", description: "Fetched description", cover_url: "" } });
     if (old) aReturned = true;
   });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   const capture = editor(page).getByRole("textbox", { name: "Title or URL", exact: true });
   await capture.fill("https://example.com/a");
@@ -301,7 +301,7 @@ test("conflicts retain the expected baseline through dismissal until explicit re
   await page.route("**/api/media", route => route.request().method() === "GET"
     ? route.fulfill({ json: [{ ...stored(), title: "Latest owner title" }] })
     : route.fallback());
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Edit Original work A", exact: true }).click();
   await editor(page).getByRole("textbox", { name: "Title", exact: true }).fill("Conflicting owner draft");
   await editor(page).getByRole("button", { name: "Save changes", exact: true }).click();

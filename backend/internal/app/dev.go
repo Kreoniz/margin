@@ -83,9 +83,15 @@ func (s *Store) updateDevFixtures(ctx context.Context, remove bool) (int, error)
 		}
 	}
 	if remove {
+		if _, err = lockUpNext(ctx, tx); err != nil {
+			return 0, err
+		}
 		ids := []string{}
 		for _, fixture := range fixtures {
 			ids = append(ids, fixture.MediaID)
+			if err = removeUpNext(ctx, tx, fixture.MediaID); err != nil {
+				return 0, err
+			}
 		}
 		if _, err = tx.Exec(ctx, "UPDATE inbox SET state='read',media_id=NULL WHERE media_id::text=ANY($1)", ids); err != nil {
 			return 0, err

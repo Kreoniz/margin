@@ -11,7 +11,7 @@ const dialog = (page: Page) => page.locator(".editor-modal");
 for (const mode of ["create", "update"] as const) test(`held ${mode} freezes the submitted draft through closing and restores editing after failure`, async ({ page }) => {
   const controls = await fixture(page);
   controls.review("video-1");
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   if (mode === "create") {
     await page.getByRole("button", { name: "Add item", exact: true }).click();
     await dialog(page).getByRole("textbox", { name: "Title or URL", exact: true }).fill("Submitted capture");
@@ -73,7 +73,7 @@ test("late book and metadata results cannot change an in-flight submitted draft"
       const result = { title: "Late unwanted title", author: "Late author", kind: lookup === "book" ? "book" : "video", cover_url: "https://images.test/wide.svg", url: "https://example.com/late" };
       await route.fulfill({ json: lookup === "book" ? { items: [result] } : result });
     });
-    await page.goto("http://margin.test/dashboard");
+    await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
     await page.getByRole("button", { name: "Add item", exact: true }).click();
     const editor = dialog(page);
     await editor.getByRole("textbox", { name: "Title or URL", exact: true }).fill(lookup === "book" ? "9780132350884" : "https://example.com/metadata");
@@ -102,7 +102,7 @@ test("image upload applies its own successful result, then is unavailable during
   let release = () => {};
   const gate = new Promise<void>(resolve => { release = resolve; });
   await page.route("**/api/images", async route => { uploads++; await gate; await route.fulfill({ json: { url: "https://images.test/wide.svg" } }); });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   const editor = dialog(page);
   await editor.getByRole("textbox", { name: "Title or URL", exact: true }).fill("Uploaded artwork");
@@ -131,7 +131,7 @@ test("old receipts cannot intercept narrow Editor controls and Sources errors re
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 320, height: 812 });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page).getByRole("textbox", { name: "Title or URL", exact: true }).fill("First quick capture");
   await page.keyboard.press(await primaryKey(page, "Enter"));
@@ -205,7 +205,7 @@ test("Editor and public artwork retain reserved geometry with rounded natural co
       await expect(cover.locator("img")).toBeVisible();
       await expect.poll(() => cover.locator("img").evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
       records.push({ width, theme, id: current.id, detail: await naturalGeometry(cover) });
-      await page.goto("http://margin.test/dashboard");
+      await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
       await page.getByRole("button", { name: `Edit ${current.title}`, exact: true }).click();
       await dialog(page).getByText("Details, image & note", { exact: true }).click();
       const previews = dialog(page).locator(".editor-metadata > .mini-cover, .editor-image > .mini-cover");
@@ -216,7 +216,7 @@ test("Editor and public artwork retain reserved geometry with rounded natural co
     // Reserve detail/editor footprints while requests are held and after 404.
     for (const context of ["detail", "editor"] as const) {
       controls.holdImage();
-      await page.goto(context === "detail" ? "http://margin.test/shared/shared-4" : "http://margin.test/dashboard");
+      await page.goto(context === "detail" ? "http://margin.test/shared/shared-4" : "http://margin.test/dashboard#library");
       if (context === "editor") { await page.getByRole("button", { name: "Edit Shared art 4", exact: true }).click(); await dialog(page).getByText("Details, image & note", { exact: true }).click(); }
       const frames = context === "detail" ? page.locator(".shared-detail .mini-cover") : dialog(page).locator(".editor-metadata > .mini-cover, .editor-image > .mini-cover");
       await expect(frames.first()).toHaveAttribute("data-loading", "true");

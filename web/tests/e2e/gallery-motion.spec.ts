@@ -68,7 +68,7 @@ for (const motion of ["no-preference", "reduce"] as const) {
         localStorage.setItem("margin-theme", theme);
         localStorage.setItem("margin-library-layout", "shelves");
       }, theme);
-      await page.goto("http://margin.test/dashboard");
+      await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
       await expect(page.locator(".media-row")).toHaveCount(theme === "dark" ? 8 : 6);
       await page.evaluate(() => document.fonts.ready);
       await page.waitForTimeout(300);
@@ -108,7 +108,7 @@ for (const [layout, from, to, motion] of [
     await page.addInitScript(layout => localStorage.setItem("margin-library-layout", layout.toLowerCase()), layout);
     await page.setViewportSize({ width: from, height: 1000 });
     await page.emulateMedia({ reducedMotion: motion });
-    await page.goto("http://margin.test/dashboard");
+    await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
     await expect(page.locator(".media-row")).toHaveCount(12);
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(300);
@@ -140,7 +140,7 @@ for (const layout of ["Shelves", "List"]) {
     await page.addInitScript(layout => localStorage.setItem("margin-library-layout", layout.toLowerCase()), layout);
     await page.setViewportSize({ width: 900, height: 1000 });
     await page.emulateMedia({ reducedMotion: "no-preference" });
-    await page.goto("http://margin.test/dashboard");
+    await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
     await expect(page.locator(".media-row")).toHaveCount(12);
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(300);
@@ -176,7 +176,7 @@ test("centered constant-width resize rebases document origin without moving earl
   const controls = await fixture(page, makeMedia());
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(12);
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(300);

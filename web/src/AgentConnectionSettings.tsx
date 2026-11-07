@@ -46,7 +46,7 @@ export function AgentConnectionSettings({ onBusyChange }: { onBusyChange: (busy:
     <summary><span><Icon name="link" size={15} /> Marvin / MCP connection</span><Icon name="chevron" size={14} /></summary>
     <div className="settings-detail">
       <p>Give Marvin a separate credential for the access you choose. These credentials do not reuse browser or submission tokens. Nothing is connected automatically.</p>
-      <p>Read access lets the client search your entire saved library, including private items, and explicitly retrieve owner notes and selected excerpts. Search summaries omit note bodies. Save access can only add private Pending items for review; duplicates return an ID without changing or exposing their contents.</p>
+      <p>Read access lets the client search your entire saved library, including private items, and explicitly retrieve owner notes and selected excerpts. Search summaries omit note bodies. Save access can only add private unfinished saved items; duplicates return an ID without changing or exposing their contents.</p>
       {(["read", "save"] as const).map(scope => {
         const configured = grants?.some(g => g.scope === scope);
         return <div key={scope}>

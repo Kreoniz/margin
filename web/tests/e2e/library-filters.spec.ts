@@ -24,7 +24,7 @@ const rows = (page: Page) => page.locator(".media-row");
 test("types and tags compose with OR inside each group and retain selections across views", async ({ page }) => {
   await fixture(page, items());
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(rows(page)).toHaveCount(4);
   let panel = await open(page, "types");
   await panel.getByRole("checkbox", { name: "Book", exact: true }).check();
@@ -57,7 +57,7 @@ test("types and tags compose with OR inside each group and retain selections acr
 test("filter shortcuts focus searchable multi-selects and leave typing and status alone", async ({ page }) => {
   await fixture(page, items());
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   for (const [key, group] of [["t", "types"], ["g", "tags"], ["c", "channels"]]) {
     await page.locator("main").focus();
     await page.keyboard.press("f"); await page.keyboard.press(key);
@@ -81,7 +81,7 @@ test("filter shortcuts focus searchable multi-selects and leave typing and statu
 test("Enter selects the first search match in every filter without closing or toggling it off", async ({ page }) => {
   await fixture(page, items());
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   for (const [group, query, first] of [["types", "book", "Book"], ["tags", "e", "Code"], ["channels", "channel", "Channel One"]]) {
     const panel = await open(page, group);
     const search = panel.getByRole("searchbox", { name: `Search ${group}`, exact: true });
@@ -109,10 +109,10 @@ test("Enter selects the first search match in every filter without closing or to
 test("clickable YouTube names filter without opening the video and allow several channels", async ({ page }) => {
   await fixture(page, items());
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Filter channel Channel One", exact: true }).click();
   await expect(rows(page)).toHaveCount(1);
-  await expect(page).toHaveURL("http://margin.test/dashboard");
+  await expect(page).toHaveURL(/\/dashboard\?test=\d+#library$/);
   expect(page.context().pages()).toHaveLength(1);
   const panel = await open(page, "channels");
   await panel.getByRole("checkbox", { name: "Channel Two", exact: true }).check();
@@ -130,7 +130,7 @@ test("book lookup can retry an empty result and explicitly select the recovered 
     expect(route.request().postDataJSON().query).toBe("Designing data intensive applications");
     return route.fulfill({ json: { items: lookups === 1 ? [] : [{ title: "Designing Data-Intensive Applications", author: "Martin Kleppmann", kind: "book", url: "https://openlibrary.org/books/OL48030878M", cover_url: "https://images.test/book.svg" }] } });
   });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   const editor = page.locator(".editor-modal");
   await editor.getByRole("textbox", { name: "Title or URL", exact: true }).fill("Designing data intensive applications");
@@ -153,7 +153,7 @@ test("filter controls and popup fit both themes at phone and desktop widths", as
   for (const width of [320, 390, 900, 1440]) for (const theme of ["dark", "light"]) {
     await page.setViewportSize({ width, height: 950 });
     await page.addInitScript(value => localStorage.setItem("margin-theme", value), theme);
-    await page.goto("http://margin.test/dashboard");
+    await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
     const panel = await open(page, "types");
     await panel.getByRole("checkbox", { name: "Book", exact: true }).check();
     const box = (await panel.boundingBox())!;
@@ -169,7 +169,7 @@ test("filter search and actions remain reachable on a short phone viewport", asy
   await fixture(page, items());
   await page.setViewportSize({ width: 320, height: 568 });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   const panel = await open(page, "types");
   const box = (await panel.boundingBox())!;
   expect(box.y).toBeGreaterThanOrEqual(0);

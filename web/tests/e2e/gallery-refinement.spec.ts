@@ -22,7 +22,7 @@ test("visual shelves reserve uniform artwork geometry through missing, loading a
   ]);
   await page.emulateMedia({ reducedMotion: "reduce" });
   controls.holdImage();
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(6);
   await page.evaluate(() => document.fonts.ready);
   const measure = () => page.locator(".media-row").evaluateAll(rows => rows.map(row => {
@@ -66,7 +66,7 @@ test("complete similar-prefix and unbroken titles wrap in both views and phone S
   const evidence = [];
   for (const width of [320, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
-    await page.goto("http://margin.test/dashboard");
+    await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
     await expect(page.locator(".media-row")).toHaveCount(4);
     await page.evaluate(() => document.fonts.ready);
     for (const layout of ["Shelves", "List"]) {
@@ -106,7 +106,7 @@ for (const layout of ["Shelves", "List"]) {
   test(`${layout} hands native review focus to its row without stealing later focus or pointer selection`, async ({ page }) => {
     const controls = await fixture(page, Array.from({ length: 5 }, (_, index) => make(index, "book", { needs_review: true })));
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("http://margin.test/dashboard");
+    await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
     await page.getByRole("button", { name: `${layout} view`, exact: true }).click();
     const row = (index: number) => page.locator(`[data-row-id="refined-${index}"]`);
     const review = (index: number) => row(index).getByRole("button", { name: `Mark reviewed: A useful book ${index}`, exact: true });
@@ -119,7 +119,7 @@ for (const layout of ["Shelves", "List"]) {
     await search.focus(); controls.releaseMediaWrite(); await expect(review(1)).toHaveCount(0); await expect(search).toBeFocused();
     await review(2).click(); await expect(review(2)).toHaveCount(0);
     await expect(row(2)).not.toBeFocused(); await expect(row(2)).not.toHaveAttribute("data-keyboard-active", "true");
-    await page.locator(".list-tabs").getByRole("button", { name: "To review (2)", exact: true }).click();
+    await page.locator(".list-tabs").getByRole("button", { name: "Needs attention (2)", exact: true }).click();
     await review(3).focus(); await page.keyboard.press("Enter");
     await expect(row(3)).toHaveCount(0); await expect(row(4)).toBeFocused();
     expect(controls.requests.mediaPatches).toBe(4);
@@ -129,7 +129,7 @@ for (const layout of ["Shelves", "List"]) {
     await fixture(page, [make(0, "book"), make(1, "article")]);
     await page.emulateMedia({ reducedMotion: "reduce" });
     for (const history of [false, true]) {
-      await page.goto("http://margin.test/dashboard");
+      await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
       await page.getByRole("button", { name: `${layout} view`, exact: true }).click();
       await expect(page.locator(".media-row")).toHaveCount(2);
       if (history) await page.locator(".media-row").first().focus();

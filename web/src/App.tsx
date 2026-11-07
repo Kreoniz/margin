@@ -11,7 +11,7 @@ import { Input } from "unlikely-ui/input";
 import { Toast } from "unlikely-ui/toast";
 import { Collection } from "./Collection";
 import { Access } from "./Access";
-import { api, send } from "./api";
+import { api, ApiError, send } from "./api";
 import { EmptyState, ListSkeleton, MiniCover, Modal, Picker, TypeLabel } from "./components";
 import { Editor, type EditorSnapshot } from "./Editor";
 import { Icon, Logo } from "./Icon";
@@ -23,10 +23,11 @@ import {
   type Kind,
   type LibraryData,
   type Media,
+  type UpNext,
   type InboxItem,
   type Session,
 } from "./types";
-import { discoveryEmptyState, hostname, imageURL, relativeDate, safeURL, selectMedia, youtubeChannelName } from "./utils";
+import { discoveryEmptyState, hostname, imageURL, relativeDate, safeURL, selectMedia, selectUpNext, youtubeChannelName } from "./utils";
 import { useListMotion } from "./useListMotion";
 import { useListNavigation } from "./useListNavigation";
 import { KeyboardHelp } from "./KeyboardHelp";
@@ -151,8 +152,8 @@ function Owner({
   const inboxCounts = useRef<LibraryData["inbox_counts"] | undefined>(undefined);
   inboxCounts.current = data?.inbox_counts;
   const [error, setError] = useState("");
-  const [view, setView] = useState<"library" | "discover">(() =>
-    window.location.hash === "#discover" ? "discover" : "library",
+  const [view, setView] = useState<"next" | "library" | "discover">(() =>
+    window.location.hash === "#discover" ? "discover" : window.location.hash === "#library" ? "library" : "next",
   );
   const [libraryLayout, setLibraryLayout] = useState<LibraryLayout>(() => {
     try {
@@ -164,10 +165,12 @@ function Owner({
     try { localStorage.setItem("margin-library-layout", libraryLayout); }
     catch { /* The layout remains usable when browser storage is unavailable. */ }
   }, [libraryLayout]);
+  const layout = view === "next" ? "list" : libraryLayout;
+  const [announcement, setAnnouncement] = useState("");
   const [libraryQuery, setLibraryQuery] = useState("");
   const [discoveryQuery, setDiscoveryQuery] = useState("");
-  const query = view === "library" ? libraryQuery : discoveryQuery;
-  const setQuery = view === "library" ? setLibraryQuery : setDiscoveryQuery;
+  const query = view !== "discover" ? libraryQuery : discoveryQuery;
+  const setQuery = view !== "discover" ? setLibraryQuery : setDiscoveryQuery;
   const [kindFilters, setKindFilters] = useState<Kind[]>([]);
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [channelFilters, setChannelFilters] = useState<string[]>([]);
@@ -177,8 +180,8 @@ function Owner({
   const [source, setSource] = useState("all");
   const [libraryLimit, setLibraryLimit] = useState(40);
   const [discoveryLimit, setDiscoveryLimit] = useState(40);
-  const limit = view === "library" ? libraryLimit : discoveryLimit;
-  const setLimit = view === "library" ? setLibraryLimit : setDiscoveryLimit;
+  const limit = view !== "discover" ? libraryLimit : discoveryLimit;
+  const setLimit = view !== "discover" ? setLibraryLimit : setDiscoveryLimit;
   const [editor, setEditor] = useState<Media | "new" | undefined>(() =>
     editorMemory.current ? editorMemory.current.item || "new" : undefined,
   );
@@ -244,7 +247,7 @@ function Owner({
   }, [refresh, view, sourcesOpen, hasPendingMetadata]);
   useEffect(() => {
     const change = () => {
-      setView(window.location.hash === "#discover" ? "discover" : "library");
+      setView(window.location.hash === "#discover" ? "discover" : window.location.hash === "#library" ? "library" : "next");
       setFilterOpen(undefined);
     };
     window.addEventListener("hashchange", change);
@@ -254,7 +257,7 @@ function Owner({
   useEffect(() => { setDiscoveryLimit(40); pendingShowMore.current = undefined; }, [discoveryQuery, inboxState, source]);
   useEffect(() => {
     document.title =
-      (view === "library" ? "Library" : "Discover") + " — Margin";
+      (view === "next" ? "Up next" : view === "library" ? "Library" : "Discover") + " — Margin";
   }, [view]);
   const shortcutsEnabled = !editor && !settings && !sourcesOpen && !helpOpen && !removeTarget && !filterOpen && !quickFindOpen && !pendingEditor;
   useHotkeys(
@@ -281,6 +284,7 @@ function Owner({
       },
       { hotkey: "A", callback: () => openEditor("new"), options: { enabled: shortcutsEnabled && singleKeys } },
       { hotkey: "U", callback: () => undo.current?.(), options: { enabled: shortcutsEnabled && singleKeys } },
+      { hotkey: ["G", "N"], callback: () => navigate("next"), options: { enabled: shortcutsEnabled && singleKeys } },
       {
         hotkey: ["G", "L"],
         callback: () => navigate("library"),
@@ -301,7 +305,7 @@ function Owner({
       { hotkey: ["V", "L"], callback: () => { getHotkeyManager().resetSequenceProgress(); setLibraryLayout("list"); }, options: { enabled: shortcutsEnabled && singleKeys && view === "library" } },
       { hotkey: ["V", "B"], callback: () => { getHotkeyManager().resetSequenceProgress(); setLibraryLayout("split"); }, options: { enabled: shortcutsEnabled && singleKeys && view === "library" } },
       ...(["S", "G"] as const).map(key => ({ hotkey: ["V", key] as const, callback: () => { getHotkeyManager().resetSequenceProgress(); setLibraryLayout("shelves"); }, options: { enabled: shortcutsEnabled && singleKeys && view === "library" } })),
-      ...([ ["T", "types"], ["G", "tags"], ["C", "channels"] ] as const).map(([key, id]) => ({ hotkey: ["F", key] as const, callback: () => { getHotkeyManager().resetSequenceProgress(); document.getElementById("library-filter-" + id)?.focus({ preventScroll: true }); setFilterOpen(id); }, options: { enabled: shortcutsEnabled && singleKeys && view === "library" } })),
+      ...([ ["T", "types"], ["G", "tags"], ["C", "channels"] ] as const).map(([key, id]) => ({ hotkey: ["F", key] as const, callback: () => { getHotkeyManager().resetSequenceProgress(); document.getElementById("library-filter-" + id)?.focus({ preventScroll: true }); setFilterOpen(id); }, options: { enabled: shortcutsEnabled && singleKeys && view !== "discover" } })),
       { hotkey: "Mod+,", callback: () => setSettings(true) },
       { hotkey: "Control+Home", callback: () => navigation.focusFirst(), options: { ignoreInputs: true } },
       {
@@ -371,13 +375,15 @@ function Owner({
   const inbox = inboxPage.items;
   const sources = data?.sources || [];
   const discoveryEmpty = discoveryEmptyState(sources, inboxState);
+  const queue = data?.up_next || { version: 0, ids: [] };
+  const queueFiltered = Boolean(libraryQuery.trim() || kindFilters.length || tagFilters.length || channelFilters.length);
   const filtered = useMemo(
     () =>
-      selectMedia(
+      view === "next" ? selectUpNext(media, queue.ids, { query: libraryQuery, status: "pending", kinds: kindFilters, tags: tagFilters, channels: channelFilters }) : selectMedia(
         status === "review" ? library.filter((item) => item.needs_review) : library,
         { query: libraryQuery, status: status === "review" ? "all" : status, kinds: kindFilters, tags: tagFilters, channels: channelFilters },
       ),
-    [media, libraryQuery, status, kindFilters, tagFilters, channelFilters, hideAutoAdded],
+    [media, queue.ids, view, libraryQuery, status, kindFilters, tagFilters, channelFilters, hideAutoAdded],
   );
   useEffect(() => {
     if (!data || !window.location.hash.startsWith("#edit=")) return;
@@ -396,29 +402,29 @@ function Owner({
   })).values()].sort((a, b) => a.label.localeCompare(b.label));
   const articles = inbox;
   const sections = librarySections.map(section => ({ ...section, items: filtered.filter(item => librarySection(item) === section.id) }));
-  const orderedLibrary = libraryLayout === "list" ? filtered : sections.flatMap(section => section.items);
-  const visibleLibrary = libraryLayout === "list" ? filtered.slice(0, limit) : sections.flatMap(section => section.items.slice(0, limit));
-  const navigationItems = view === "library" ? orderedLibrary : articles;
-  const visibleItems = view === "library" ? visibleLibrary : articles.slice(0, limit);
-  const hasMoreLibrary = libraryLayout === "list" ? filtered.length > limit : sections.some(section => section.items.length > limit);
+  const orderedLibrary = layout === "list" ? filtered : sections.flatMap(section => section.items);
+  const visibleLibrary = layout === "list" ? filtered.slice(0, limit) : sections.flatMap(section => section.items.slice(0, limit));
+  const navigationItems = view !== "discover" ? orderedLibrary : articles;
+  const visibleItems = view !== "discover" ? visibleLibrary : articles.slice(0, limit);
+  const hasMoreLibrary = layout === "list" ? filtered.length > limit : sections.some(section => section.items.length > limit);
   const listRef = useListMotion(
     visibleItems.map((item) => item.id).join("|"),
-    libraryLayout,
+    layout,
     JSON.stringify(visibleItems.map(item => [
       item.title, item.author || hostname(item.url), Boolean(imageURL(item.cover_url)),
       "kind" in item
         ? [item.kind, item.tags.slice(0, 2), item.visibility, item.needs_review, item.metadata_state, item.status,
-            libraryLayout !== "list"]
+            layout !== "list"]
         : [item.source_name, item.description, item.state, relativeDate(item.published_at || item.discovered_at)],
     ])),
   );
   const navigation = useListNavigation({
     items: navigationItems,
     visibleItems,
-    spatial: view === "library" && libraryLayout !== "list",
-    group: item => view === "library" && libraryLayout !== "list" && "kind" in item ? librarySection(item) : "all",
+    spatial: view !== "discover" && layout !== "list",
+    group: item => view !== "discover" && layout !== "list" && "kind" in item ? librarySection(item) : "all",
     onReveal: item => {
-      const items = view === "library" && libraryLayout !== "list" && "kind" in item ? sections.find(section => section.id === librarySection(item))!.items : navigationItems;
+      const items = view !== "discover" && layout !== "list" && "kind" in item ? sections.find(section => section.id === librarySection(item))!.items : navigationItems;
       const position = items.findIndex(candidate => candidate.id === item.id);
       setLimit(n => Math.max(n, Math.ceil((position + 1) / 40) * 40));
     },
@@ -428,7 +434,7 @@ function Owner({
     hasMore: view === "discover" && Boolean(inboxPage.next_cursor),
     onMore: async () => { if (await inboxPage.more()) setLimit(n => n + 40); },
     onEnd: async () => { if (await inboxPage.all()) setLimit(Number.MAX_SAFE_INTEGER); },
-    scope: view + ":" + (view === "library" ? status : inboxState),
+    scope: view + ":" + (view !== "discover" ? status : inboxState),
     pageScope: JSON.stringify([view, status, inboxState, query, source, kindFilters, tagFilters, channelFilters, hideAutoAdded]),
     enabled: shortcutsEnabled,
     singleKeys,
@@ -440,7 +446,7 @@ function Owner({
         if ("state" in item && item.state === "new")
           void setArticleState(item.id, "read");
       },
-      ...(view === "library"
+      ...(view !== "discover"
         ? {
             done: (item: (typeof media)[number] | (typeof inbox)[number]) => {
               if ("kind" in item) void toggle(item);
@@ -497,7 +503,7 @@ function Owner({
       pendingShowMore.current = undefined;
       navigation.focusIndex(index);
     }
-  }, [limit, filtered.length, articles.length, view, libraryLayout]);
+  }, [limit, filtered.length, articles.length, view, layout]);
   async function perform(
     key: string,
     fn: () => Promise<unknown>,
@@ -512,6 +518,11 @@ function Owner({
       if (message) toast.add({ title: message, type: "success" });
       return true;
     } catch (e) {
+      if (e instanceof ApiError && e.code === "up_next_conflict") {
+        if (e.upNext) setData(current => current ? { ...current, up_next: e.upNext! } : current);
+        await refresh();
+      }
+      setAnnouncement(e instanceof Error ? e.message : "Please try again.");
       toast.add({
         title: e instanceof Error ? e.message : "Please try again.",
         type: "danger",
@@ -522,7 +533,7 @@ function Owner({
       setPending(new Set(activeMutations.current));
     }
   }
-  function navigate(next: "library" | "discover") {
+  function navigate(next: "next" | "library" | "discover") {
     setView(next);
     window.location.hash = next;
     setFilterOpen(undefined);
@@ -554,13 +565,14 @@ function Owner({
     setEditor(item);
   }
   function cycleStatus(direction: number) {
+    if (view === "next") return;
     const values =
-      view === "library"
+      view !== "discover"
         ? ["pending", "done", "review", "all"]
         : ["new", "saved", "read", "dismissed"];
-    const current = values.indexOf(view === "library" ? status : inboxState);
+    const current = values.indexOf(view !== "discover" ? status : inboxState);
     const next = values[(current + direction + values.length) % values.length];
-    if (view === "library") setStatus(next);
+    if (view !== "discover") setStatus(next);
     else setInboxState(next);
   }
   function acknowledgeMedia(item: Media) {
@@ -568,15 +580,19 @@ function Owner({
       ? current.media.map(existing => existing.id === item.id ? item : existing)
       : [item, ...current.media] } : current);
   }
-  async function patchMedia(id: string, changes: Partial<Media>) {
-    const item = await api<Media>("/media/" + id, send("PATCH", changes));
+  async function patchMedia(id: string, changes: Partial<Media>, expected?: Media) {
+    const item = await api<Media>("/media/" + id, send("PATCH", { ...changes, expected }));
     acknowledgeMedia(item);
+    if (item.status === "done") {
+      setData(current => current?.up_next ? { ...current, up_next: { ...current.up_next, ids: current.up_next.ids.filter(id => id !== item.id) } } : current);
+      setAnnouncement("Marked done and removed from Up next. Undo returns to unfinished without restoring its place.");
+    }
     return item;
   }
   async function removeMedia(id: string) {
     await api("/media/" + id, send("DELETE"));
     undo.current = undefined;
-    setData(current => current ? { ...current, media: current.media.filter(item => item.id !== id) } : current);
+    setData(current => current ? { ...current, media: current.media.filter(item => item.id !== id), up_next: current.up_next ? { ...current.up_next, ids: current.up_next.ids.filter(member => member !== id) } : undefined } : current);
   }
   function mediaFocus() {
     return document.querySelector<HTMLElement>('.media-row[tabindex="0"]') || document.getElementById("content");
@@ -612,11 +628,11 @@ function Owner({
   async function toggle(item: Media) {
     const next = item.status === "done" ? "pending" : "done";
     if (
-      await perform(item.id, () => patchMedia(item.id, { status: next }))
+      await perform(item.id, () => patchMedia(item.id, { status: next }, item))
     ) {
-      const undoAction = setUndo(() => perform(item.id, () => patchMedia(item.id, { status: item.status })));
+      const undoAction = setUndo(() => perform(item.id, () => patchMedia(item.id, { status: item.status }, { ...item, status: next })));
       toast.add({
-        title: next === "done" ? "Marked done." : "Back on your list.",
+        title: next === "done" ? "Marked done. Undo returns to unfinished without restoring Up next." : "Returned to unfinished. Add to Up next when ready.",
         actionProps: {
           children: "Undo",
           onClick: undoAction,
@@ -707,8 +723,23 @@ function Owner({
       "Checking your sources. New articles appear automatically.",
     );
   }
+  async function changeQueue(item: Media, action: "add" | "remove" | "up" | "down") {
+    // Move focus to the stable row before a button disappears or hits a boundary.
+    const row = document.querySelector<HTMLElement>(`[data-row-id="${item.id}"]`);
+    if (row?.contains(document.activeElement)) row.focus({ preventScroll: true });
+    await perform("up-next", async () => {
+      const updated = await api<UpNext>("/up-next", send("POST", { id: item.id, action, expected_version: queue.version }));
+      setData(current => current ? { ...current, up_next: updated } : current);
+      const position = updated.ids.indexOf(item.id) + 1;
+      setAnnouncement(action === "remove" ? `${item.title} removed from Up next. Kept in your library.` : `${item.title} ${action === "add" ? "added to Up next" : "moved"}. Position ${position} of ${updated.ids.length}.`);
+    });
+  }
+  function clearQueueFilters() {
+    setLibraryQuery(""); setKindFilters([]); setTagFilters([]); setChannelFilters([]); setFilterOpen(undefined);
+    searchRef.current?.focus({ preventScroll: true });
+  }
   function renderLibraryItem(item: Media) {
-    const compactReview = libraryLayout !== "list";
+    const compactReview = view !== "next" && layout !== "list";
     const reading = compactReview && ["article", "paper", "other"].includes(item.kind);
     const tags = (
       item.tags.length > 0 && <div className="item-tags">
@@ -728,6 +759,12 @@ function Owner({
     );
     const controls = (
       <div className="row-controls">
+        {view === "next" ? <div className="queue-controls" role="group" aria-label={"Up next controls for " + item.title}>
+          <button type="button" aria-label={"Move up: " + item.title} aria-describedby={queueFiltered ? "queue-filter-explanation" : undefined} disabled={queueFiltered || pending.has("up-next") || queue.ids.indexOf(item.id) === 0} onClick={() => void changeQueue(item, "up")}>↑<span>Up</span></button>
+          <button type="button" aria-label={"Move down: " + item.title} aria-describedby={queueFiltered ? "queue-filter-explanation" : undefined} disabled={queueFiltered || pending.has("up-next") || queue.ids.indexOf(item.id) === queue.ids.length - 1} onClick={() => void changeQueue(item, "down")}>↓<span>Down</span></button>
+          <button type="button" aria-label={"Remove from Up next: " + item.title} disabled={pending.has("up-next")} onClick={() => void changeQueue(item, "remove")}>Remove</button>
+        </div> : null}
+
           <ActionHint
             label={item.status === "done" ? "Move to read/watch" : "Mark done"}
             shortcut={singleKeys ? "Space" : undefined}
@@ -786,6 +823,7 @@ function Owner({
         data-textual={item.kind === "article" || item.kind === "paper" || item.kind === "other" || undefined}
         data-art-absent={!imageURL(item.cover_url) && item.metadata_state !== "pending" || undefined}
       >
+        {view === "next" && <span className="queue-position" aria-label={"Position " + (queue.ids.indexOf(item.id) + 1)}>{queue.ids.indexOf(item.id) + 1}</span>}
         <div className="library-art">
           <MiniCover kind={item.kind} url={item.cover_url} publisherURL={item.kind === "article" ? item.url : undefined} naturalArtwork={item.kind !== "article" && item.kind !== "paper" && item.kind !== "other"} />
           <span className="gallery-art-fallback" data-unavailable={item.metadata_state !== "pending" && Boolean(imageURL(item.cover_url)) || undefined} aria-hidden={item.metadata_state === "pending" || undefined}>{item.metadata_state === "pending" ? "Finding preview…" : imageURL(item.cover_url) ? "Preview unavailable" : "No preview"}</span>
@@ -816,6 +854,7 @@ function Owner({
                 <Icon name="globe" size={13} /> Public
               </span>
             )}
+            {view !== "next" && item.status === "pending" && <button type="button" className="queue-add" aria-label={"Add to Up next: " + item.title} disabled={queue.ids.includes(item.id) || pending.has("up-next")} onClick={() => void changeQueue(item, "add")}>{queue.ids.includes(item.id) ? "In Up next" : "+ Up next"}</button>}
           </div>
           {(item.kind === "article" || item.kind === "paper" || item.kind === "other") && item.description.trim() && (
             <p className="gallery-description">{item.description}</p>
@@ -845,7 +884,7 @@ function Owner({
           )}
         {item.needs_review && (
           <div className="item-review">
-          <span>Needs review</span>
+          <span>Needs attention</span>
           {!compactReview && renderReviewButton(item)}
           </div>
         )}
@@ -858,7 +897,7 @@ function Owner({
     return (
       <ActionHint
         label="Mark reviewed"
-        context="Remove from To review without marking it done."
+        context="Clear Needs attention without marking it done."
       >
         <Button
           className="review-button"
@@ -905,11 +944,12 @@ function Owner({
           <button
             className="brand-button"
             aria-label="Margin library"
-            onClick={() => navigate("library")}
+            onClick={() => navigate("next")}
           >
             <Logo small />
           </button>
           <nav className="main-nav" aria-label="Main navigation">
+            <button aria-current={view === "next" ? "page" : undefined} onClick={() => navigate("next")}>Up next</button>
             <ActionHint
               label="Library"
               shortcut={singleKeys ? "g then l" : undefined}
@@ -987,7 +1027,7 @@ function Owner({
           </div>
         </div>
       </header>
-      <main id="content" className={"content" + (view === "library" && media.length ? " library-populated" : "")} data-library-layout={view === "library" ? libraryLayout : undefined} tabIndex={-1}>
+      <main id="content" className={"content" + (view !== "discover" && media.length ? " library-populated" : "")} data-library-layout={view !== "discover" ? layout : undefined} data-up-next={view === "next" || undefined} tabIndex={-1}>
         {draftPending && !editor && <div className="notice flex flex-wrap items-center gap-2" role="region" aria-label="Unfinished draft">
           <span className="mr-auto">Unfinished draft{editorMemory.current?.item ? ": " + editorMemory.current.item.title : ""}</span>
           <Button variant="secondary" size="sm" onClick={resumeDraft}>Resume draft</Button>
@@ -1005,14 +1045,14 @@ function Owner({
             </Button>
           </div>
         )}
-        <div className={"page-heading" + (view === "library" && media.length ? " library-heading-populated" : "")} key={view}>
+        <div className={"page-heading" + (view !== "discover" && media.length ? " library-heading-populated" : "")} key={view}>
           <div>
             <h1>
-              {view === "library" ? "Your library" : "Discover"}
+              {view === "next" ? "Up next" : view === "library" ? "Your library" : "Discover"}
               <span>.</span>
             </h1>
-            {!(view === "library" && media.length) && <p>
-              {view === "library"
+            {(view === "next" || !(view !== "discover" && media.length)) && <p>
+              {view === "next" ? "Choose what comes next. Keep it in your own order." : view === "library"
                 ? "A small place for things worth coming back to."
                 : "Fresh reading from the places you follow."}
             </p>}
@@ -1054,10 +1094,10 @@ function Owner({
               ref={searchRef}
               type="search"
               aria-label={
-                view === "library" ? "Search library" : "Search discoveries"
+                view === "next" ? "Search Up next" : view === "library" ? "Search library" : "Search discoveries"
               }
               placeholder={
-                view === "library"
+                view !== "discover"
                   ? "Find a title, creator, tag…"
                   : "Search articles or sources…"
               }
@@ -1083,7 +1123,7 @@ function Owner({
             </Button>
           </ActionHint>
           <div className="toolbar-filters">
-            {view === "library" ? (
+            {view !== "discover" ? (
               <>
                 <FilterPicker id="types" label="Types" values={kindFilters} options={kinds.map(value => ({ value, label: kindLabels[value] }))} open={filterOpen === "types"} onOpenChange={open => setFilterOpen(open ? "types" : undefined)} onChange={values => setKindFilters(values as Kind[])} shortcut={singleKeys ? "f t" : undefined} />
                 <FilterPicker id="tags" label="Tags" values={tagFilters} options={tags.map(value => ({ value, label: value }))} open={filterOpen === "tags"} onOpenChange={open => setFilterOpen(open ? "tags" : undefined)} onChange={setTagFilters} shortcut={singleKeys ? "f g" : undefined} />
@@ -1102,25 +1142,25 @@ function Owner({
             )}
           </div>
         </div>
-        {view === "library" && (kindFilters.length + tagFilters.length + channelFilters.length > 0) && <div className="active-library-filters" aria-label="Active filters">
+        {view !== "discover" && (kindFilters.length + tagFilters.length + channelFilters.length > 0) && <div className="active-library-filters" aria-label="Active filters">
           {kindFilters.map(value => <button type="button" key={"type-" + value} aria-label={"Remove type filter " + kindLabels[value]} onClick={() => { setKindFilters(values => values.filter(v => v !== value)); document.getElementById("library-filter-types")?.focus({ preventScroll: true }); }}>{kindLabels[value]} <Icon name="close" size={12} /></button>)}
           {tagFilters.map(value => <button type="button" key={"tag-" + value} aria-label={"Remove tag filter " + value} onClick={() => { setTagFilters(values => values.filter(v => v !== value)); document.getElementById("library-filter-tags")?.focus({ preventScroll: true }); }}>#{value} <Icon name="close" size={12} /></button>)}
           {channelFilters.map(value => <button type="button" key={"channel-" + value} aria-label={"Remove channel filter " + value} onClick={() => { setChannelFilters(values => values.filter(v => v !== value)); document.getElementById("library-filter-channels")?.focus({ preventScroll: true }); }}>{channels.find(option => option.value === value)?.label || value} <Icon name="close" size={12} /></button>)}
           <button type="button" className="text-link" onClick={() => { setKindFilters([]); setTagFilters([]); setChannelFilters([]); searchRef.current?.focus({ preventScroll: true }); }}>Clear selections</button>
         </div>}
         <div className="list-tabs-row">
-          <div
+          {view !== "next" && <div
             className="list-tabs"
             aria-label={
-              view === "library" ? "Library status" : "Discovery status"
+              view !== "discover" ? "Library status" : "Discovery status"
             }
           >
-            {(view === "library"
+            {(view !== "discover"
               ? [
                   {
                     value: "pending",
-                    label: "To read/watch",
-                    hint: "Items you plan to read or watch",
+                    label: "Unfinished",
+                    hint: "Saved items you have not finished",
                   },
                   {
                     value: "done",
@@ -1129,8 +1169,8 @@ function Owner({
                   },
                   {
                     value: "review",
-                    label: `To review (${library.filter((m) => m.needs_review).length})`,
-                    hint: "Captured items waiting for your review",
+                    label: `Needs attention (${library.filter((m) => m.needs_review).length})`,
+                    hint: "Items with details to check",
                   },
                   { value: "all", label: "All", hint: "Your entire library" },
                 ]
@@ -1165,10 +1205,10 @@ function Owner({
               >
                 <button
                   aria-pressed={
-                    (view === "library" ? status : inboxState) === tab.value
+                    (view !== "discover" ? status : inboxState) === tab.value
                   }
                   onClick={() =>
-                    view === "library"
+                    view !== "discover"
                       ? setStatus(tab.value)
                       : setInboxState(tab.value)
                   }
@@ -1177,11 +1217,11 @@ function Owner({
                 </button>
               </ActionHint>
             ))}
-          </div>
+          </div>}
           {data && (
             <span className="result-count" aria-live="polite">
-              {view === "discover" && !inboxPage.hasResult ? (inboxPage.error ? "Count unavailable" : "Loading…") : <>{view === "library" ? filtered.length : inboxPage.total}{" "}
-              {view === "library"
+              {view === "discover" && !inboxPage.hasResult ? (inboxPage.error ? "Count unavailable" : "Loading…") : <>{view !== "discover" ? filtered.length : inboxPage.total}{" "}
+              {view !== "discover"
                 ? filtered.length === 1
                   ? "item"
                   : "items"
@@ -1195,22 +1235,31 @@ function Owner({
           setHideAutoAdded(false);
           try { localStorage.setItem("margin-hide-auto-added", "off"); } catch { /* optional preference */ }
         }}>Show all additions</button></p>}
+        <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</p>
+        {view === "next" && <div className="queue-guidance"><span>{queueFiltered ? "Filters keep your manual order. Clear filters to reorder." : "Private shortlist · use Up and Down to change your order."}</span><button type="button" className="text-link" onClick={() => navigate("library")}>Browse library</button></div>}
+        {view === "next" && queueFiltered && <p id="queue-filter-explanation" className="quiet text-xs">Reordering is disabled while searching or filtering. <button type="button" className="text-link" onClick={clearQueueFilters}>Clear filters</button></p>}
         {!data && !error && (
-          <ListSkeleton discovery={view === "discover"} gallery={view === "library" && libraryLayout !== "list"} />
+          <ListSkeleton discovery={view === "discover"} gallery={view !== "discover" && layout !== "list"} />
         )}
-        {view === "library" && libraryLayout !== "list" && sections.filter(section => section.items.length).length > 1 && <nav className="library-section-links" aria-label="Jump to library section">
+        {view !== "discover" && layout !== "list" && sections.filter(section => section.items.length).length > 1 && <nav className="library-section-links" aria-label="Jump to library section">
           {sections.filter(section => section.items.length).map(section => <button type="button" key={section.id} aria-label={"Jump to " + section.label} onClick={() => navigation.focusIndex(orderedLibrary.findIndex(item => item.id === section.items[0].id))}>{section.id === "reading" ? "Read" : section.id === "books" ? "Books" : section.label}<span>{section.items.length}</span></button>)}
         </nav>}
         {data &&
-          view === "library" &&
+          view !== "discover" &&
           (filtered.length ? (
-            <div className={"media-list" + (libraryLayout !== "list" ? " library-mixed" : "")} data-layout={libraryLayout} data-single-section={sections.filter(section => section.items.length).length === 1 || !sections.find(section => section.id === "reading")!.items.length || undefined} ref={listRef}>
-              {libraryLayout === "list" ? visibleLibrary.map(renderLibraryItem) : <>
+            <div className={"media-list" + (layout !== "list" ? " library-mixed" : "")} data-layout={layout} data-single-section={sections.filter(section => section.items.length).length === 1 || !sections.find(section => section.id === "reading")!.items.length || undefined} ref={listRef}>
+              {layout === "list" ? visibleLibrary.map(renderLibraryItem) : <>
                 <div className="library-visuals">
                   {sections.filter(section => section.id !== "reading" && section.items.length).map(renderLibrarySection)}
                 </div>
                 {sections.filter(section => section.id === "reading" && section.items.length).map(renderLibrarySection)}
               </>}
+            </div>
+          ) : view === "next" ? (
+            <div className="empty-state queue-empty">
+              <h2>{queue.ids.length ? "No Up next items match." : "What would you like to start next?"}</h2>
+              <p>{queue.ids.length ? "Your shortlist is still here. Clear filters to see it." : "Choose unfinished items from your library, then put them in the order you want to read, watch, or play."}</p>
+              <Button variant="secondary" size="sm" onClick={queue.ids.length ? clearQueueFilters : () => { clearQueueFilters(); navigate("library"); setStatus("pending"); }}>{queue.ids.length ? "Clear filters" : "Browse library"}</Button>
             </div>
           ) : (
             <EmptyState
@@ -1409,12 +1458,12 @@ function Owner({
               }
             />
           ))}
-        {(view === "library" ? hasMoreLibrary : articles.length > limit || inboxPage.next_cursor) && (
+        {(view !== "discover" ? hasMoreLibrary : articles.length > limit || inboxPage.next_cursor) && (
           <div className="show-more">
             <ActionHint
               label={
-                view === "library"
-                  ? libraryLayout === "list" ? "Show up to 40 more items" : "Show up to 40 more items per section"
+                view !== "discover"
+                  ? layout === "list" ? "Show up to 40 more items" : "Show up to 40 more items per section"
                   : "Show up to 40 more articles"
               }
             >
@@ -1423,7 +1472,7 @@ function Owner({
                 size="sm"
                 loading={view === "discover" && inboxPage.loading}
                 onClick={async (event) => {
-                  if (event.detail === 0) pendingShowMore.current = view === "library" ? navigationItems.findIndex(item => !visibleItems.some(visible => visible.id === item.id)) : limit;
+                  if (event.detail === 0) pendingShowMore.current = view !== "discover" ? navigationItems.findIndex(item => !visibleItems.some(visible => visible.id === item.id)) : limit;
                   if (view === "discover" && limit >= articles.length) {
                     if (await inboxPage.more()) setLimit(n => n + 40);
                     else pendingShowMore.current = undefined;
@@ -1467,8 +1516,8 @@ function Owner({
           </div>
         )}
         <footer className="page-footer">
-          <Icon name={view === "library" ? "lock" : "rss"} size={13} />
-          {view === "library"
+          <Icon name={view !== "discover" ? "lock" : "rss"} size={13} />
+          {view !== "discover"
             ? "Private by default. Yours to curate."
             : "Collected automatically. Saved by choice."}
           <ActionHint label="Keyboard shortcuts" shortcut="F1">
@@ -1477,7 +1526,7 @@ function Owner({
               onClick={() => setHelpOpen(true)}
             >
               {singleKeys
-                ? "h/j/k/l move · [/] tabs · F1 help"
+                ? view === "next" ? "↑/↓ move · Tab for order controls · F1 help" : "h/j/k/l move · [/] tabs · F1 help"
                 : "Arrow keys move · Enter open · F1 help"}
             </button>
           </ActionHint>

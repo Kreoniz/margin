@@ -1,10 +1,10 @@
 # Margin corrected product/API contract
 
-The product is a compact personal reading/watch list plus automatic discovery. Main destinations Library and Discover. Sources and integration controls are secondary. Keep Unlikely UI aesthetics; previews are large and uncropped. `/` is the public Collection; `/dashboard` is the private owner entry. No favorites, ratings, progress, units, or sessions/habits. Optional tags and private notes support finding/organizing.
+The product is a compact personal reading/watch list plus automatic discovery. Main owner destinations Up next (default), Library and Discover. Up next is a private ordered selection of unfinished saved items. Sources and integration controls are secondary. Keep Unlikely UI aesthetics; previews are large and uncropped. `/` is the public Collection; `/dashboard` is the private owner entry. No favorites, ratings, progress, units, or sessions/habits. Optional tags and private notes support finding/organizing.
 
 ## Data and migration
 
-Media: `{id,title,author,kind,status,url,cover_url,description,notes,tags:string[],visibility,needs_review:boolean,created_at,updated_at,completed_at?:string}`. Kinds unchanged. ONLY status `pending` (To read/watch) or `done` (Done). Visibility `private` by default or explicitly `public`. Notes always owner-only. No progress/total/unit/rating/favorite current fields. PublicMedia excludes notes and private operational fields; public lists contain only explicitly public non-demo items and reveal no private counts/sources/inbox.
+Media: `{id,title,author,kind,status,url,cover_url,description,notes,tags:string[],visibility,needs_review:boolean,created_at,updated_at,completed_at?:string}`. Kinds unchanged. ONLY status `pending` (Unfinished) or `done` (Done). Visibility `private` by default or explicitly `public`. Notes always owner-only. No progress/total/unit/rating/favorite current fields. PublicMedia excludes notes and private operational fields; public lists contain only explicitly public non-demo items and reveal no private counts/sources/inbox.
 
 InboxItem existing shape/states new/read/dismissed/saved. Source existing fields plus `auto_save:boolean` (defaultfalse). Enabling auto-save sets a cutoff; only genuinely new discoveries published at/after cutoff become PRIVATE PENDING library items. No historical backfill surprise; seen/read/dismissed/deleted records do not resave; existing library metadata/visibility unchanged.
 
@@ -43,14 +43,14 @@ GET /api/integration/token -> `{configured:boolean,created_at:string|null}` owne
 POST /api/integration/token -> `{token:string,created_at}` owner-only create/rotate randomsecret shownonceinapp; storedhashed. DELETE ->204 revoke.
 POST /api/integrations/items requires Authorization Bearer submissiontoken, NOT browsercookieauthority. Accept `{title?,url?,author?,kind?,tags?,notes?}` titleORurlrequired. Metadata fills missingfields; explicitfieldswin. FORCE PRIVATE PENDING, reject status/visibility overrides. New201 or duplicate200 idempotent. Every successful submission returns ONLY `{id:string,created:boolean}` (`created:true` for 201, `false` for 200), including manual, URL, concurrent and legacy-sample-copy submissions. Duplicates preserve the existing item and reveal no title, URL, status, notes or other owner-edited metadata. Tokencannotreadprivate/list/notes, edit/delete/share ormanagesources. Boundbodies/rejectrevokedcredentials.
 
-URL submissions persist pending metadata before any publisher request; a successful receipt acknowledges the committed item, not completed enrichment. Only newly created pending items trigger the existing durable metadata worker. Duplicates never fetch the publisher or change stored fields. The worker fills missing/default-derived fields and preserves later owner edits; publisher failures leave an available incomplete item with existing recovery/retry behavior. New submissions require review, and title-only submissions remain valid. Token validity is rechecked under a row lock in the submission transaction; storage failures cannot return success. Owner `POST /api/media` keeps its default synchronous lookup unless `fetch_metadata:true` is supplied.
+URL submissions persist pending metadata before any publisher request; a successful receipt acknowledges the committed item, not completed enrichment. Only newly created pending items trigger the existing durable metadata worker. Duplicates never fetch the publisher or change stored fields. The worker fills missing/default-derived fields and preserves later owner edits; publisher failures leave an available incomplete item with existing recovery/retry behavior. Deliberate submissions do not set a blanket review flag; unresolved ISBNs still do. Title-only submissions remain valid. Token validity is rechecked under a row lock in the submission transaction; storage failures cannot return success. Owner `POST /api/media` keeps its default synchronous lookup unless `fetch_metadata:true` is supplied.
 
 Document curl/Python/Hermes HTTP submission using environment token placeholders. No live Marvin/Telegram changes authorized. Tests isolated schemas and clearly named testrecords, no fabricated normal screenshots.
 
 
 ## Capture, images, and export (migration 004)
 
-- `needs_review` is owner-only, default false for existing/manual items. New integration and automatic source captures set it true. Owner PATCH `/api/media/{id}` accepts `{needs_review:false}` independently of pending/done. Duplicates preserve existing review state. Public DTOs exclude this field.
+- `needs_review` is owner-only, default false for existing/manual items. Automatic source captures retain their existing review behavior. Deliberately invoked browser/submission/MCP saves do not set a blanket flag; concrete unresolved identity problems such as a title-only ISBN still do. Owner PATCH `/api/media/{id}` accepts `{needs_review:false}` independently of pending/done. Duplicates preserve existing review state. Public DTOs exclude this field.
 - POST `/api/books/search` `{query,author?}` returns `{items:Metadata[],warning?}`. It uses up to five ranked Open Library results and the first relevant edition for each work, caches bounded nonempty results for 15 minutes, and throttles uncached calls to one per second. Empty results can be retried, valid bare/path catalogue IDs are accepted, and malformed responses/provider failures return an empty result with a warning. Book JSON-LD on publisher URLs is preferred; explicit complete editor fields skip redundant metadata fetching on save.
 - POST `/api/images` requires an owner session and raw JPEG/PNG bytes, at most 2 MiB and 1600px per edge. The server decodes and re-encodes JPEG, stores bytes in PostgreSQL, and returns 201 `{url:"/api/images/{uuid}"}`. Owner media `cover_url` accepts this exact local path or a validated public HTTP(S) image URL.
 - GET `/api/images/{id}` returns JPEG only to the owner or when a non-demo public media item references that image. Otherwise 404. Responses are private/no-store so changing visibility takes effect on subsequent requests. Unattached images older than a day are cleaned on upload.
@@ -104,7 +104,7 @@ bearer read/save catalogs and per-operation transaction-time revocation checks.
 Read grants expose bounded `search_items` summaries without note/excerpt bodies;
 explicit `get_item` can disclose private notes and selected excerpts under the
 disclosed read consent. Save grants expose only `save_item`, reusing durable
-private/Pending/review capture and minimal `{id,created}` duplicate receipts.
+private/Pending capture and minimal `{id,created}` duplicate receipts.
 No edit/delete/publish/admin tools exist. First-client support is manually
 configured Authorization headers for verified Marvin/Hermes, without OAuth
 discovery/conformance. See [client contract](../integrations/hermes/mcp.md).
@@ -138,3 +138,13 @@ explicit metadata fetch, preview and application. Sparse field baselines protect
 concurrent changes; failed/stale lookups preserve text. Same-document fragment
 corrections omit unchanged metadata and preserve pending enrichment. New-item
 Save as Done is secondary; ordinary save remains private/Pending by default.
+
+## Private Up next (migration 009)
+
+The queue starts empty, independently of saved library contents. Owner bootstrap includes `up_next:{version:number,ids:string[]}` in deliberate order; GET `/api/up-next` returns the same state. This is separate from Media/PublicMedia and absent from public, MCP read/export and capture/submission receipt representations. Existing credentials gain no access.
+
+Owner POST `/api/up-next` requires a same-origin session and `{id:uuid,action:"add"|"remove"|"up"|"down",expected_version:number}`. Add accepts only a saved non-demo pending item and appends; remove retains the media; up/down swap adjacent queue positions across kinds. Repeated add/remove and boundary moves are idempotent. Effective mutations increment a singleton version. Missing/invalid input is 400, missing add target 404, missing owner session 401. A stale version is 409 `{code:"up_next_conflict",error,up_next:{version,ids}}` with no mutation. The UI acknowledges successful state and refreshes stale state without discarding drafts.
+
+The singleton is locked before media rows. Capture takes its token/URL gates before the queue; no other queue writer takes those gates. Every application completion/deletion writer removes membership and bumps version in its transaction, including browser Done and development fixture deletion. Returning to unfinished never adds membership. Status Undo explicitly explains that it restores unfinished status without restoring priority, and checks the acknowledged status before applying. No background source, duplicate capture, Discover save or integration can add to this queue.
+
+The owner view preserves mixed manual order and has a single artwork/list presentation. Native labeled Up/Down/Remove buttons support pointer and keyboard; moving keeps selection, removing selects the nearest remaining visible row. Reordering is disabled under any search/type/tag/channel filter with an explanation and Clear filters action. A filtered-empty shortlist differs from an initially empty shortlist, which offers Browse library. Library keeps its secondary layout choices.

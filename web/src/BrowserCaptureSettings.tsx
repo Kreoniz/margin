@@ -149,7 +149,7 @@ export function BrowserCaptureSettings({ onBusyChange }: { onBusyChange: (busy: 
           in its Settings. Open capture from the toolbar or its browser
           shortcut, then press S to save or D to mark done. Its Shortcuts button
           shows your browser assignments, including optional direct Save and
-          Done commands. New captures appear under To review.
+          Done commands. New captures appear in Library. Choose unfinished items for Up next in Margin.
         </p>
         {error && (
           <p role="alert" className="notice error">

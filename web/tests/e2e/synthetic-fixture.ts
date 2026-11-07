@@ -18,6 +18,9 @@ export async function fixture(page: Page, customMedia?: Media[]) {
   let inboxGate = Promise.resolve();
   let releaseImage = () => {};
   let imageGate = Promise.resolve();
+  let queue = { version: 0, ids: [] as string[] };
+  let queueFailure = false;
+  let queueConflict = false;
   let bootstrapFailure = false;
   let inboxFailure = false;
   let cursorFailure = false;
@@ -54,11 +57,31 @@ export async function fixture(page: Page, customMedia?: Media[]) {
       return route.fulfill({ contentType: "image/svg+xml", body: artwork });
     }
     if (url.origin !== "http://margin.test") return route.abort();
+    if (url.pathname === "/api/integration/agent-grants") return route.fulfill({ json: [] });
     if (url.pathname === "/api/session") return route.fulfill({ json: { authenticated: true, setup_required: false } });
     if (url.pathname === "/api/bootstrap") {
       requests.bootstrap++;
       const counts = Object.fromEntries(["new", "saved", "read", "dismissed"].map(state => [state, inbox.filter(item => item.state === state).length]));
-      return bootstrapFailure ? route.fulfill({ status: 503, json: { error: "Synthetic bootstrap unavailable" } }) : route.fulfill({ json: { media, inbox: [], sources, inbox_counts: counts, legacy_sample_count: 0 } });
+      return bootstrapFailure ? route.fulfill({ status: 503, json: { error: "Synthetic bootstrap unavailable" } }) : route.fulfill({ json: { up_next: queue, media, inbox: [], sources, inbox_counts: counts, legacy_sample_count: 0 } });
+    }
+    if (url.pathname === "/api/up-next") {
+      if (route.request().method() === "GET") return route.fulfill({ json: queue });
+      const body = route.request().postDataJSON();
+      if (queueFailure) return route.fulfill({ status: 503, json: { error: "Synthetic queue unavailable" } });
+      if (queueConflict || body.expected_version !== queue.version) {
+        queueConflict = false;
+        queue = { ...queue, version: queue.version + 1, ids: [...queue.ids].reverse() };
+        return route.fulfill({ status: 409, json: { error: "Up next changed in another tab. The latest order is shown; try again.", code: "up_next_conflict", up_next: queue } });
+      }
+      const index = queue.ids.indexOf(body.id);
+      if (body.action === "add" && index < 0) queue.ids.push(body.id);
+      if (body.action === "remove" && index >= 0) queue.ids.splice(index, 1);
+      if (["up", "down"].includes(body.action)) {
+        const next = index + (body.action === "up" ? -1 : 1);
+        if (index >= 0 && next >= 0 && next < queue.ids.length) [queue.ids[index], queue.ids[next]] = [queue.ids[next], queue.ids[index]];
+      }
+      queue.version++;
+      return route.fulfill({ json: queue });
     }
     if (url.pathname === "/api/sources") {
       requests.sourceCreates++;
@@ -101,7 +124,7 @@ export async function fixture(page: Page, customMedia?: Media[]) {
       await inboxWriteGate;
       const item = inbox.find(item => url.pathname === `/api/inbox/${item.id}/save`)!;
       item.state = "saved";
-      const saved = { ...media[0], id: "saved-" + item.id, kind: "article", title: item.title, url: item.url, cover_url: item.cover_url, author: item.author, description: item.description, notes: "", tags: [], visibility: "private", needs_review: true };
+      const saved = { ...media[0], id: "saved-" + item.id, kind: "article", title: item.title, url: item.url, cover_url: item.cover_url, author: item.author, description: item.description, notes: "", tags: [], visibility: "private", needs_review: false };
       media.push(saved);
       requests.inboxCommits++;
       await inboxAckGate;
@@ -120,7 +143,8 @@ export async function fixture(page: Page, customMedia?: Media[]) {
     if (url.pathname.startsWith("/api/media/") && route.request().method() === "DELETE") {
       requests.mediaDeletes++;
       if (deleteFailure) return route.fulfill({ status: 503, json: { error: "Synthetic removal unavailable" } });
-      media.splice(media.findIndex(item => url.pathname.endsWith(item.id)), 1);
+      const removed = media.splice(media.findIndex(item => url.pathname.endsWith(item.id)), 1)[0];
+      if (queue.ids.includes(removed.id)) queue = { version: queue.version + 1, ids: queue.ids.filter(id => id !== removed.id) };
       return route.fulfill({ status: 204 });
     }
     if (url.pathname.startsWith("/api/media/") && route.request().method() === "PATCH") {
@@ -132,6 +156,7 @@ export async function fixture(page: Page, customMedia?: Media[]) {
       const item = media.find(item => url.pathname.endsWith(item.id))!;
       const body = route.request().postDataJSON();
       for (const key of Object.keys(item)) if (key in body) Object.assign(item, { [key]: body[key] });
+      if (item.status === "done" && queue.ids.includes(item.id)) queue = { version: queue.version + 1, ids: queue.ids.filter(id => id !== item.id) };
       return route.fulfill({ json: item });
     }
     if (url.pathname === "/api/media" && route.request().method() === "POST") {
@@ -151,6 +176,9 @@ export async function fixture(page: Page, customMedia?: Media[]) {
   });
   return {
     requests,
+    queue(ids: string[]) { queue = { version: queue.version + 1, ids: [...ids] }; },
+    failQueue(value = true) { queueFailure = value; },
+    conflictQueue() { queueConflict = true; },
     review(id: string) { media.find(item => item.id === id)!.needs_review = true; },
     kind(id: string, kind: string) { media.find(item => item.id === id)!.kind = kind as Media["kind"]; },
     enrichMedia(id: string, values: Partial<Pick<Media, "title" | "description" | "cover_url" | "author" | "metadata_state">>) { Object.assign(media.find(item => item.id === id)!, values); },

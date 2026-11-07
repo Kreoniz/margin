@@ -24,7 +24,7 @@ test("terminal exit boundary rejects natural browser-token activation after Esca
     configured = true;
     return route.fulfill({ json: { token: "SYNTHETIC-POST-REVIEW-VALUE-ONLY" } });
   });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.clock.install();
   const origin = page.getByRole("button", { name: "Settings", exact: true });
   const settings = page.locator(".settings-modal");
@@ -73,7 +73,7 @@ test("terminal exit boundary cancels native removal and programmatic Keep it whi
     if (route.request().method() === "DELETE") { deletes++; await gate; }
     return route.fallback();
   });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.clock.install();
   const origin = page.getByRole("button", { name: "Remove A landscape video", exact: true });
   const remove = page.locator(".app-modal").filter({ hasText: "Remove from library?" });
@@ -111,7 +111,7 @@ test("terminal exit boundary cancels native removal and programmatic Keep it whi
 test("terminal exit boundary prevents native Sources form submission after Escape or header dismissal", async ({ page }) => {
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.clock.install();
   const origin = page.getByRole("button", { name: "Sources", exact: true });
   const sources = page.locator(".sources-modal");
@@ -140,7 +140,7 @@ test("terminal exit boundary prevents native Sources form submission after Escap
 test("terminal exit boundary preserves nested keyboard-help focus and leaves the containing Settings interactive", async ({ page }) => {
   await fixture(page);
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("http://margin.test/dashboard");
+  await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   const origin = page.getByRole("button", { name: "Settings", exact: true });
   await origin.click();
   const settings = page.locator(".settings-modal"), help = page.locator(".keyboard-help");

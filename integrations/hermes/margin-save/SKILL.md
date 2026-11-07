@@ -13,7 +13,7 @@ required_environment_variables:
 
 # Save to Margin
 
-Use when the user asks to save a link, book, video, or other title in Margin, including from Telegram. Saving through this skill always creates private, pending items for review. It cannot search, read, edit, complete, delete, or publish library items.
+Use when the user asks to save a link, book, video, or other title in Margin, including from Telegram. Saving through this skill always creates private, pending saved items. It cannot search, read, edit, complete, delete, or publish library items.
 
 Run the bundled `scripts/save.py` through the terminal tool, using the skill directory supplied by `skill_view`. Python 3 standard library only; no package installation. Secrets come from the declared environment variables. Do not read or print their values, put them in commands, or request them in messaging chats. If setup is missing, direct the user to local Hermes CLI setup for this skill.
 

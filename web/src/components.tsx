@@ -281,7 +281,7 @@ export function EmptyState({
         {filtered
           ? "Nothing matches yet."
           : heading ? heading : review
-            ? "All captures reviewed."
+            ? "Nothing needs attention."
             : discovery
               ? "You’re all caught up."
               : done
@@ -292,7 +292,7 @@ export function EmptyState({
         {filtered
           ? "Try another search or clear your filters."
           : description ? description : review
-            ? "New captures from the extension, integrations, and automatic saves will appear here. Reviewing keeps completion separate."
+            ? "Items flagged for checking appear here. Deliberate saves do not automatically require review, and reviewing does not mark an item done."
             : discovery
               ? "Your sources keep collecting in the background. Save the articles you want to come back to."
               : done
