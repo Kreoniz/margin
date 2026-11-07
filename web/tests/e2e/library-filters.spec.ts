@@ -15,7 +15,7 @@ const items = () => [
   make("done", { title: "A finished video", kind: "video", author: "Channel One", url: "https://youtu.be/BBBBBBBBBBB", status: "done" }),
 ];
 async function open(page: Page, group: string) {
-  await page.getByRole("button", { name: `Filter ${group}`, exact: true }).click();
+  await page.locator(`#library-filter-${group}`).click();
   return page.locator(".library-filter-panel");
 }
 async function close(page: Page) { await page.locator(".library-filter-panel").getByRole("button", { name: "Done", exact: true }).click(); }
@@ -32,7 +32,7 @@ test("types and tags compose with OR inside each group and retain selections acr
   await panel.getByRole("checkbox", { name: "Video", exact: true }).check();
   await expect(rows(page)).toHaveCount(3);
   await close(page);
-  await expect(page.getByRole("button", { name: "Filter types", exact: true })).toBeFocused();
+  await expect(page.locator("#library-filter-types")).toBeFocused();
   panel = await open(page, "tags");
   await panel.getByRole("checkbox", { name: "Design", exact: true }).check();
   await expect(rows(page)).toHaveCount(1);
@@ -48,7 +48,7 @@ test("types and tags compose with OR inside each group and retain selections acr
   await expect(page.locator(".media-list")).toHaveAttribute("data-layout", "shelves");
   await page.getByRole("button", { name: "Remove tag filter Code", exact: true }).click();
   await expect(rows(page)).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "Filter tags", exact: true })).toBeFocused();
+  await expect(page.locator("#library-filter-tags")).toBeFocused();
   await page.getByRole("button", { name: "Clear selections", exact: true }).click();
   await expect(rows(page)).toHaveCount(4);
   await expect(page.getByRole("searchbox", { name: "Search library", exact: true })).toBeFocused();
@@ -67,7 +67,7 @@ test("filter shortcuts focus searchable multi-selects and leave typing and statu
     await expect(search).toHaveValue("hlggvlfc");
     await expect(page.locator(".media-list")).toHaveAttribute("data-layout", "split");
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("button", { name: `Filter ${group}`, exact: true })).toBeFocused();
+    await expect(page.locator(`#library-filter-${group}`)).toBeFocused();
   }
   const search = page.getByRole("searchbox", { name: "Search library", exact: true });
   await search.fill("vlfc");

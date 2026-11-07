@@ -24,6 +24,14 @@ test("default empty shortlist invites explicit library choices, saves mixed orde
   const art = rows(page).filter({ hasText: "Chosen book" }).locator(".mini-cover img").first();
   await expect(art).toBeVisible();
   await expect(art).toHaveCSS("object-fit", "contain");
+  // Artwork must remain alongside the title, not flow below the action row.
+  const book = rows(page).filter({ hasText: "Chosen book" });
+  const artwork = await art.boundingBox();
+  const content = await book.locator(".row-content").boundingBox();
+  expect(artwork!.y).toBeLessThan(content!.y + content!.height);
+  expect(content!.y).toBeLessThan(artwork!.y + artwork!.height);
+  await expect(page.locator("#library-filter-types")).toHaveAccessibleName("All types, filter types");
+  await expect(page.locator("#library-filter-tags")).toHaveAccessibleName("All tags, filter tags");
   await page.reload();
   await expect(rows(page).locator(".item-title")).toHaveText(["Chosen game", "Chosen book", "Chosen video"]);
 });

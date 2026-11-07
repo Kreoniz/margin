@@ -68,7 +68,7 @@ test("select menus and keyboard tooltips keep opening and closing transitions", 
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).waitFor();
-  const selectOpen = await motion(page, ".library-filter-panel", '[aria-label="Filter types"]');
+  const selectOpen = await motion(page, ".library-filter-panel", '#library-filter-types');
   expect(selectOpen.some(value => value > 0 && value < 1)).toBe(true);
   const selectClose = await motion(page, ".library-filter-panel", ".library-filter-panel", true);
   expect(selectClose.some(value => value > 0 && value < 1)).toBe(true);

@@ -849,10 +849,7 @@ test("Vim keys leave typing, widgets and dialogs alone and follow the shortcut p
   await expect(search).toHaveValue("hlggHL");
   await expect(search).toBeFocused();
   await search.fill("");
-  const type = page.getByRole("button", {
-    name: "Filter types",
-    exact: true,
-  });
+  const type = page.locator("#library-filter-types");
   await type.click();
   await page.keyboard.press("[");
   await page.keyboard.press("]");

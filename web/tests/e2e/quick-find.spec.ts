@@ -37,7 +37,7 @@ async function setup(page: Page, media = items()) {
   return controls;
 }
 async function selectFilter(page: Page, group: string, label: string) {
-  await page.getByRole("button", { name: `Filter ${group}`, exact: true }).click();
+  await page.locator(`#library-filter-${group}`).click();
   await page.locator(".library-filter-panel").getByRole("checkbox", { name: label, exact: true }).check();
   await page.locator(".library-filter-panel").getByRole("button", { name: "Done", exact: true }).click();
 }

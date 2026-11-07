@@ -21,10 +21,11 @@ export function FilterPicker({ id, label, values, options, open, onOpenChange, o
   const search = useRef<HTMLInputElement>(null);
   useEffect(() => { if (!open) setQuery(""); }, [open]);
   const visible = options.filter(option => option.label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+  const triggerLabel = values.length ? `${label} (${values.length})` : id === "channels" ? label : `All ${id}`;
   return (
     <Popover.Root open={open} onOpenChange={onOpenChange}>
-      <Popover.Trigger render={<Button id={"library-filter-" + id} variant="secondary" className="library-filter-trigger" aria-label={"Filter " + id} />}>
-        {values.length ? `${label} (${values.length})` : id === "channels" ? label : `All ${id}`}
+      <Popover.Trigger render={<Button id={"library-filter-" + id} variant="secondary" className="library-filter-trigger" aria-label={`${triggerLabel}, filter ${id}`} />}>
+        {triggerLabel}
         <Icon name="chevron" size={14} />
       </Popover.Trigger>
       <Popover.Content className="library-filter-panel" initialFocus={search} positionerProps={{ align: "end" }}>
