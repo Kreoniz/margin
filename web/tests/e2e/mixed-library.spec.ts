@@ -23,15 +23,15 @@ const view = (page: Page, label: string) => page.getByRole("button", { name: `${
 test("three Library views preserve global filters and preference, and migrate the gallery preference", async ({ page }) => {
   await fixture(page, content()); await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
-  await expect(view(page, "Side by side")).toHaveAttribute("aria-pressed", "true");
-  for (const label of ["Shelves", "List", "Side by side"]) {
+  await expect(view(page, "Mixed")).toHaveAttribute("aria-pressed", "true");
+  for (const label of ["Shelves", "List", "Mixed"]) {
     await view(page, label).click();
     await page.getByRole("searchbox", { name: "Search library", exact: true }).fill("Refactoring");
     await expect(page.locator(".media-row")).toHaveCount(1); await expect(row(page, 2)).toBeVisible();
     await page.getByRole("searchbox", { name: "Search library", exact: true }).fill("");
   }
   await page.locator(".list-tabs").getByRole("button", { name: "Needs attention (2)", exact: true }).click();
-  for (const label of ["Shelves", "List", "Side by side"]) {
+  for (const label of ["Shelves", "List", "Mixed"]) {
     await view(page, label).click(); await expect(page.locator(".media-row")).toHaveCount(2);
   }
   await view(page, "Shelves").click(); await page.reload();
@@ -54,7 +54,7 @@ test("mixed layouts contain full titles, artwork and 44px controls across widths
     await page.addInitScript(theme => localStorage.setItem("margin-theme", theme), theme);
     await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`); await expect(row(page, 0)).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
-    for (const label of ["Side by side", "Shelves", "List"]) {
+    for (const label of ["Mixed", "Shelves", "List"]) {
       await view(page, label).click();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
       const geometry = await page.locator(".media-row").evaluateAll(rows => rows.map(el => {
@@ -71,7 +71,7 @@ test("mixed layouts contain full titles, artwork and 44px controls across widths
         if (Math.abs(cards[0].y-cards[1].y)<1) expect(cards[0].height).toBe(cards[1].height);
         expect(geometry.find(item=>item.id==="mixed-1")!.height).toBeLessThan(250);
         const placement=await page.locator(".library-reading").evaluate(el=>{const r=el.getBoundingClientRect(),v=document.querySelector(".library-visuals")!.getBoundingClientRect();return {right:r.x>=v.right,below:r.y>=v.bottom};});
-        if (label==="Side by side" && width>=1000) expect(placement.right).toBe(true); else expect(placement.below).toBe(true);
+        if (label==="Mixed" && width>=1000) expect(placement.right).toBe(true); else expect(placement.below).toBe(true);
       }
       if ((width===390 || width===1440) && label!=="List") {
         await page.evaluate(()=>scrollTo(0,0)); await page.screenshot({ path:`../.local/current-refinement/captures/${label.replaceAll(" ","-")}-${theme}-${width}-${info.project.name}.png`,fullPage:true,animations:"disabled" });
@@ -97,7 +97,7 @@ test("Vim follows the grid, status keys stay separate, and view shortcuts preser
   await page.keyboard.press("h"); await expect(row(page,0)).toBeFocused();
   await page.keyboard.press("]"); await expect(row(page,22)).toBeVisible();
   await page.keyboard.press("["); await expect(row(page,0)).toBeVisible();
-  await page.keyboard.press("v"); await page.keyboard.press("b"); await expect(view(page,"Side by side")).toHaveAttribute("aria-pressed","true");
+  await page.keyboard.press("v"); await page.keyboard.press("b"); await expect(view(page,"Mixed")).toHaveAttribute("aria-pressed","true");
   const splitColumns = await row(page,0).evaluate(el => { const top=el.getBoundingClientRect().top; return [...el.parentElement!.children].filter(c=>Math.abs(c.getBoundingClientRect().top-top)<1).length; });
   expect(splitColumns).toBe(3);
   await row(page,0).focus();
@@ -159,7 +159,7 @@ test("top shortcuts and upward item navigation reveal the heading and filters wi
   await fixture(page, Array.from({length:24},(_,index)=>make(index,"video",{cover_url:"https://images.test/wide.svg"})));
   await page.emulateMedia({reducedMotion:"reduce"}); await page.setViewportSize({width:1440,height:800});
   await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`); await expect(row(page,0)).toBeVisible();
-  for (const label of ["Side by side","Shelves","List"]) {
+  for (const label of ["Mixed","Shelves","List"]) {
     await view(page,label).click();
     for (const shortcut of ["Home","Control+Home","gg"]) {
       await row(page,23).focus(); await page.evaluate(()=>scrollTo(0,document.body.scrollHeight));
@@ -203,7 +203,7 @@ test("reading rows share tags and actions, retain full touch targets and use str
     await page.setViewportSize({width,height:1000});
     await page.addInitScript(theme=>localStorage.setItem("margin-theme",theme),theme);
     await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`); await expect(row(page,20)).toBeVisible();
-    for (const label of ["Side by side","Shelves"]) {
+    for (const label of ["Mixed","Shelves"]) {
       await view(page,label).click();
       const readings=await page.locator(".library-reading-list .media-row").evaluateAll(rows=>rows.map(row=>{
         const r=row.getBoundingClientRect(),actions=row.querySelector(".row-controls")!.getBoundingClientRect();

@@ -1855,11 +1855,11 @@ test("action hints share one lazy popup across repeated rows and support hover, 
     await expect(hints).toHaveCount(1);
     await expect(hints).toContainText("Edit item");
     await expect(hints.locator("kbd")).toHaveText("e");
-    const remove = rows.first().getByRole("button", { name: /^Remove / });
-    await remove.hover();
+    const completion = rows.first().getByRole("checkbox", { name: /^Mark done:/ });
+    await completion.hover();
     await page.waitForTimeout(200);
     expect(await hints.count()).toBe(0);
-    await expect(hints).toContainText("Remove from library");
+    await expect(hints).toContainText("Mark done");
     await page.mouse.move(0, 0);
     // Re-enter during closing instead of waiting for the floating DOM to leave.
     await page.waitForTimeout(100);

@@ -348,9 +348,10 @@ test("removal cancellation and success use animated close completion with useful
   const controls = await fixture(page);
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
-  const remove = page.getByRole("button", { name: "Remove A landscape video", exact: true });
+  const remove = page.locator('[data-row-id="video-1"]');
+  const openRemoval = async () => { await remove.locator(".priority-trigger").click(); await page.locator(".priority-panel").getByRole("button", { name: "Remove from library…", exact: true }).click(); };
   const modal = page.getByRole("dialog", { name: "Remove from library?", exact: true });
-  await remove.click();
+  await openRemoval();
   const keep = page.getByRole("button", { name: "Keep it", exact: true });
   await keep.evaluate(element => { element.id = "keep-motion-trigger"; });
   // Wait for entry to finish before measuring exit.
@@ -359,11 +360,11 @@ test("removal cancellation and success use animated close completion with useful
   expect(cancellation.some(value => value > 0 && value < 1)).toBe(true);
   await expect(modal).toHaveCount(0);
   await expect(remove).toBeFocused();
-  await remove.click();
+  await openRemoval();
   await expect.poll(() => modal.evaluate(element => getComputedStyle(element).opacity)).toBe("1");
   controls.failDelete();
   await page.getByRole("button", { name: "Remove item", exact: true }).click();
-  await expect(page.getByText("Synthetic removal unavailable", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Synthetic removal unavailable", exact: true })).toBeVisible();
   await expect(modal).toBeVisible();
   controls.failDelete(false);
   await page.getByRole("button", { name: "Remove item", exact: true }).evaluate(element => { element.id = "remove-motion-trigger"; });
@@ -373,7 +374,8 @@ test("removal cancellation and success use animated close completion with useful
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-row-id]")?.getAttribute("data-row-id") || document.activeElement?.id)).toMatch(/^(content|video-[234])$/);
   await expect(remove).toHaveCount(0);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.getByRole("button", { name: "Remove An unavailable preview", exact: true }).click();
+  await page.getByRole("button", { name: "Up next: An unavailable preview", exact: true }).click();
+  await page.locator(".priority-panel").getByRole("button", { name: "Remove from library…", exact: true }).click();
   await page.getByRole("button", { name: "Keep it", exact: true }).click();
   await expect(modal).toHaveCount(0);
 });
@@ -388,7 +390,7 @@ test("rounded status and main navigation selections keep every button and neighb
   const measure = (selector: string) => page.locator(selector).evaluateAll(elements => elements.map(element => {
     const box = element.getBoundingClientRect();
     const style = getComputedStyle(element);
-    return { x: box.x, y: box.y, width: box.width, height: box.height, weight: style.fontWeight, radius: parseFloat(style.borderTopLeftRadius) };
+    return { x: box.x + (element.closest(".list-tabs")?.scrollLeft || 0), y: box.y, width: box.width, height: box.height, weight: style.fontWeight, radius: parseFloat(style.borderTopLeftRadius) };
   }));
   const frames = (selector: string) => page.evaluate(async selector => {
     const samples = [];
@@ -397,16 +399,16 @@ test("rounded status and main navigation selections keep every button and neighb
       samples.push([...document.querySelectorAll(selector)].map(element => {
         const box = element.getBoundingClientRect();
         const style = getComputedStyle(element);
-        return { x: box.x, y: box.y, width: box.width, height: box.height, weight: style.fontWeight, radius: parseFloat(style.borderTopLeftRadius) };
+        return { x: box.x + (element.closest(".list-tabs")?.scrollLeft || 0), y: box.y, width: box.width, height: box.height, weight: style.fontWeight, radius: parseFloat(style.borderTopLeftRadius) };
       }));
     }
     return samples;
   }, selector);
   const navBaseline = await measure(".main-nav > button");
   expect(navBaseline.every(button => button.radius > 0)).toBe(true);
-  for (const view of [1, 2]) {
-    await page.locator(".main-nav > button").nth(view).click();
-    await expect(page.locator(".main-nav > button").nth(view)).toHaveAttribute("aria-current", "page");
+  for (const view of ["Library", "Discover"]) {
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: new RegExp("^" + view) }).click();
+    await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: new RegExp("^" + view) })).toHaveAttribute("aria-current", "page");
     const baseline = await measure(".list-tabs > button");
     expect(baseline.every(button => button.radius > 0 && button.weight === "400")).toBe(true);
     for (let index = 0; index < baseline.length; index++) {
@@ -423,9 +425,9 @@ test("rounded status and main navigation selections keep every button and neighb
       expect(focus.radius).toBeGreaterThan(0);
     }
   }
-  for (const view of [1, 2, 1]) {
-    await page.locator(".main-nav > button").nth(view).click();
-    await expect(page.locator(".main-nav > button").nth(view)).toHaveAttribute("aria-current", "page");
+  for (const view of ["Library", "Discover", "Library"]) {
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: new RegExp("^" + view) }).click();
+    await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: new RegExp("^" + view) })).toHaveAttribute("aria-current", "page");
     for (const sample of await frames(".main-nav > button")) expect(sample).toEqual(navBaseline);
   }
   await page.keyboard.press("Tab");
@@ -796,7 +798,7 @@ test("Tab shows one Library title indicator and retains independent control focu
   expect(await row.evaluate(element => getComputedStyle(element).outlineStyle)).toBe("none");
   expect(await title.evaluate(element => getComputedStyle(element, "::after").outlineStyle)).toBe("none");
   await page.keyboard.press("Tab");
-  await expect(row.getByRole("button", { name: "Remove A landscape video", exact: true })).toBeFocused();
+  await expect(row.getByRole("button", { name: "Up next: A landscape video", exact: true })).toBeFocused();
   await page.getByRole("searchbox", { name: "Search library" }).focus();
   expect(await row.evaluate(element => getComputedStyle(element).outlineStyle)).toBe("none");
   await expect(page.locator('.media-row[data-keyboard-active="true"]')).toHaveCount(0);

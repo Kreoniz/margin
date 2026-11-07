@@ -149,7 +149,7 @@ test("illustrated rows preserve native Tab order, distinct review, shortcuts and
   await page.keyboard.press("Tab");
   await expect(first.getByRole("button", { name: "Edit A wide idea worth watching", exact: true })).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(first.getByRole("button", { name: "Remove A wide idea worth watching", exact: true })).toBeFocused();
+  await expect(first.getByRole("button", { name: "Up next: A wide idea worth watching", exact: true })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(first.getByRole("button", { name: "Edit A wide idea worth watching", exact: true })).toBeFocused();
   await first.focus();

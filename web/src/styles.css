@@ -1860,56 +1860,21 @@
   }
 }
 
-/* Up next has one mixed, ordered presentation with persistent native controls. */
+/* Priority shares the Library layouts and opens controls only on demand. */
 @layer components {
-  .queue-guidance {
-    @apply mb-5 flex flex-wrap items-center justify-between gap-2 text-sm text-u-muted;
-  }
-  .queue-empty {
-    @apply mx-auto flex max-w-lg flex-col items-center gap-4 py-16 text-center;
-  }
-  .queue-empty h2 { @apply text-xl; }
-  .queue-empty p { @apply text-sm leading-6 text-u-muted; }
-  .queue-controls { @apply flex flex-wrap gap-1; }
-  .queue-controls button, .queue-add {
-    @apply relative z-2 inline-flex min-h-11 items-center justify-center gap-1 rounded-md border border-solid border-u-soft bg-u-surface px-2 text-xs text-u-muted;
-  }
-  .queue-controls button:not(:disabled):hover, .queue-add:not(:disabled):hover { @apply bg-u-well text-u-accent-text; }
-  .queue-controls button:disabled, .queue-add:disabled { @apply cursor-default opacity-45; }
-  .queue-controls button:focus-visible, .queue-add:focus-visible { @apply outline-2 outline-offset-2 outline-u-focus; }
-  .owner-shell [data-up-next] .media-row {
-    @apply grid-cols-[24px_144px_minmax(0,1fr)_228px] gap-4 py-5;
-    --library-art-width: 144px;
-    --library-art-height: 104px;
-  }
-  .owner-shell [data-up-next] .queue-position { @apply col-start-1 row-start-1 self-start pt-2 text-sm text-u-muted; font-variant-numeric: tabular-nums; }
-  .owner-shell [data-up-next] .library-art { @apply col-start-2 row-start-1 row-span-1; }
-  .owner-shell [data-up-next] .media-row > .row-content { @apply col-start-3 row-start-1; }
-  .owner-shell [data-up-next] .row-controls { @apply col-start-4 row-start-1 w-full flex-wrap justify-start gap-1; }
-  .owner-shell [data-up-next] .queue-controls { @apply w-full; }
-  .owner-shell [data-up-next] .gallery-description { @apply line-clamp-2; }
-  .owner-shell [data-up-next] .gallery-art-fallback { @apply hidden; }
-  .owner-shell [data-library-layout="list"]:not([data-up-next]) .row-controls { @apply flex-wrap; }
-  .owner-shell [data-library-layout="list"] .queue-add { @apply w-full; }
-  @media (max-width: 700px) {
-    .main-nav { @apply gap-0; }
-    .main-nav > button, .main-nav button { @apply px-2 text-xs; }
-    .owner-shell [data-up-next] .media-row {
-      @apply grid-cols-[18px_80px_minmax(0,1fr)] gap-x-3 gap-y-2;
-      --library-art-width: 80px;
-      --library-art-height: 88px;
-    }
-    .owner-shell [data-up-next] .row-controls { @apply col-start-2 col-end-4 row-start-2; }
-    .owner-shell [data-up-next] .queue-controls { @apply w-auto; }
-    .owner-shell [data-up-next] .item-meta { @apply text-xs; }
-  }
-}
-@layer components {
-  .owner-shell .media-row .item-meta > .queue-add { @apply w-auto shrink-0; }
-  @media (max-width: 560px) {
-    .owner-shell .header-inner { @apply h-auto flex-wrap gap-y-1 py-2; }
-    .owner-shell .main-nav { @apply order-3 w-full justify-between; }
-    .owner-shell .main-nav > button { @apply min-h-11 px-3; }
-    .owner-shell :is(.media-row, .article-row) { scroll-margin-top: 116px; }
-  }
+  .priority-membership { @apply whitespace-nowrap text-u-accent-text; }
+  .priority-add-label { @apply inline-flex items-center gap-0.5 text-[10px]; }
+  .priority-trigger[data-queued] { @apply text-xs font-medium text-u-accent-text; font-variant-numeric: tabular-nums; }
+  .priority-panel { @apply z-30 flex w-72 max-w-[calc(100vw-24px)] flex-col gap-1 p-3; }
+  .priority-panel-heading { @apply flex items-center justify-between gap-2; }
+  .priority-panel-heading > h2 { @apply text-sm font-medium; }
+  .priority-panel-heading > button { @apply size-11 min-h-11 min-w-11; }
+  .priority-panel > p { @apply mb-2 text-xs leading-5 text-u-muted; }
+  .priority-panel > button { @apply min-h-11 justify-start text-left; }
+  .priority-panel > .priority-delete { @apply mt-2 border-t border-solid border-u-soft text-u-muted; }
+  .priority-context { @apply mb-2 leading-5; }
+  .priority-empty { @apply flex flex-col items-start gap-2 py-6; }
+  .priority-empty h2 { @apply text-sm font-medium; }
+  .priority-empty p { @apply text-xs text-u-muted; }
+  .priority-empty > button { @apply mt-1 min-h-11; }
 }

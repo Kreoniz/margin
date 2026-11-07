@@ -61,14 +61,14 @@ test("invalid or unavailable browser storage leaves both layouts usable", async 
   await fixture(page, mixed());
   await page.addInitScript(() => { try { localStorage.setItem("margin-library-layout", "masonry"); } catch { /* Later navigation also probes unavailable storage. */ } });
   await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
-  await expect(page.getByRole("button", { name: "Side by side view", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Mixed view", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.addInitScript(() => {
     const originalGet = Storage.prototype.getItem, originalSet = Storage.prototype.setItem;
     Storage.prototype.getItem = function(key) { if (key === "margin-library-layout") throw new DOMException("Storage unavailable", "SecurityError"); return originalGet.call(this, key); };
     Storage.prototype.setItem = function(key, value) { if (key === "margin-library-layout") throw new DOMException("Storage unavailable", "SecurityError"); return originalSet.call(this, key, value); };
   });
   await page.reload();
-  await expect(page.getByRole("button", { name: "Side by side view", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Mixed view", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "List view", exact: true }).click();
   await expect(page.locator(".media-list")).toHaveAttribute("data-layout", "list");
   await page.getByRole("button", { name: "Shelves view", exact: true }).click();

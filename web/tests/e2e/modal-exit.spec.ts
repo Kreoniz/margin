@@ -75,9 +75,9 @@ test("terminal exit boundary cancels native removal and programmatic Keep it whi
   });
   await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await page.clock.install();
-  const origin = page.getByRole("button", { name: "Remove A landscape video", exact: true });
+  const origin = page.locator('[data-row-id="video-1"]');
   const remove = page.locator(".app-modal").filter({ hasText: "Remove from library?" });
-  const open = async () => { await origin.click(); await expect(remove.getByRole("button", { name: "Keep it", exact: true })).toBeFocused(); await page.waitForTimeout(220); };
+  const open = async () => { await origin.locator(".priority-trigger").click(); await page.locator(".priority-panel").getByRole("button", { name: "Remove from library…", exact: true }).click(); await expect(remove.getByRole("button", { name: "Keep it", exact: true })).toBeFocused(); await page.waitForTimeout(220); };
   await open(); await page.keyboard.press("Tab");
   await expect(remove.getByRole("button", { name: "Remove item", exact: true })).toBeFocused();
   await holdExit(page);

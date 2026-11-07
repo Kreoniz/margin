@@ -9,6 +9,7 @@ import { Button } from "unlikely-ui/button";
 import { Checkbox } from "unlikely-ui/checkbox";
 import { Input } from "unlikely-ui/input";
 import { Toast } from "unlikely-ui/toast";
+import { Popover } from "unlikely-ui/popover";
 import { Collection } from "./Collection";
 import { Access } from "./Access";
 import { api, ApiError, send } from "./api";
@@ -38,7 +39,7 @@ import { QuickFind } from "./QuickFind";
 
 type LibraryLayout = "split" | "shelves" | "list";
 const libraryViews = [
-  { value: "split", label: "Side by side", icon: "columns", shortcut: "v then b" },
+  { value: "split", label: "Mixed", icon: "columns", shortcut: "v then b" },
   { value: "shelves", label: "Shelves", icon: "grid", shortcut: "v then s" },
   { value: "list", label: "List", icon: "list", shortcut: "v then l" },
 ] as const;
@@ -152,8 +153,8 @@ function Owner({
   const inboxCounts = useRef<LibraryData["inbox_counts"] | undefined>(undefined);
   inboxCounts.current = data?.inbox_counts;
   const [error, setError] = useState("");
-  const [view, setView] = useState<"next" | "library" | "discover">(() =>
-    window.location.hash === "#discover" ? "discover" : window.location.hash === "#library" ? "library" : "next",
+  const [view, setView] = useState<"library" | "discover">(() =>
+    window.location.hash === "#discover" ? "discover" : "library",
   );
   const [libraryLayout, setLibraryLayout] = useState<LibraryLayout>(() => {
     try {
@@ -165,7 +166,7 @@ function Owner({
     try { localStorage.setItem("margin-library-layout", libraryLayout); }
     catch { /* The layout remains usable when browser storage is unavailable. */ }
   }, [libraryLayout]);
-  const layout = view === "next" ? "list" : libraryLayout;
+  const layout = libraryLayout;
   const [announcement, setAnnouncement] = useState("");
   const [libraryQuery, setLibraryQuery] = useState("");
   const [discoveryQuery, setDiscoveryQuery] = useState("");
@@ -175,7 +176,8 @@ function Owner({
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [channelFilters, setChannelFilters] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState<LibraryFilter>();
-  const [status, setStatus] = useState("pending");
+  const [status, setStatus] = useState(() => window.location.hash === "#next" ? "next" : "pending");
+  const [queueOpen, setQueueOpen] = useState<string>();
   const [inboxState, setInboxState] = useState("new");
   const [source, setSource] = useState("all");
   const [libraryLimit, setLibraryLimit] = useState(40);
@@ -247,7 +249,11 @@ function Owner({
   }, [refresh, view, sourcesOpen, hasPendingMetadata]);
   useEffect(() => {
     const change = () => {
-      setView(window.location.hash === "#discover" ? "discover" : window.location.hash === "#library" ? "library" : "next");
+      setView(window.location.hash === "#discover" ? "discover" : "library");
+      if (window.location.hash === "#next") setStatus("next");
+      else if (window.location.hash === "#library") setStatus(current => current === "next" ? "pending" : current);
+      else if (window.location.hash !== "#discover") setStatus("pending");
+      setQueueOpen(undefined);
       setFilterOpen(undefined);
     };
     window.addEventListener("hashchange", change);
@@ -257,9 +263,9 @@ function Owner({
   useEffect(() => { setDiscoveryLimit(40); pendingShowMore.current = undefined; }, [discoveryQuery, inboxState, source]);
   useEffect(() => {
     document.title =
-      (view === "next" ? "Up next" : view === "library" ? "Library" : "Discover") + " — Margin";
+      (view === "library" ? "Library" : "Discover") + " — Margin";
   }, [view]);
-  const shortcutsEnabled = !editor && !settings && !sourcesOpen && !helpOpen && !removeTarget && !filterOpen && !quickFindOpen && !pendingEditor;
+  const shortcutsEnabled = !editor && !settings && !sourcesOpen && !helpOpen && !removeTarget && !filterOpen && !queueOpen && !quickFindOpen && !pendingEditor;
   useHotkeys(
     [
       {
@@ -376,10 +382,11 @@ function Owner({
   const sources = data?.sources || [];
   const discoveryEmpty = discoveryEmptyState(sources, inboxState);
   const queue = data?.up_next || { version: 0, ids: [] };
-  const queueFiltered = Boolean(libraryQuery.trim() || kindFilters.length || tagFilters.length || channelFilters.length);
+  const queueSubset = status === "review" || (hideAutoAdded && status !== "next");
+  const queueFiltered = queueSubset || Boolean(libraryQuery.trim() || kindFilters.length || tagFilters.length || channelFilters.length);
   const filtered = useMemo(
     () =>
-      view === "next" ? selectUpNext(media, queue.ids, { query: libraryQuery, status: "pending", kinds: kindFilters, tags: tagFilters, channels: channelFilters }) : selectMedia(
+      status === "next" ? selectUpNext(media, queue.ids, { query: libraryQuery, status: "pending", kinds: kindFilters, tags: tagFilters, channels: channelFilters }) : selectMedia(
         status === "review" ? library.filter((item) => item.needs_review) : library,
         { query: libraryQuery, status: status === "review" ? "all" : status, kinds: kindFilters, tags: tagFilters, channels: channelFilters },
       ),
@@ -534,10 +541,19 @@ function Owner({
     }
   }
   function navigate(next: "next" | "library" | "discover") {
-    setView(next);
+    setView(next === "discover" ? "discover" : "library");
+    if (next === "next") setStatus("next");
+    else if (next === "library") setStatus(current => current === "next" ? "pending" : current);
+    setQueueOpen(undefined);
     window.location.hash = next;
     setFilterOpen(undefined);
     window.scrollTo({ top: 0, behavior: "instant" });
+  }
+  function changeStatus(next: string) {
+    setStatus(next);
+    // Up next remains a Library filter; keep the old deep link reloadable.
+    window.history.replaceState(null, "", next === "next" ? "#next" : "#library");
+    setQueueOpen(undefined);
   }
   function openQuickFind() {
     if (document.activeElement === document.body || document.activeElement === document.documentElement)
@@ -565,14 +581,13 @@ function Owner({
     setEditor(item);
   }
   function cycleStatus(direction: number) {
-    if (view === "next") return;
     const values =
       view !== "discover"
-        ? ["pending", "done", "review", "all"]
+        ? ["pending", "done", "next", "review", "all"]
         : ["new", "saved", "read", "dismissed"];
     const current = values.indexOf(view !== "discover" ? status : inboxState);
     const next = values[(current + direction + values.length) % values.length];
-    if (view !== "discover") setStatus(next);
+    if (view !== "discover") changeStatus(next);
     else setInboxState(next);
   }
   function acknowledgeMedia(item: Media) {
@@ -725,8 +740,9 @@ function Owner({
   }
   async function changeQueue(item: Media, action: "add" | "remove" | "up" | "down") {
     // Move focus to the stable row before a button disappears or hits a boundary.
-    const row = document.querySelector<HTMLElement>(`[data-row-id="${item.id}"]`);
-    if (row?.contains(document.activeElement)) row.focus({ preventScroll: true });
+    const row = document.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(item.id)}"]`);
+    if (row?.contains(document.activeElement) || document.activeElement?.closest(".priority-panel")) row?.focus({ preventScroll: true });
+    setQueueOpen(undefined);
     await perform("up-next", async () => {
       const updated = await api<UpNext>("/up-next", send("POST", { id: item.id, action, expected_version: queue.version }));
       setData(current => current ? { ...current, up_next: updated } : current);
@@ -739,7 +755,8 @@ function Owner({
     searchRef.current?.focus({ preventScroll: true });
   }
   function renderLibraryItem(item: Media) {
-    const compactReview = view !== "next" && layout !== "list";
+    const compactReview = layout !== "list";
+    const rank = queue.ids.indexOf(item.id) + 1;
     const reading = compactReview && ["article", "paper", "other"].includes(item.kind);
     const tags = (
       item.tags.length > 0 && <div className="item-tags">
@@ -759,11 +776,6 @@ function Owner({
     );
     const controls = (
       <div className="row-controls">
-        {view === "next" ? <div className="queue-controls" role="group" aria-label={"Up next controls for " + item.title}>
-          <button type="button" aria-label={"Move up: " + item.title} aria-describedby={queueFiltered ? "queue-filter-explanation" : undefined} disabled={queueFiltered || pending.has("up-next") || queue.ids.indexOf(item.id) === 0} onClick={() => void changeQueue(item, "up")}>↑<span>Up</span></button>
-          <button type="button" aria-label={"Move down: " + item.title} aria-describedby={queueFiltered ? "queue-filter-explanation" : undefined} disabled={queueFiltered || pending.has("up-next") || queue.ids.indexOf(item.id) === queue.ids.length - 1} onClick={() => void changeQueue(item, "down")}>↓<span>Down</span></button>
-          <button type="button" aria-label={"Remove from Up next: " + item.title} disabled={pending.has("up-next")} onClick={() => void changeQueue(item, "remove")}>Remove</button>
-        </div> : null}
 
           <ActionHint
             label={item.status === "done" ? "Move to read/watch" : "Mark done"}
@@ -795,9 +807,30 @@ function Owner({
             <Icon name="edit" size={16} />
           </Button>
         </ActionHint>
-        <ActionHint label="Remove from library" shortcut={singleKeys ? "d d" : undefined} context="Asks before removing">
+        {item.status === "pending" ? <Popover.Root open={queueOpen === item.id} onOpenChange={open => setQueueOpen(open ? item.id : undefined)}>
+          <Popover.Trigger render={<Button variant="ghost" size="icon" className="priority-trigger" data-queued={Boolean(rank) || undefined} aria-label={"Up next" + (rank ? ", position " + rank : "") + ": " + item.title} title="Up next actions" />}>
+            {rank ? <span aria-hidden="true">#{rank}</span> : <span className="priority-add-label" aria-hidden="true"><Icon name="plus" size={10} />Next</span>}
+          </Popover.Trigger>
+          <Popover.Content className="priority-panel" finalFocus={() => {
+            // Actions move focus to the stable row before closing; outside
+            // clicks keep their focus. Escape/Close restores the trigger.
+            const active = document.activeElement;
+            return active === document.body || active?.closest(".priority-panel") ? document.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(item.id)}"] .priority-trigger`) : false;
+          }} positionerProps={{ align: "end" }}>
+            <div className="priority-panel-heading"><Popover.Title>Up next</Popover.Title><Popover.Close render={<Button variant="ghost" size="icon" aria-label="Close Up next actions" />}><Icon name="close" size={16} /></Popover.Close></div>
+            <Popover.Description>{rank ? `Position ${rank} of ${queue.ids.length} across your library. Moves swap with the previous or next item, across all types.` : "Choose this item to read, watch, or play next."}</Popover.Description>
+            {rank ? <>
+              {queueFiltered && <p className="quiet">{queueSubset ? <>Open Up next with search and filters cleared to reorder. <button type="button" className="text-link" onClick={() => { clearQueueFilters(); navigate("next"); }}>Show Up next</button></> : "Clear search and filters to reorder."}</p>}
+              <Button variant="ghost" disabled={queueFiltered || pending.has("up-next") || rank === 1} onClick={() => void changeQueue(item, "up")}>Move earlier</Button>
+              <Button variant="ghost" disabled={queueFiltered || pending.has("up-next") || rank === queue.ids.length} onClick={() => void changeQueue(item, "down")}>Move later</Button>
+              <Button variant="ghost" disabled={pending.has("up-next")} onClick={() => void changeQueue(item, "remove")}>Remove from Up next</Button>
+            </> : <Button variant="secondary" disabled={pending.has("up-next")} onClick={() => void changeQueue(item, "add")}>Add to Up next</Button>}
+            <Button variant="ghost" className="priority-delete" onClick={() => { setQueueOpen(undefined); document.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(item.id)}"]`)?.focus({ preventScroll: true }); setRemoveTarget(item); }}>Remove from library…</Button>
+          </Popover.Content>
+        </Popover.Root> : <ActionHint label="Remove from library" shortcut={singleKeys ? "d d" : undefined} context="Asks before removing">
           <Button variant="ghost" size="icon" aria-label={"Remove " + item.title} onClick={() => setRemoveTarget(item)}><Icon name="trash" size={16} /></Button>
-        </ActionHint>
+        </ActionHint>}
+
         </div>
         </div>
     );
@@ -823,7 +856,6 @@ function Owner({
         data-textual={item.kind === "article" || item.kind === "paper" || item.kind === "other" || undefined}
         data-art-absent={!imageURL(item.cover_url) && item.metadata_state !== "pending" || undefined}
       >
-        {view === "next" && <span className="queue-position" aria-label={"Position " + (queue.ids.indexOf(item.id) + 1)}>{queue.ids.indexOf(item.id) + 1}</span>}
         <div className="library-art">
           <MiniCover kind={item.kind} url={item.cover_url} publisherURL={item.kind === "article" ? item.url : undefined} naturalArtwork={item.kind !== "article" && item.kind !== "paper" && item.kind !== "other"} />
           <span className="gallery-art-fallback" data-unavailable={item.metadata_state !== "pending" && Boolean(imageURL(item.cover_url)) || undefined} aria-hidden={item.metadata_state === "pending" || undefined}>{item.metadata_state === "pending" ? "Finding preview…" : imageURL(item.cover_url) ? "Preview unavailable" : "No preview"}</span>
@@ -854,7 +886,7 @@ function Owner({
                 <Icon name="globe" size={13} /> Public
               </span>
             )}
-            {view !== "next" && item.status === "pending" && <button type="button" className="queue-add" aria-label={"Add to Up next: " + item.title} disabled={queue.ids.includes(item.id) || pending.has("up-next")} onClick={() => void changeQueue(item, "add")}>{queue.ids.includes(item.id) ? "In Up next" : "+ Up next"}</button>}
+            {rank > 0 && <span className="priority-membership">Up next · #{rank}</span>}
           </div>
           {(item.kind === "article" || item.kind === "paper" || item.kind === "other") && item.description.trim() && (
             <p className="gallery-description">{item.description}</p>
@@ -944,12 +976,11 @@ function Owner({
           <button
             className="brand-button"
             aria-label="Margin library"
-            onClick={() => navigate("next")}
+            onClick={() => { setStatus("pending"); navigate("library"); }}
           >
             <Logo small />
           </button>
           <nav className="main-nav" aria-label="Main navigation">
-            <button aria-current={view === "next" ? "page" : undefined} onClick={() => navigate("next")}>Up next</button>
             <ActionHint
               label="Library"
               shortcut={singleKeys ? "g then l" : undefined}
@@ -1027,7 +1058,7 @@ function Owner({
           </div>
         </div>
       </header>
-      <main id="content" className={"content" + (view !== "discover" && media.length ? " library-populated" : "")} data-library-layout={view !== "discover" ? layout : undefined} data-up-next={view === "next" || undefined} tabIndex={-1}>
+      <main id="content" className={"content" + (view !== "discover" && media.length ? " library-populated" : "")} data-library-layout={view !== "discover" ? layout : undefined} tabIndex={-1}>
         {draftPending && !editor && <div className="notice flex flex-wrap items-center gap-2" role="region" aria-label="Unfinished draft">
           <span className="mr-auto">Unfinished draft{editorMemory.current?.item ? ": " + editorMemory.current.item.title : ""}</span>
           <Button variant="secondary" size="sm" onClick={resumeDraft}>Resume draft</Button>
@@ -1048,11 +1079,11 @@ function Owner({
         <div className={"page-heading" + (view !== "discover" && media.length ? " library-heading-populated" : "")} key={view}>
           <div>
             <h1>
-              {view === "next" ? "Up next" : view === "library" ? "Your library" : "Discover"}
+              {view === "library" ? "Your library" : "Discover"}
               <span>.</span>
             </h1>
-            {(view === "next" || !(view !== "discover" && media.length)) && <p>
-              {view === "next" ? "Choose what comes next. Keep it in your own order." : view === "library"
+            {!(view !== "discover" && media.length) && <p>
+              {view === "library"
                 ? "A small place for things worth coming back to."
                 : "Fresh reading from the places you follow."}
             </p>}
@@ -1094,7 +1125,7 @@ function Owner({
               ref={searchRef}
               type="search"
               aria-label={
-                view === "next" ? "Search Up next" : view === "library" ? "Search library" : "Search discoveries"
+                view === "library" ? "Search library" : "Search discoveries"
               }
               placeholder={
                 view !== "discover"
@@ -1149,7 +1180,7 @@ function Owner({
           <button type="button" className="text-link" onClick={() => { setKindFilters([]); setTagFilters([]); setChannelFilters([]); searchRef.current?.focus({ preventScroll: true }); }}>Clear selections</button>
         </div>}
         <div className="list-tabs-row">
-          {view !== "next" && <div
+          <div
             className="list-tabs"
             aria-label={
               view !== "discover" ? "Library status" : "Discovery status"
@@ -1167,6 +1198,7 @@ function Owner({
                     label: "Done",
                     hint: "Items you have finished",
                   },
+                  { value: "next", label: "Up next", hint: "Your chosen unfinished items, in priority order" },
                   {
                     value: "review",
                     label: `Needs attention (${library.filter((m) => m.needs_review).length})`,
@@ -1209,7 +1241,7 @@ function Owner({
                   }
                   onClick={() =>
                     view !== "discover"
-                      ? setStatus(tab.value)
+                      ? changeStatus(tab.value)
                       : setInboxState(tab.value)
                   }
                 >
@@ -1217,7 +1249,7 @@ function Owner({
                 </button>
               </ActionHint>
             ))}
-          </div>}
+          </div>
           {data && (
             <span className="result-count" aria-live="polite">
               {view === "discover" && !inboxPage.hasResult ? (inboxPage.error ? "Count unavailable" : "Loading…") : <>{view !== "discover" ? filtered.length : inboxPage.total}{" "}
@@ -1231,18 +1263,17 @@ function Owner({
             </span>
           )}
         </div>
-        {view === "library" && hideAutoAdded && <p className="automatic-filter-notice quiet text-xs">Automatic additions hidden. <button type="button" className="text-link" onClick={() => {
+        {view === "library" && status !== "next" && hideAutoAdded && <p className="automatic-filter-notice quiet text-xs">Automatic additions hidden. <button type="button" className="text-link" onClick={() => {
           setHideAutoAdded(false);
           try { localStorage.setItem("margin-hide-auto-added", "off"); } catch { /* optional preference */ }
         }}>Show all additions</button></p>}
         <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</p>
-        {view === "next" && <div className="queue-guidance"><span>{queueFiltered ? "Filters keep your manual order. Clear filters to reorder." : "Private shortlist · use Up and Down to change your order."}</span><button type="button" className="text-link" onClick={() => navigate("library")}>Browse library</button></div>}
-        {view === "next" && queueFiltered && <p id="queue-filter-explanation" className="quiet text-xs">Reordering is disabled while searching or filtering. <button type="button" className="text-link" onClick={clearQueueFilters}>Clear filters</button></p>}
+        {view === "library" && status === "next" && filtered.length > 0 && <p className="priority-context quiet">{queueFiltered ? <>Reordering is disabled while searching or filtering. <button type="button" className="text-link" onClick={clearQueueFilters}>Clear filters</button></> : <>Manual priority{layout !== "list" ? " within each shelf · numbers show overall order" : ""}. Open an item’s Up next actions to reorder.</>}</p>}
         {!data && !error && (
           <ListSkeleton discovery={view === "discover"} gallery={view !== "discover" && layout !== "list"} />
         )}
         {view !== "discover" && layout !== "list" && sections.filter(section => section.items.length).length > 1 && <nav className="library-section-links" aria-label="Jump to library section">
-          {sections.filter(section => section.items.length).map(section => <button type="button" key={section.id} aria-label={"Jump to " + section.label} onClick={() => navigation.focusIndex(orderedLibrary.findIndex(item => item.id === section.items[0].id))}>{section.id === "reading" ? "Read" : section.id === "books" ? "Books" : section.label}<span>{section.items.length}</span></button>)}
+          {sections.filter(section => section.items.length).map(section => <button type="button" key={section.id} aria-label={(section.id === "reading" ? "Read" : section.id === "books" ? "Books" : section.label) + " " + section.items.length + ", jump to " + section.label} onClick={() => navigation.focusIndex(orderedLibrary.findIndex(item => item.id === section.items[0].id))}>{section.id === "reading" ? "Read" : section.id === "books" ? "Books" : section.label}{" "}<span>{section.items.length}</span></button>)}
         </nav>}
         {data &&
           view !== "discover" &&
@@ -1255,11 +1286,11 @@ function Owner({
                 {sections.filter(section => section.id === "reading" && section.items.length).map(renderLibrarySection)}
               </>}
             </div>
-          ) : view === "next" ? (
-            <div className="empty-state queue-empty">
-              <h2>{queue.ids.length ? "No Up next items match." : "What would you like to start next?"}</h2>
-              <p>{queue.ids.length ? "Your shortlist is still here. Clear filters to see it." : "Choose unfinished items from your library, then put them in the order you want to read, watch, or play."}</p>
-              <Button variant="secondary" size="sm" onClick={queue.ids.length ? clearQueueFilters : () => { clearQueueFilters(); navigate("library"); setStatus("pending"); }}>{queue.ids.length ? "Clear filters" : "Browse library"}</Button>
+          ) : status === "next" ? (
+            <div className="priority-empty">
+              <h2>{queue.ids.length ? "No Up next items match." : "Nothing in Up next yet."}</h2>
+              <p>{queue.ids.length ? "Your shortlist is still here. Clear filters to see it." : "Use an item’s Up next actions to add it here."}</p>
+              <Button variant="secondary" size="sm" onClick={queue.ids.length ? clearQueueFilters : () => { clearQueueFilters(); navigate("library"); }}>{queue.ids.length ? "Clear filters" : "Show unfinished"}</Button>
             </div>
           ) : (
             <EmptyState
@@ -1526,7 +1557,7 @@ function Owner({
               onClick={() => setHelpOpen(true)}
             >
               {singleKeys
-                ? view === "next" ? "↑/↓ move · Tab for order controls · F1 help" : "h/j/k/l move · [/] tabs · F1 help"
+                ? "h/j/k/l move · [/] tabs · F1 help"
                 : "Arrow keys move · Enter open · F1 help"}
             </button>
           </ActionHint>

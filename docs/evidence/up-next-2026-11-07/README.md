@@ -1,32 +1,36 @@
-# Up next — review evidence
+# Library priorities — review evidence
 
-Margin now opens the owner's private Up next shortlist. Explicitly add unfinished library items and put them in a mixed manual order. Removing an item keeps it in Library; completion removes it from the shortlist. Deliberate browser and integration saves no longer create a routine review task. Concrete unresolved identity problems still appear under Needs attention.
+Margin opens the compact Library overview in its remembered Mixed, Shelves, or List layout. Up next is an optional filter with the same layouts, discreet ranks, and contextual priority controls. Removing an item from Up next keeps it in Library; completion removes its priority. Direct browser and integration saves no longer create a routine review task. Concrete unresolved identity problems still need attention.
 
 ## Before and after
 
-All records and artwork in these captures are fictional. Both instances use the real Go application and isolated PostgreSQL databases, with no request interception and no followed sources. Desktop is 1440×1000; mobile is 390×844. Mobile images show the top of the scrollable page.
+All records and artwork are fictional. Both instances use the real Go application and isolated PostgreSQL databases, without request interception or followed sources. Desktop viewport captures are 1440×1000; mobile captures are 390×844. Mobile overview images show the top of the scrollable page; priority-filter images include the full page.
 
 | View | Before | After |
 | --- | --- | --- |
-| Desktop | [Library](before-desktop.png) | [Ordered shortlist](after-desktop.png) |
-| Mobile | [Library](before-mobile.png) | [Ordered shortlist](after-mobile.png) |
-| Empty shortlist | — | [Desktop](after-empty-desktop.png), [mobile](after-empty-mobile.png) |
+| Desktop overview | [Library](before-desktop.png) | [Library with priority controls](after-desktop.png) |
+| Mobile overview | [Library](before-mobile.png) | [Library with priority controls](after-mobile.png) |
+| Priority filter | — | [Desktop](after-next-desktop.png), [mobile](after-next-mobile.png) |
+| Contextual controls | — | [Desktop](after-actions-desktop.png), [mobile](after-actions-mobile.png) |
+| Empty priority filter | — | [Desktop](after-empty-desktop.png), [mobile](after-empty-mobile.png) |
 
-[Watch the 30-second desktop screencast](after-flow.webm). It is edited from separate real UI recordings, not one uninterrupted session. It shows explicit additions, completion, ordering, removal, and Library views. The final screenshots also include the subsequent mobile artwork alignment fix; the accessibility-name correction does not change visible labels.
+[Watch the approximately 35-second desktop screencast](after-flow.webm). This is one continuous local UI recording played at half speed for readability. It shows Mixed and Shelves, explicit addition, the Up next filter, List's full priority order, moving an item, reload persistence, removal retaining the library item, completion, and returning to unfinished without restoring priority.
 
-The final four-item shortlist places the 45-day-old game ahead of a one-day-old book. Reload preserves that order. The removed video remains in Library, and the completed movie appears under Done.
+The original fixture has seven items. Before shows six unfinished; after shows five because the movie was completed in the earlier behavioral check. The final four-item priority order puts the older game ahead of a recent book. The video remains unfinished and unqueued. Recording temporarily changed the synthetic queue and video status, then restored both. Empty-filter screenshots were captured through real removals followed by restoration of the same queue order.
 
 ## Validation
 
-- Full database-backed Go app suite, queue race tests, Go vet, production TypeScript/Vite build, web utility and extension tests passed during implementation.
-- Seventy-four selected mocked desktop/mobile browser cases passed across the implementation run and focused rechecks; these are separate from the real-server evidence above.
-- Independent review found a bootstrap snapshot race and an obsolete capture-policy test. Controlled concurrent completion/deletion tests reproduced the race, then passed after bootstrap began reading queue and media in one repeatable-read snapshot. Queue race tests passed after the fix.
-- Two corrected real-server product scenarios passed on desktop and mobile (four cases): deliberate captures versus unresolved ISBNs, and attention/filter/editor hints.
-- All 40 final focused queue/filter/Quick Find browser checks passed, covering accessible filter names and artwork remaining beside the title on mobile.
-- Final real-server axe checks at 1440, 390 and 320 px report no violations, page errors, or horizontal overflow. This is automated coverage of the tested screen, not a complete accessibility audit.
+- Backend foundation: full database-backed Go app suite, queue race tests, Go vet, web utility and extension tests passed. Independent review's bootstrap snapshot race was reproduced and fixed with a consistent read transaction; controlled completion/deletion regressions and queue race tests passed afterward.
+- Four focused real-server product cases passed for deliberate captures, unresolved ISBNs, and attention/filter/editor hints before the layout revision.
+- Final compact revision: TypeScript check, production build, utility tests, and 80 selected desktop/mobile browser cases passed across the main selection and focused rechecks. These browser cases use synthetic intercepted responses and cover defaults/layout persistence, grouped global ranks, filtered reordering, errors/conflicts, focus, deletion, Done/Undo, Quick Find, and narrow-screen controls.
+- Real-server audits covered all three priority layouts at widths 1440, 390, and 320: zero axe violations, horizontal overflow, and page/console errors in all nine checks, including open priority controls. This is automated and targeted keyboard/touch coverage, not a complete assistive-technology audit.
+- Final real-server recording confirmed persistence, non-destructive priority removal, transactional completion cleanup, and restored synthetic state, with no page or console errors.
+- An independent Terra review of the compact revision found no blocking P1/P2 issues in navigation, filtering/order, actions/focus, async updates, mobile styles, tests, or documentation. It was a static review; the reviewer did not rerun suites or inspect the recording.
 
-## Deliberate limits
+## Behavior and scope
 
-Reordering is disabled while search or filters are active, with a clear-filters action. Undoing Done restores unfinished status without restoring shortlist membership, and the UI explicitly says so. Existing library layouts, Discover, source settings, public sharing, and integrations remain available. Existing review flags are preserved; only new deliberate saves use the changed default.
+Mixed and Shelves preserve priority within their type groups; rank numbers refer to the full queue. List shows the full global order. Moves swap global neighbors. Reordering is disabled under search/type/tag/channel filters and attention or hidden-automatic subsets, with recovery guidance. Undoing Done restores unfinished status without restoring priority, as stated in the UI.
 
-The feature PR is based on `baseline/pre-up-next-20261107` (`dea2ad2`), a snapshot of application work already present before this task. The baseline is separate so the feature diff does not mix in earlier unpublished changes. Production was not deployed.
+Discover, source settings, public sharing, and integrations remain available. Existing review flags are preserved; only new deliberate saves use the changed default. [Product criteria](../../product-direction.md) describe the purpose and criteria for further simplification.
+
+The feature branch is based on `baseline/pre-up-next-20261107` (`dea2ad2`), a snapshot of application work already present before this task. The baseline keeps this feature's diff separate from earlier unpublished changes. No production deployment was performed.

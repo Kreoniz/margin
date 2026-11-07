@@ -79,7 +79,8 @@ test("Vim completion, undo and dd removal are distinct and row removal works", a
   await page.locator("main").focus();
   await page.keyboard.press("u");
   await expect(row).toBeVisible();
-  await row.getByRole("button", { name: "Remove " + item.title, exact: true }).click();
+  await row.locator(".priority-trigger").click();
+  await page.locator(".priority-panel").getByRole("button", { name: "Remove from library…", exact: true }).click();
   await expect(dialog(page)).toContainText("Remove from library?");
   await page.getByRole("button", { name: "Remove item", exact: true }).click();
   await expect(dialog(page)).toHaveCount(0);

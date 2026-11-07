@@ -62,7 +62,8 @@ YouTube metadata handles multiple link formats, but generic URL identity still a
 | Keys, in sequence | Action |
 | --- | --- |
 | `v l` | List view |
-| `v b` | Side by side view |
+| `v b` | Mixed view |
+| `g n` | Up next Library filter |
 | `v s` | Shelves view (`v g` also works) |
 | `f t` | Types picker |
 | `f g` | Tags picker |
@@ -71,11 +72,13 @@ YouTube metadata handles multiple link formats, but generic URL identity still a
 | `F1` | All shortcuts |
 | `Home`, `Ctrl Home` or `g g` | Page top (`g g` uses Vim quick keys) |
 
+Library opens on unfinished items in your remembered layout. Up next is a secondary filter; open a row’s Up next actions to add it or change its priority. Rank numbers always refer to the whole shortlist, even on grouped shelves. Clear search and filters before reordering.
+
 Vim quick keys must be enabled in Settings. They leave text inputs and open dialogs/pickers alone.
 
 Pick several checkboxes without reopening a menu. Selections apply immediately; **Done** or Escape closes the picker. Options have their own search, and each group can be cleared. **Any selected value matches within a group**; groups combine with search and status. Example: Book **or** Video, carrying Design **or** Code. Selecting a channel additionally limits results to its YouTube videos. Click a saved YouTube channel name to toggle that filter. Channel filtering uses the saved display name, not a verified YouTube channel ID, so identical names are grouped.
 
-Filters stay selected when switching Side by side, Shelves and List. Remove individual chips or use **Clear selections**. Navigating between Library and Discover starts a fresh search/filter scope.
+Filters stay selected when switching Mixed, Shelves and List. Remove individual chips or use **Clear selections**. Library and Discover retain their own search/filter context when you switch between them.
 
 Book search uses Open Library. Empty results can be retried immediately, subject to its request rate limit; valid bare and path-shaped catalogue IDs are accepted. A provider error is shown as unavailable, rather than a confident “No match.” Your exact title returned catalogue matches during the 2026-10-31 check; the screenshot's original failure was not independently reproduced. Use **Retry book lookup** or correct the query/author, then choose an edition. You can always save the title manually.
 

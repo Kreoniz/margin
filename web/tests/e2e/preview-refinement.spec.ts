@@ -110,7 +110,7 @@ test("400ms mouse hints dwell on entry, sibling handoff and reentry while focus 
   await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   const row = page.locator(".media-row").first();
   const edit = row.getByRole("button", { name: /^Edit / });
-  const remove = row.getByRole("button", { name: /^Remove / });
+  const completion = row.getByRole("checkbox", { name: /^Mark done:/ });
   const hints = page.getByRole("tooltip");
   if (info.project.name === "desktop") {
     await row.waitFor();
@@ -151,7 +151,7 @@ test("400ms mouse hints dwell on entry, sibling handoff and reentry while focus 
       observations.push(observation);
     };
     await dwell(edit, "Edit item");
-    await dwell(remove, "Remove from library");
+    await dwell(completion, "Mark done");
     await page.mouse.move(0, 0);
     await page.waitForTimeout(60);
     await dwell(edit, "Edit item");
@@ -160,7 +160,7 @@ test("400ms mouse hints dwell on entry, sibling handoff and reentry while focus 
     await expect(hints).toBeVisible();
     await page.mouse.move(0, 0);
     await expect(hints).toHaveCount(0);
-    await remove.hover();
+    await completion.hover();
     await page.waitForTimeout(120);
     await page.mouse.move(0, 0);
     await page.waitForTimeout(450);
