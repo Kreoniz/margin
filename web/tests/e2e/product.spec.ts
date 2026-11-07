@@ -746,6 +746,8 @@ test("Vim navigation moves through rows, tabs and pages without colliding with g
   ).toHaveAttribute("aria-pressed", "true");
   await expect(rows).toHaveCount(1);
   await page.keyboard.press("]");
+  await expect(tabs.getByRole("button", { name: "Up next", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("]");
   await expect(tabs.getByRole("button", { name: /Needs attention/ })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -761,9 +763,13 @@ test("Vim navigation moves through rows, tabs and pages without colliding with g
     "true",
   );
   await page.keyboard.press("[");
+  await expect(tabs.getByRole("button", { name: "Up next", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("[");
   await expect(
     tabs.getByRole("button", { name: "Done", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("]");
+  await expect(tabs.getByRole("button", { name: "Up next", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("]");
   await expect(tabs.getByRole("button", { name: /Needs attention/ })).toHaveAttribute(
     "aria-pressed",
@@ -803,7 +809,7 @@ test("Vim navigation moves through rows, tabs and pages without colliding with g
     tabs.getByRole("button", { name: "Saved", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("g");
-  await page.keyboard.press("]");
+  await page.keyboard.press("l");
   await expect(
     page.getByRole("heading", { name: "Your library.", exact: true }),
   ).toBeVisible();

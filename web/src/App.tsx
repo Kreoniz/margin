@@ -210,13 +210,16 @@ function Owner({
   const [pending, setPending] = useState<Set<string>>(new Set());
   const searchRef = useRef<HTMLInputElement>(null);
   const version = useRef(0);
+  const latestQueueVersion = useRef(-1);
+  const queueCleanupGeneration = useRef(0);
   const activeMutations = useRef(new Set<string>());
   const toast = Toast.useToastManager();
   const refresh = useCallback(async () => {
     const id = ++version.current;
     try {
       const response = await api<LibraryData>("/bootstrap");
-      if (version.current === id) {
+      if (version.current === id && (response.up_next?.version ?? 0) >= latestQueueVersion.current) {
+        latestQueueVersion.current = response.up_next?.version ?? 0;
         setData(response);
         setError("");
       }
@@ -311,7 +314,7 @@ function Owner({
       { hotkey: ["V", "L"], callback: () => { getHotkeyManager().resetSequenceProgress(); setLibraryLayout("list"); }, options: { enabled: shortcutsEnabled && singleKeys && view === "library" } },
       { hotkey: ["V", "B"], callback: () => { getHotkeyManager().resetSequenceProgress(); setLibraryLayout("split"); }, options: { enabled: shortcutsEnabled && singleKeys && view === "library" } },
       ...(["S", "G"] as const).map(key => ({ hotkey: ["V", key] as const, callback: () => { getHotkeyManager().resetSequenceProgress(); setLibraryLayout("shelves"); }, options: { enabled: shortcutsEnabled && singleKeys && view === "library" } })),
-      ...([ ["T", "types"], ["G", "tags"], ["C", "channels"] ] as const).map(([key, id]) => ({ hotkey: ["F", key] as const, callback: () => { getHotkeyManager().resetSequenceProgress(); document.getElementById("library-filter-" + id)?.focus({ preventScroll: true }); setFilterOpen(id); }, options: { enabled: shortcutsEnabled && singleKeys && view !== "discover" } })),
+      ...([ ["T", "types"], ["G", "tags"], ["C", "channels"] ] as const).map(([key, id]) => ({ hotkey: ["F", key] as const, callback: () => { getHotkeyManager().resetSequenceProgress(); const trigger = document.getElementById("library-filter-" + id); if (trigger) { trigger.focus({ preventScroll: true }); setFilterOpen(id); } }, options: { enabled: shortcutsEnabled && singleKeys && view !== "discover" } })),
       { hotkey: "Mod+,", callback: () => setSettings(true) },
       { hotkey: "Control+Home", callback: () => navigation.focusFirst(), options: { ignoreInputs: true } },
       {
@@ -407,6 +410,12 @@ function Owner({
     const name = youtubeChannelName(item);
     return name ? [[name.toLocaleLowerCase(), { value: name.toLocaleLowerCase(), label: name }] as const] : [];
   })).values()].sort((a, b) => a.label.localeCompare(b.label));
+  useEffect(() => {
+    if (filterOpen === "channels" && !channels.length && !channelFilters.length) {
+      setFilterOpen(undefined);
+      searchRef.current?.focus({ preventScroll: true });
+    }
+  }, [filterOpen, channels.length, channelFilters.length]);
   const articles = inbox;
   const sections = librarySections.map(section => ({ ...section, items: filtered.filter(item => librarySection(item) === section.id) }));
   const orderedLibrary = layout === "list" ? filtered : sections.flatMap(section => section.items);
@@ -511,6 +520,15 @@ function Owner({
       navigation.focusIndex(index);
     }
   }, [limit, filtered.length, articles.length, view, layout]);
+  function acknowledgeQueue(updated: UpNext, cleanupGeneration: number) {
+    // A media acknowledgement can remove membership without supplying the new
+    // queue version. Neither an older queue reply nor bootstrap may undo it.
+    if (cleanupGeneration !== queueCleanupGeneration.current || updated.version < latestQueueVersion.current) return false;
+    latestQueueVersion.current = updated.version;
+    version.current++;
+    setData(current => current ? { ...current, up_next: updated } : current);
+    return true;
+  }
   async function perform(
     key: string,
     fn: () => Promise<unknown>,
@@ -519,6 +537,7 @@ function Owner({
     if (activeMutations.current.has(key)) return false;
     activeMutations.current.add(key);
     setPending(new Set(activeMutations.current));
+    const cleanupGeneration = queueCleanupGeneration.current;
     try {
       await fn();
       await refresh();
@@ -526,7 +545,7 @@ function Owner({
       return true;
     } catch (e) {
       if (e instanceof ApiError && e.code === "up_next_conflict") {
-        if (e.upNext) setData(current => current ? { ...current, up_next: e.upNext! } : current);
+        if (e.upNext) acknowledgeQueue(e.upNext, cleanupGeneration);
         await refresh();
       }
       setAnnouncement(e instanceof Error ? e.message : "Please try again.");
@@ -591,21 +610,26 @@ function Owner({
     else setInboxState(next);
   }
   function acknowledgeMedia(item: Media) {
+    version.current++;
+    if (item.status === "done") queueCleanupGeneration.current++;
     setData(current => current ? { ...current, media: current.media.some(existing => existing.id === item.id)
       ? current.media.map(existing => existing.id === item.id ? item : existing)
-      : [item, ...current.media] } : current);
+      : [item, ...current.media], up_next: item.status === "done" && current.up_next
+        ? { ...current.up_next, ids: current.up_next.ids.filter(id => id !== item.id) }
+        : current.up_next } : current);
   }
   async function patchMedia(id: string, changes: Partial<Media>, expected?: Media) {
     const item = await api<Media>("/media/" + id, send("PATCH", { ...changes, expected }));
     acknowledgeMedia(item);
     if (item.status === "done") {
-      setData(current => current?.up_next ? { ...current, up_next: { ...current.up_next, ids: current.up_next.ids.filter(id => id !== item.id) } } : current);
       setAnnouncement("Marked done and removed from Up next. Undo returns to unfinished without restoring its place.");
     }
     return item;
   }
   async function removeMedia(id: string) {
     await api("/media/" + id, send("DELETE"));
+    version.current++;
+    queueCleanupGeneration.current++;
     undo.current = undefined;
     setData(current => current ? { ...current, media: current.media.filter(item => item.id !== id), up_next: current.up_next ? { ...current.up_next, ids: current.up_next.ids.filter(member => member !== id) } : undefined } : current);
   }
@@ -743,9 +767,10 @@ function Owner({
     const row = document.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(item.id)}"]`);
     if (row?.contains(document.activeElement) || document.activeElement?.closest(".priority-panel")) row?.focus({ preventScroll: true });
     setQueueOpen(undefined);
+    const cleanupGeneration = queueCleanupGeneration.current;
     await perform("up-next", async () => {
       const updated = await api<UpNext>("/up-next", send("POST", { id: item.id, action, expected_version: queue.version }));
-      setData(current => current ? { ...current, up_next: updated } : current);
+      if (!acknowledgeQueue(updated, cleanupGeneration)) return;
       const position = updated.ids.indexOf(item.id) + 1;
       setAnnouncement(action === "remove" ? `${item.title} removed from Up next. Kept in your library.` : `${item.title} ${action === "add" ? "added to Up next" : "moved"}. Position ${position} of ${updated.ids.length}.`);
     });
@@ -809,7 +834,7 @@ function Owner({
         </ActionHint>
         {item.status === "pending" ? <Popover.Root open={queueOpen === item.id} onOpenChange={open => setQueueOpen(open ? item.id : undefined)}>
           <Popover.Trigger render={<Button variant="ghost" size="icon" className="priority-trigger" data-queued={Boolean(rank) || undefined} aria-label={"Up next" + (rank ? ", position " + rank : "") + ": " + item.title} title="Up next actions" />}>
-            {rank ? <span aria-hidden="true">#{rank}</span> : <span className="priority-add-label" aria-hidden="true"><Icon name="plus" size={10} />Next</span>}
+            {rank ? <span className="priority-rank-label" aria-hidden="true">#{rank}<Icon name="chevron" size={10} /></span> : <span className="priority-add-label" aria-hidden="true"><Icon name="plus" size={10} />Next</span>}
           </Popover.Trigger>
           <Popover.Content className="priority-panel" finalFocus={() => {
             // Actions move focus to the stable row before closing; outside
@@ -1158,7 +1183,7 @@ function Owner({
               <>
                 <FilterPicker id="types" label="Types" values={kindFilters} options={kinds.map(value => ({ value, label: kindLabels[value] }))} open={filterOpen === "types"} onOpenChange={open => setFilterOpen(open ? "types" : undefined)} onChange={values => setKindFilters(values as Kind[])} shortcut={singleKeys ? "f t" : undefined} />
                 <FilterPicker id="tags" label="Tags" values={tagFilters} options={tags.map(value => ({ value, label: value }))} open={filterOpen === "tags"} onOpenChange={open => setFilterOpen(open ? "tags" : undefined)} onChange={setTagFilters} shortcut={singleKeys ? "f g" : undefined} />
-                <FilterPicker id="channels" label="Channels" values={channelFilters} options={channels} open={filterOpen === "channels"} onOpenChange={open => setFilterOpen(open ? "channels" : undefined)} onChange={setChannelFilters} shortcut={singleKeys ? "f c" : undefined} />
+                {(channels.length > 0 || channelFilters.length > 0) && <FilterPicker id="channels" label="Channels" values={channelFilters} options={channels} open={filterOpen === "channels"} onOpenChange={open => setFilterOpen(open ? "channels" : undefined)} onChange={setChannelFilters} shortcut={singleKeys ? "f c" : undefined} />}
               </>
             ) : (
               <Picker
@@ -1176,7 +1201,7 @@ function Owner({
         {view !== "discover" && (kindFilters.length + tagFilters.length + channelFilters.length > 0) && <div className="active-library-filters" aria-label="Active filters">
           {kindFilters.map(value => <button type="button" key={"type-" + value} aria-label={"Remove type filter " + kindLabels[value]} onClick={() => { setKindFilters(values => values.filter(v => v !== value)); document.getElementById("library-filter-types")?.focus({ preventScroll: true }); }}>{kindLabels[value]} <Icon name="close" size={12} /></button>)}
           {tagFilters.map(value => <button type="button" key={"tag-" + value} aria-label={"Remove tag filter " + value} onClick={() => { setTagFilters(values => values.filter(v => v !== value)); document.getElementById("library-filter-tags")?.focus({ preventScroll: true }); }}>#{value} <Icon name="close" size={12} /></button>)}
-          {channelFilters.map(value => <button type="button" key={"channel-" + value} aria-label={"Remove channel filter " + value} onClick={() => { setChannelFilters(values => values.filter(v => v !== value)); document.getElementById("library-filter-channels")?.focus({ preventScroll: true }); }}>{channels.find(option => option.value === value)?.label || value} <Icon name="close" size={12} /></button>)}
+          {channelFilters.map(value => <button type="button" key={"channel-" + value} aria-label={"Remove channel filter " + value} onClick={() => { setChannelFilters(values => values.filter(v => v !== value)); (channels.length || channelFilters.length > 1 ? document.getElementById("library-filter-channels") : searchRef.current)?.focus({ preventScroll: true }); }}>{channels.find(option => option.value === value)?.label || value} <Icon name="close" size={12} /></button>)}
           <button type="button" className="text-link" onClick={() => { setKindFilters([]); setTagFilters([]); setChannelFilters([]); searchRef.current?.focus({ preventScroll: true }); }}>Clear selections</button>
         </div>}
         <div className="list-tabs-row">

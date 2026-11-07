@@ -205,3 +205,45 @@ test("Quick Find reaches unqueued items and returns to the priority filter", asy
   await page.keyboard.press("Escape");
   await expect(tab(page)).toHaveAttribute("aria-pressed", "true"); await expect(rows(page)).toHaveCount(1);
 });
+
+for (const conflict of [false, true]) test(`delayed ${conflict ? "conflict" : "successful"} queue response cannot replace a newer completion snapshot`, async ({ page }) => {
+  const f = await fixture(page, media); f.queue(["book", "video", "game"]);
+  await page.goto("http://margin.test/app#next"); await list(page);
+  f.holdQueueAck(); if (conflict) f.conflictQueue();
+  await (await actions(page, "video")).getByRole("button", { name: "Move earlier", exact: true }).click();
+  await expect.poll(() => f.requests.queueCommits).toBe(1);
+  const completed = conflict ? "game" : "book";
+  await row(page, completed).getByRole("checkbox").click();
+  await expect(page.getByText("Marked done. Undo returns to unfinished without restoring Up next.", { exact: true })).toBeVisible();
+  const remaining = conflict ? ["video", "book"] : ["video", "game"];
+  for (const [index, id] of remaining.entries()) await expect(row(page, id).locator(".priority-membership")).toHaveText(`Up next · #${index + 1}`);
+  f.failBootstrap(); f.releaseQueueAck();
+  await expect(page.getByText("Synthetic bootstrap unavailable", { exact: false }).first()).toBeVisible();
+  await expect(row(page, completed)).toHaveCount(0);
+  for (const [index, id] of remaining.entries()) await expect(row(page, id).locator(".priority-membership")).toHaveText(`Up next · #${index + 1}`);
+});
+
+for (const removal of ["done and undo", "delete"]) test(`delayed queue response cannot undo local ${removal} when refreshes fail`, async ({ page }) => {
+  const f = await fixture(page, media); f.queue(["book", "video", "game"]);
+  await page.goto("http://margin.test/app#next"); await list(page);
+  f.holdQueueAck();
+  await (await actions(page, "video")).getByRole("button", { name: "Move earlier", exact: true }).click();
+  await expect.poll(() => f.requests.queueCommits).toBe(1);
+  f.failBootstrap();
+  if (removal === "delete") {
+    await (await actions(page, "book")).getByRole("button", { name: "Remove from library…", exact: true }).click();
+    await page.getByRole("dialog", { name: "Remove from library?", exact: true }).getByRole("button", { name: "Remove item", exact: true }).click();
+  } else {
+    await row(page, "book").getByRole("checkbox").click();
+    await expect(page.getByText("Marked done. Undo returns to unfinished without restoring Up next.", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect.poll(() => f.requests.mediaPatches).toBe(2);
+  }
+  await expect(row(page, "book")).toHaveCount(0);
+  const bootstraps = f.requests.bootstrap;
+  f.releaseQueueAck();
+  await expect.poll(() => f.requests.bootstrap).toBeGreaterThan(bootstraps);
+  await expect(page.getByText("Synthetic bootstrap unavailable", { exact: false }).first()).toBeVisible();
+  await expect(row(page, "book")).toHaveCount(0);
+  await expect(row(page, "game").locator(".priority-membership")).toHaveText("Up next · #2");
+});

@@ -21,6 +21,8 @@ export async function fixture(page: Page, customMedia?: Media[]) {
   let queue = { version: 0, ids: [] as string[] };
   let queueFailure = false;
   let queueConflict = false;
+  let releaseQueueAck = () => {};
+  let queueAckGate = Promise.resolve();
   let bootstrapFailure = false;
   let inboxFailure = false;
   let cursorFailure = false;
@@ -37,7 +39,7 @@ export async function fixture(page: Page, customMedia?: Media[]) {
   let inboxAckGate = Promise.resolve();
   let releaseSourceDelete = () => {};
   let sourceDeleteGate = Promise.resolve();
-  const requests = { bootstrap: 0, sourcePatches: 0, sourceCreates: 0, sourceDeletes: 0, mediaDeletes: 0, mediaPatches: 0, mediaCreates: 0, mediaWrites: [] as Record<string, unknown>[], inboxSaves: 0, inboxPatches: 0, inboxCommits: 0, inbox: [] as string[] };
+  const requests = { bootstrap: 0, queueCommits: 0, sourcePatches: 0, sourceCreates: 0, sourceDeletes: 0, mediaDeletes: 0, mediaPatches: 0, mediaCreates: 0, mediaWrites: [] as Record<string, unknown>[], inboxSaves: 0, inboxPatches: 0, inboxCommits: 0, inbox: [] as string[] };
   await page.route("**/*", async route => {
     const url = new URL(route.request().url());
     if (url.origin === "https://images.test") {
@@ -71,7 +73,10 @@ export async function fixture(page: Page, customMedia?: Media[]) {
       if (queueConflict || body.expected_version !== queue.version) {
         queueConflict = false;
         queue = { ...queue, version: queue.version + 1, ids: [...queue.ids].reverse() };
-        return route.fulfill({ status: 409, json: { error: "Up next changed in another tab. The latest order is shown; try again.", code: "up_next_conflict", up_next: queue } });
+        const snapshot = structuredClone(queue);
+        requests.queueCommits++;
+        await queueAckGate;
+        return route.fulfill({ status: 409, json: { error: "Up next changed in another tab. The latest order is shown; try again.", code: "up_next_conflict", up_next: snapshot } });
       }
       const index = queue.ids.indexOf(body.id);
       if (body.action === "add" && index < 0) queue.ids.push(body.id);
@@ -81,7 +86,10 @@ export async function fixture(page: Page, customMedia?: Media[]) {
         if (index >= 0 && next >= 0 && next < queue.ids.length) [queue.ids[index], queue.ids[next]] = [queue.ids[next], queue.ids[index]];
       }
       queue.version++;
-      return route.fulfill({ json: queue });
+      const snapshot = structuredClone(queue);
+      requests.queueCommits++;
+      await queueAckGate;
+      return route.fulfill({ json: snapshot });
     }
     if (url.pathname === "/api/sources") {
       requests.sourceCreates++;
@@ -179,6 +187,8 @@ export async function fixture(page: Page, customMedia?: Media[]) {
     queue(ids: string[]) { queue = { version: queue.version + 1, ids: [...ids] }; },
     failQueue(value = true) { queueFailure = value; },
     conflictQueue() { queueConflict = true; },
+    holdQueueAck() { queueAckGate = new Promise<void>(resolve => { releaseQueueAck = resolve; }); },
+    releaseQueueAck() { releaseQueueAck(); queueAckGate = Promise.resolve(); },
     review(id: string) { media.find(item => item.id === id)!.needs_review = true; },
     kind(id: string, kind: string) { media.find(item => item.id === id)!.kind = kind as Media["kind"]; },
     enrichMedia(id: string, values: Partial<Pick<Media, "title" | "description" | "cover_url" | "author" | "metadata_state">>) { Object.assign(media.find(item => item.id === id)!, values); },

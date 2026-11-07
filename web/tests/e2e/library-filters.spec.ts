@@ -21,6 +21,47 @@ async function open(page: Page, group: string) {
 async function close(page: Page) { await page.locator(".library-filter-panel").getByRole("button", { name: "Done", exact: true }).click(); }
 const rows = (page: Page) => page.locator(".media-row");
 
+test("empty channel controls stay out of the toolbar without trapping filter shortcuts", async ({ page }) => {
+  await fixture(page, [make("book", {})]);
+  await page.goto("http://margin.test/app");
+  await expect(rows(page)).toHaveCount(1);
+  await expect(page.locator("#library-filter-channels")).toHaveCount(0);
+  await page.locator("main").focus();
+  await page.keyboard.press("f"); await page.keyboard.press("c");
+  await expect(page.locator(".library-filter-panel")).toHaveCount(0);
+  await page.keyboard.press("]");
+  await expect(page.locator(".list-tabs").getByRole("button", { name: "Done", exact: true })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("an active channel remains clearable after its last option disappears", async ({ page }) => {
+  const f = await fixture(page, [items()[1]]);
+  await page.goto("http://margin.test/app");
+  const panel = await open(page, "channels");
+  await panel.getByRole("checkbox", { name: "Channel One", exact: true }).check();
+  await close(page);
+  f.enrichMedia("one", { author: "" });
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(rows(page)).toHaveCount(0);
+  await expect(page.locator("#library-filter-channels")).toBeVisible();
+  await page.getByRole("button", { name: "Remove channel filter channel one", exact: true }).click();
+  await expect(rows(page)).toHaveCount(1);
+  await expect(page.locator("#library-filter-channels")).toHaveCount(0);
+  await expect(page.getByRole("searchbox", { name: "Search library", exact: true })).toBeFocused();
+});
+
+test("a disappearing empty channel picker restores focus and keyboard shortcuts", async ({ page }) => {
+  const f = await fixture(page, [items()[1]]);
+  await page.goto("http://margin.test/app");
+  await open(page, "channels");
+  f.enrichMedia("one", { author: "" });
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.locator(".library-filter-panel")).toHaveCount(0);
+  await expect(page.getByRole("searchbox", { name: "Search library", exact: true })).toBeFocused();
+  await page.locator("main").focus();
+  await page.keyboard.press("]");
+  await expect(page.locator(".list-tabs").getByRole("button", { name: "Done", exact: true })).toHaveAttribute("aria-pressed", "true");
+});
+
 test("types and tags compose with OR inside each group and retain selections across views", async ({ page }) => {
   await fixture(page, items());
   await page.emulateMedia({ reducedMotion: "reduce" });

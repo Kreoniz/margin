@@ -1,0 +1,17 @@
+# Independent review — correctness and UX
+
+Verdict: feature is coherent and fits the compact Library direction. I found one low-severity async consistency defect; no blocking privacy or durable ordering defect in the reviewed code. The shared layouts, global ranks across grouped shelves, and separate save/priority/completion actions are reasonable accepted tradeoffs.
+
+## Finding
+
+**P3 — A delayed queue acknowledgement can replace a newer snapshot if the subsequent refresh fails.** `web/src/App.tsx:519` serializes queue actions only against other queue actions, not status/delete operations. `web/src/App.tsx:748` unconditionally installs the queue POST response; conflict responses are similarly installed at line 529. The bootstrap request counter at lines 215–220 only orders bootstrap requests, not mutation acknowledgements. `refresh` catches its own failure (lines 223–225), so a failed refresh does not undo the stale acknowledgement.
+
+Reproduction by controlled response timing: start with queued A and B; move B, let the server commit its queue response but delay delivering that response. Mark A Done in the same tab and let its mutation and bootstrap finish, yielding the newer queue containing only B. Deliver the older move response, then fail its following bootstrap request. The client retains the old version and A's ID; the Done item is filtered out, but B can show rank #2 and subsequent queue writes conflict until a successful refresh. Server state remains correct; this is not a stale durable overwrite. I have reasoned this sequence from the code, not reproduced it in a browser.
+
+Minimal fix: apply queue acknowledgements and conflict snapshots only if their version is at least the currently installed queue version, and ensure locally removing an item on completion/delete cannot later be undone by an older response (e.g. invalidate in-flight acknowledgements or return/install the transaction's new queue version). Add one focused delayed-response test with a failing follow-up bootstrap. This keeps displayed ranks aligned with acknowledged state and preserves the existing conflict/retry behavior.
+
+## Scope and evidence
+
+Inspected the complete base-to-frozen diff, product and API direction, queue storage and lock ordering, bootstrap snapshot, authentication boundary, capture defaults, UI filtering/navigation and mutation handling. Queue writes serialize on the singleton and check expected version; completion/deletion remove membership under the same lock; bootstrap reads media and queue in one repeatable-read transaction. Priority is separate from media representations and the new endpoints use the existing owner boundary. Grouped views derive from queue order; List retains global order; subset restrictions are explicit. No other concrete defect identified in these areas.
+
+I inspected the supplied final desktop overview, mobile priority view, and mobile action screenshot as static evidence. Artwork and actions remain recognizable, and the compact overview and mobile scrolling are plausible. Sparse grouped shelves and the additional popover click are design tradeoffs, not grounds for a speculative redesign. I did not inspect the video, run a live browser or rerun test suites. Existing reported tests and accessibility audits are not independent verification; full assistive-technology behavior, real network timing, and all existing Discover/integration flows remain coverage limits. No personal data or production was accessed.
