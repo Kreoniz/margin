@@ -16,6 +16,6 @@ Navigation behavior remains intentional: Library navigation exits Up next to Unf
 
 ## Verification and limits
 
-The coordinator applied and checked these changes after the reviewed revision. There was no second council round, independent review, or rescore of the fixes. The reviewers' verdicts apply to `e5589e6`, not the later commit.
+The coordinator applied and checked these changes after the reviewed revision. This request ended after one round; its reviewers' verdicts apply to `e5589e6`, not the later fixes. The owner subsequently requested [one additional round with Astra](round-2/README.md), which reviewed those fixes at `4a9c7b2`.
 
 The targeted validation and refreshed screenshot/video results are recorded in the [evidence summary](../README.md). The async regression uses controlled browser responses; the real-server recording exercises ordinary priority operations. No new database code or API changes were needed. Full assistive-technology testing, a large personal collection, and a real two-owner-tab network-timing experiment remain outside this pass. No production or personal library data was used, and no publication was attempted.

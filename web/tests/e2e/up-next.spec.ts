@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { fixture } from "./synthetic-fixture";
-import type { Media } from "../../src/types";
+import type { LibraryData, Media } from "../../src/types";
 
 const media: Media[] = ["book", "video", "game"].map((kind, index) => ({
   id: kind, title: "Chosen " + kind, kind: kind as Media["kind"], status: "pending", author: "Synthetic author", url: "https://example.com/" + kind,
@@ -246,4 +246,34 @@ for (const removal of ["done and undo", "delete"]) test(`delayed queue response 
   await expect(page.getByText("Synthetic bootstrap unavailable", { exact: false }).first()).toBeVisible();
   await expect(row(page, "book")).toHaveCount(0);
   await expect(row(page, "game").locator(".priority-membership")).toHaveText("Up next · #2");
+});
+
+for (const newerTime of ["2026-11-07T10:02:00Z", "2026-11-07T10:01:00.000002Z"]) test(`an older Done response cannot erase restored priority (${newerTime})`, async ({ page }) => {
+  const f = await fixture(page, media); f.queue(["book", "video", "game"]);
+  let snapshot: LibraryData | undefined;
+  let failRefresh = false;
+  let release = () => {};
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const done: Media = { ...media[0], status: "done", updated_at: "2026-11-07T10:01:00.000001Z" };
+  await page.route("**/api/bootstrap", async route => {
+    if (failRefresh) return route.fulfill({ status: 503, json: { error: "Synthetic bootstrap unavailable" } });
+    return snapshot ? route.fulfill({ json: snapshot }) : route.fallback();
+  });
+  await page.route("**/api/media/book", async route => {
+    snapshot = { media: [done, ...media.slice(1)], up_next: { version: 2, ids: ["video", "game"] }, inbox: [], inbox_counts: { new: 0, saved: 0, read: 0, dismissed: 0 }, sources: [], legacy_sample_count: 0 };
+    await gate;
+    await route.fulfill({ json: done });
+  });
+  await page.goto("http://margin.test/app#next"); await list(page);
+  await row(page, "book").getByRole("checkbox").click();
+  await expect.poll(() => snapshot?.up_next?.version).toBe(2);
+  // Another owner returns the item to unfinished and deliberately appends it.
+  snapshot = { ...snapshot!, media: [{ ...media[0], updated_at: newerTime }, ...media.slice(1)], up_next: { version: 3, ids: ["video", "game", "book"] } };
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(row(page, "book").locator(".priority-membership")).toHaveText("Up next · #3");
+  failRefresh = true; release();
+  await expect(page.getByText("Synthetic bootstrap unavailable", { exact: false }).first()).toBeVisible();
+  await expect(row(page, "book").locator(".priority-membership")).toHaveText("Up next · #3");
+  await expect(row(page, "book").getByRole("checkbox")).not.toBeChecked();
+  await expect(page.getByText("Marked done. Undo returns to unfinished without restoring Up next.", { exact: true })).toHaveCount(0);
 });

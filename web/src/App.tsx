@@ -28,7 +28,7 @@ import {
   type InboxItem,
   type Session,
 } from "./types";
-import { discoveryEmptyState, hostname, imageURL, relativeDate, safeURL, selectMedia, selectUpNext, youtubeChannelName } from "./utils";
+import { compareUpdatedAt, discoveryEmptyState, hostname, imageURL, relativeDate, safeURL, selectMedia, selectUpNext, youtubeChannelName } from "./utils";
 import { useListMotion } from "./useListMotion";
 import { useListNavigation } from "./useListNavigation";
 import { KeyboardHelp } from "./KeyboardHelp";
@@ -211,6 +211,7 @@ function Owner({
   const searchRef = useRef<HTMLInputElement>(null);
   const version = useRef(0);
   const latestQueueVersion = useRef(-1);
+  const latestMediaUpdates = useRef(new Map<string, string>());
   const queueCleanupGeneration = useRef(0);
   const activeMutations = useRef(new Set<string>());
   const toast = Toast.useToastManager();
@@ -220,6 +221,7 @@ function Owner({
       const response = await api<LibraryData>("/bootstrap");
       if (version.current === id && (response.up_next?.version ?? 0) >= latestQueueVersion.current) {
         latestQueueVersion.current = response.up_next?.version ?? 0;
+        latestMediaUpdates.current = new Map(response.media.map(item => [item.id, item.updated_at]));
         setData(response);
         setError("");
       }
@@ -610,6 +612,9 @@ function Owner({
     else setInboxState(next);
   }
   function acknowledgeMedia(item: Media) {
+    const knownUpdate = latestMediaUpdates.current.get(item.id);
+    if (knownUpdate && compareUpdatedAt(item.updated_at, knownUpdate) < 0) return false;
+    latestMediaUpdates.current.set(item.id, item.updated_at);
     version.current++;
     if (item.status === "done") queueCleanupGeneration.current++;
     setData(current => current ? { ...current, media: current.media.some(existing => existing.id === item.id)
@@ -617,10 +622,11 @@ function Owner({
       : [item, ...current.media], up_next: item.status === "done" && current.up_next
         ? { ...current.up_next, ids: current.up_next.ids.filter(id => id !== item.id) }
         : current.up_next } : current);
+    return true;
   }
   async function patchMedia(id: string, changes: Partial<Media>, expected?: Media) {
     const item = await api<Media>("/media/" + id, send("PATCH", { ...changes, expected }));
-    acknowledgeMedia(item);
+    if (!acknowledgeMedia(item)) return;
     if (item.status === "done") {
       setAnnouncement("Marked done and removed from Up next. Undo returns to unfinished without restoring its place.");
     }
@@ -630,6 +636,7 @@ function Owner({
     await api("/media/" + id, send("DELETE"));
     version.current++;
     queueCleanupGeneration.current++;
+    latestMediaUpdates.current.delete(id);
     undo.current = undefined;
     setData(current => current ? { ...current, media: current.media.filter(item => item.id !== id), up_next: current.up_next ? { ...current.up_next, ids: current.up_next.ids.filter(member => member !== id) } : undefined } : current);
   }
@@ -666,8 +673,9 @@ function Owner({
   }
   async function toggle(item: Media) {
     const next = item.status === "done" ? "pending" : "done";
+    let acknowledged: Media | undefined;
     if (
-      await perform(item.id, () => patchMedia(item.id, { status: next }, item))
+      await perform(item.id, async () => { acknowledged = await patchMedia(item.id, { status: next }, item); }) && acknowledged
     ) {
       const undoAction = setUndo(() => perform(item.id, () => patchMedia(item.id, { status: item.status }, { ...item, status: next })));
       toast.add({
@@ -726,8 +734,9 @@ function Owner({
   }
   async function markReviewed(item: Media) {
     if (!item.needs_review) return;
+    let acknowledged: Media | undefined;
     if (
-      await perform(item.id, () => patchMedia(item.id, { needs_review: false }))
+      await perform(item.id, async () => { acknowledged = await patchMedia(item.id, { needs_review: false }); }) && acknowledged
     ) {
       const undoAction = setUndo(() => perform(item.id, () => patchMedia(item.id, { needs_review: true })));
       toast.add({

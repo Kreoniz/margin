@@ -1,5 +1,16 @@
 import type { Kind, Media, Source } from "./types";
 
+export function compareUpdatedAt(left: string, right: string): number {
+  const leftTime = Date.parse(left), rightTime = Date.parse(right);
+  if (!Number.isFinite(leftTime) || !Number.isFinite(rightTime)) return 0;
+  if (leftTime !== rightTime) return leftTime - rightTime;
+  // Date.parse truncates PostgreSQL's sub-millisecond precision. Compare that
+  // remainder too; the parsed milliseconds already account for UTC offsets.
+  const remainder = (value: string) => (value.match(/\.(\d+)(?:Z|[+-]\d{2}:\d{2})$/)?.[1] || "").padEnd(9, "0").slice(3, 9);
+  const a = remainder(left), b = remainder(right);
+  return a === b ? 0 : a > b ? 1 : -1;
+}
+
 export function discoveryEmptyState(sources: Source[], state: string) {
   if (state !== "new") return { heading: `No ${state} articles.`, description: "Your discoveries will appear here when you change their status." };
   if (!sources.length) return { heading: "Follow something worth reading.", description: "Add a source to start collecting articles in Discover." };

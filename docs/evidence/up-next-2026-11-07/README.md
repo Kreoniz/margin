@@ -36,6 +36,12 @@ The owner requested one round, followed by improvements. Sol and two Terra revie
 - Reduced the 390px toolbar by 42px by placing Quick Find beside scoped search. Hid Channels only when there are no options or active selections; verified keyboard and focus recovery when it disappears. Added an outline and chevron to the priority control.
 - Passed 64 distinct focused synthetic browser cases across the main run and narrow channel rechecks, plus TypeScript/production build and utility tests. Repeated all nine real-backend layout/viewport checks with zero axe violations, overflow, or page/console errors. Refreshed all after captures and the continuous screencast, restoring synthetic queue and completion state afterward.
 
+## Additional council round with Astra
+
+The owner then requested one additional round, adding Astra to Sol and two Terra reviewers. All four reviewed frozen `4a9c7b2`; [the reports and reconciliation](council/round-2/README.md) distinguish their coverage and severity assessments. Three identified the same reverse response race, two independently reproducing it; the fourth found no actionable defects. All supported the existing design.
+
+The coordinator added a freshness check before accepting delayed media acknowledgements, preserving newer unfinished/reprioritized state and avoiding stale Done/review Undo toasts. The new regression failed before the fix, then passed for both separated timestamps and a one-microsecond difference. All 50 selected desktop/mobile priority and transition-recovery cases, the production TypeScript/build, and utility tests passed. No subsequent review round was run. This uses existing server update timestamps, without introducing a globally monotonic media revision protocol. The backend and visual layout are unchanged; existing captures and database verification remain applicable to those unchanged parts.
+
 ## Behavior and scope
 
 Mixed and Shelves preserve priority within their type groups; rank numbers refer to the full queue. List shows the full global order. Moves swap global neighbors. Reordering is disabled under search/type/tag/channel filters and attention or hidden-automatic subsets, with recovery guidance. Undoing Done restores unfinished status without restoring priority, as stated in the UI.

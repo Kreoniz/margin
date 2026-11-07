@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isFallbackTitle, safeURL, selectMedia, selectUpNext, youtubeChannelName } from "../src/utils.ts";
+import { compareUpdatedAt, isFallbackTitle, safeURL, selectMedia, selectUpNext, youtubeChannelName } from "../src/utils.ts";
 import type { Media } from "../src/types.ts";
+
+test("media update freshness preserves sub-millisecond precision and UTC offsets", () => {
+  assert.ok(compareUpdatedAt("2026-11-07T10:01:00.000001Z", "2026-11-07T10:01:00.000002Z") < 0);
+  assert.ok(compareUpdatedAt("2026-11-07T10:02:00Z", "2026-11-07T10:01:00.999999Z") > 0);
+  assert.equal(compareUpdatedAt("2026-11-07T13:01:00.1234+03:00", "2026-11-07T10:01:00.123400Z"), 0);
+  assert.ok(compareUpdatedAt("2026-11-07T13:01:00.123401+03:00", "2026-11-07T10:01:00.1234Z") > 0);
+  assert.equal(compareUpdatedAt("2026-11-07T10:01:00Z", "2026-11-07T10:01:00.000000Z"), 0);
+  assert.equal(compareUpdatedAt("invalid", "2026-11-07T10:01:00Z"), 0);
+});
 
 test("known YouTube placeholders are recoverable without replacing real titles", () => {
   for (const url of ["https://youtu.be/NBCM_ZoWZo8", "https://www.youtube.com/watch?v=NBCM_ZoWZo8", "https://m.youtube.com/shorts/NBCM_ZoWZo8"]) {
