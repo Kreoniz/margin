@@ -1,10 +1,12 @@
 export class ApiError extends Error {
   status: number;
   existingId?: string;
-  constructor(message: string, status: number, existingId?: string) {
+  code?: string;
+  constructor(message: string, status: number, existingId?: string, code?: string) {
     super(message);
     this.status = status;
     this.existingId = existingId;
+    this.code = code;
   }
 }
 export async function api<T>(
@@ -17,7 +19,9 @@ export async function api<T>(
       ...options,
       credentials: "same-origin",
       headers: { "Content-Type": "application/json", ...options.headers },
-      signal: options.signal ?? AbortSignal.timeout(25_000),
+      signal: options.signal
+        ? AbortSignal.any([options.signal, AbortSignal.timeout(25_000)])
+        : AbortSignal.timeout(25_000),
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError")
@@ -39,6 +43,7 @@ export async function api<T>(
         `Something went wrong (${response.status}). Please try again.`,
       response.status,
       body.existing_id,
+      body.code,
     );
   }
   return response.status === 204 ? (undefined as T) : response.json();

@@ -13,3 +13,4 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 backups/
+__pycache__/

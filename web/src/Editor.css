@@ -1,0 +1,14 @@
+.editor-modal .modal-footer > div {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 480px) {
+  .editor-modal .modal-footer {
+    flex-wrap: wrap;
+  }
+
+  .editor-modal .modal-footer > div {
+    width: 100%;
+  }
+}

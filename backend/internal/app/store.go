@@ -82,13 +82,13 @@ func (s *Store) Migrate(ctx context.Context) error {
 	return tx.Commit(ctx)
 }
 
-const mediaColumns = "id::text,title,author,kind,status,url,cover_url,description,notes,tags,visibility,created_at,updated_at,completed_at,needs_review,metadata_state,metadata_warning"
+const mediaColumns = "id::text,title,author,kind,status,url,cover_url,description,notes,tags,visibility,created_at,updated_at,completed_at,needs_review,metadata_state,metadata_warning,kind_explicit,auto_added,title_explicit,author_explicit,selected_text,selected_text_source_url"
 
 type scanner interface{ Scan(...any) error }
 
 func scanMedia(row scanner) (Media, error) {
 	var m Media
-	err := row.Scan(&m.ID, &m.Title, &m.Author, &m.Kind, &m.Status, &m.URL, &m.CoverURL, &m.Description, &m.Notes, &m.Tags, &m.Visibility, &m.CreatedAt, &m.UpdatedAt, &m.CompletedAt, &m.NeedsReview, &m.MetadataState, &m.MetadataWarning)
+	err := row.Scan(&m.ID, &m.Title, &m.Author, &m.Kind, &m.Status, &m.URL, &m.CoverURL, &m.Description, &m.Notes, &m.Tags, &m.Visibility, &m.CreatedAt, &m.UpdatedAt, &m.CompletedAt, &m.NeedsReview, &m.MetadataState, &m.MetadataWarning, &m.KindExplicit, &m.AutoAdded, &m.TitleExplicit, &m.AuthorExplicit, &m.SelectedText, &m.SelectedTextSourceURL)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -124,11 +124,11 @@ func insertMedia(ctx context.Context, tx pgx.Tx, m Media) (Media, bool, error) {
 			return m, false, err
 		}
 	}
-	created, err := scanMedia(tx.QueryRow(ctx, `INSERT INTO media(id,title,author,kind,status,url,url_key,manual_key,cover_url,description,notes,tags,visibility,completed_at,needs_review,metadata_state,metadata_warning)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
- ON CONFLICT DO NOTHING RETURNING `+mediaColumns, newID(), m.Title, m.Author, m.Kind, m.Status, m.URL, u, mk, m.CoverURL, m.Description, m.Notes, m.Tags, m.Visibility, m.CompletedAt, m.NeedsReview, m.MetadataState, m.MetadataWarning))
+	created, err := scanMedia(tx.QueryRow(ctx, `INSERT INTO media(id,title,author,kind,status,url,url_key,manual_key,cover_url,description,notes,tags,visibility,completed_at,needs_review,metadata_state,metadata_warning,kind_explicit,auto_added,title_explicit,author_explicit,selected_text,selected_text_source_url)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+ ON CONFLICT DO NOTHING RETURNING `+mediaColumns, newID(), m.Title, m.Author, m.Kind, m.Status, m.URL, u, mk, m.CoverURL, m.Description, m.Notes, m.Tags, m.Visibility, m.CompletedAt, m.NeedsReview, m.MetadataState, m.MetadataWarning, m.KindExplicit, m.AutoAdded, m.TitleExplicit, m.AuthorExplicit, m.SelectedText, m.SelectedTextSourceURL))
 	if !errors.Is(err, ErrNotFound) {
-		return created, err == nil, err
+		return created, err == nil, mediaWriteError(err)
 	}
 	existing, err := scanMedia(tx.QueryRow(ctx, "SELECT "+mediaColumns+" FROM media WHERE NOT is_demo AND (url_key=$1 OR manual_key=$2)", u, mk))
 	return existing, false, err
@@ -160,9 +160,18 @@ func (s *Store) PatchMedia(ctx context.Context, id string, in MediaInput) (Media
 	if err != nil {
 		return m, err
 	}
+	if err = in.checkExpected(m); err != nil {
+		return m, err
+	}
 	m, err = in.Apply(m)
 	if err != nil {
 		return m, &ValidationError{err.Error()}
+	}
+	if in.Title != nil {
+		m.TitleExplicit = true
+	}
+	if in.Author != nil {
+		m.AuthorExplicit = true
 	}
 	u, mk := mediaKeys(m)
 	if u != nil {
@@ -170,7 +179,7 @@ func (s *Store) PatchMedia(ctx context.Context, id string, in MediaInput) (Media
 			return m, err
 		}
 	}
-	_, err = tx.Exec(ctx, `UPDATE media SET title=$2,author=$3,kind=$4,status=$5,url=$6,url_key=$7,manual_key=$8,cover_url=$9,description=$10,notes=$11,tags=$12,visibility=$13,completed_at=$14,needs_review=$15,metadata_state=$16,metadata_warning=$17,metadata_lease_token=CASE WHEN url<>$6 OR $18 THEN NULL ELSE metadata_lease_token END,metadata_lease_until=CASE WHEN url<>$6 OR $18 THEN NULL ELSE metadata_lease_until END,updated_at=now() WHERE id=$1`, id, m.Title, m.Author, m.Kind, m.Status, m.URL, u, mk, m.CoverURL, m.Description, m.Notes, m.Tags, m.Visibility, m.CompletedAt, m.NeedsReview, m.MetadataState, m.MetadataWarning, in.FetchMetadata)
+	_, err = tx.Exec(ctx, `UPDATE media SET title=$2,author=$3,kind=$4,status=$5,url=$6,url_key=$7,manual_key=$8,cover_url=$9,description=$10,notes=$11,tags=$12,visibility=$13,completed_at=$14,needs_review=$15,metadata_state=$16,metadata_warning=$17,metadata_lease_token=CASE WHEN url<>$6 OR $18 THEN NULL ELSE metadata_lease_token END,metadata_lease_until=CASE WHEN url<>$6 OR $18 THEN NULL ELSE metadata_lease_until END,kind_explicit=$19,title_explicit=$20,author_explicit=$21,updated_at=now() WHERE id=$1`, id, m.Title, m.Author, m.Kind, m.Status, m.URL, u, mk, m.CoverURL, m.Description, m.Notes, m.Tags, m.Visibility, m.CompletedAt, m.NeedsReview, m.MetadataState, m.MetadataWarning, in.FetchMetadata, m.KindExplicit, m.TitleExplicit, m.AuthorExplicit)
 	if isUnique(err) {
 		tx.Rollback(ctx)
 		var existing string
@@ -181,7 +190,7 @@ func (s *Store) PatchMedia(ctx context.Context, id string, in MediaInput) (Media
 		return m, &DuplicateError{existing}
 	}
 	if err != nil {
-		return m, err
+		return m, mediaWriteError(err)
 	}
 	m, err = scanMedia(tx.QueryRow(ctx, "SELECT "+mediaColumns+" FROM media WHERE id=$1", id))
 	if err != nil {
@@ -191,6 +200,14 @@ func (s *Store) PatchMedia(ctx context.Context, id string, in MediaInput) (Media
 }
 
 func isUnique(err error) bool { var p *pgconn.PgError; return errors.As(err, &p) && p.Code == "23505" }
+
+func mediaWriteError(err error) error {
+	var p *pgconn.PgError
+	if errors.As(err, &p) && p.Code == "23503" && p.ConstraintName == "media_cover_image_id_fkey" {
+		return &ValidationError{"This uploaded image is no longer available. Upload it again before saving."}
+	}
+	return err
+}
 
 type ValidationError struct{ Message string }
 
@@ -359,6 +376,7 @@ func (s *Store) PatchSource(ctx context.Context, id string, p SourcePatch) (Sour
 	}
 	return scanSource(s.Pool.QueryRow(ctx, `UPDATE sources s SET name=COALESCE($2,name),enabled=COALESCE($3,enabled),interval_minutes=COALESCE($4,interval_minutes),
  auto_save=COALESCE($5,auto_save),auto_save_after=CASE WHEN $5::boolean=true AND NOT auto_save THEN clock_timestamp() ELSE auto_save_after END,
+ lease_token=CASE WHEN $3::boolean=false THEN NULL ELSE lease_token END,lease_until=CASE WHEN $3::boolean=false THEN NULL ELSE lease_until END,
  next_sync=CASE WHEN $3::boolean=true AND NOT enabled THEN now() WHEN $4::integer IS NOT NULL THEN COALESCE(last_sync,now())+make_interval(mins=>$4::integer) ELSE next_sync END
  WHERE id=$1 RETURNING `+sourceColumns, id, p.Name, p.Enabled, p.IntervalMinutes, p.AutoSave))
 }
@@ -393,8 +411,8 @@ func (s *Store) FinishSource(ctx context.Context, src Source, token string, item
 	}
 	if syncErr == nil {
 		for _, i := range items {
-			// A persistent seen key prevents deleted/read/dismissed records from
-			// becoming new again, including after source deletion/recreation.
+			// Seen keys prevent repeat auto-save, including after source removal.
+			// Re-subscribing starts a fresh discovery inbox, as the UI explains.
 			tag, err := tx.Exec(ctx, "INSERT INTO seen_articles(url_key) VALUES($1) ON CONFLICT DO NOTHING", urlKey(i.URL))
 			if err != nil {
 				return err
@@ -411,6 +429,7 @@ func (s *Store) FinishSource(ctx context.Context, src Source, token string, item
 					return err
 				}
 				m.NeedsReview = true
+				m.AutoAdded = true
 				m, _, err = insertMedia(ctx, tx, m)
 				if err != nil {
 					return err

@@ -9,6 +9,7 @@ import { Modal } from "./components";
 import { Icon } from "./Icon";
 import type { Media } from "./types";
 import { publicPath } from "./utils";
+import { AgentConnectionSettings } from "./AgentConnectionSettings";
 import { BrowserCaptureSettings } from "./BrowserCaptureSettings";
 import { KeyboardHelp } from "./KeyboardHelp";
 
@@ -25,6 +26,8 @@ export function Settings({
   fixtureCount = 0,
   onDemoData,
   demoBusy = false,
+  hideAutoAdded,
+  onHideAutoAdded,
 }: {
   onClose: () => void;
   onLogout: () => void;
@@ -38,11 +41,17 @@ export function Settings({
   fixtureCount?: number;
   onDemoData?: () => void;
   demoBusy?: boolean;
+  hideAutoAdded: boolean;
+  onHideAutoAdded: (hide: boolean) => void;
 }) {
   const [configured, setConfigured] = useState<boolean>();
+  const [checkingToken, setCheckingToken] = useState(true);
+  const [tokenStatusError, setTokenStatusError] = useState("");
   const [token, setToken] = useState("");
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [browserBusy, setBrowserBusy] = useState(false);
+  const [agentBusy, setAgentBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState("");
   const [samples, setSamples] = useState<Media[]>();
@@ -52,13 +61,21 @@ export function Settings({
     ignoreInputs: false,
     requireReset: true,
   });
-  useEffect(() => {
-    void api<{ configured: boolean }>("/integration/token")
-      .then((data) => setConfigured(data.configured))
-      .catch((e) => setError(e.message));
-  }, []);
+  async function checkTokenStatus() {
+    setCheckingToken(true);
+    setTokenStatusError("");
+    try {
+      const data = await api<{ configured: boolean }>("/integration/token");
+      setConfigured(data.configured);
+    } catch (e) {
+      setTokenStatusError(e instanceof Error ? e.message : "Could not check submission token.");
+    } finally {
+      setCheckingToken(false);
+    }
+  }
+  useEffect(() => { void checkTokenStatus(); }, []);
   async function tokenAction(remove = false) {
-    if (busy) return;
+    if (busy || configured === undefined) return;
     setBusy(true);
     setError("");
     try {
@@ -87,7 +104,7 @@ export function Settings({
       title="Settings"
       onClose={onClose}
       className="settings-modal"
-      busy={busy || demoBusy}
+      busy={busy || browserBusy || agentBusy || demoBusy}
     >
       {devMode && (
         <details className="settings-disclosure">
@@ -100,7 +117,7 @@ export function Settings({
           </summary>
           <div className="settings-detail">
             <p>
-              Nine fictional public items with local covers. G then M loads or
+              Nine fictional public items with local covers. g then m loads or
               clears them.
             </p>
             <Button
@@ -150,9 +167,9 @@ export function Settings({
         <label className="single-key-option">
           <Checkbox checked={singleKeys} onCheckedChange={onSingleKeys} />
           <span>
-            Enable single-key shortcuts{" "}
+            Enable Vim quick keys{" "}
             <span className="text-u-muted">
-              · h/l tabs · j/k items · / search
+              · h/l tabs · j/k items · Ctrl+d/u
             </span>
           </span>
         </label>
@@ -163,6 +180,16 @@ export function Settings({
           </Button>
         </div>
       </section>
+      <details className="settings-disclosure">
+        <summary><span><Icon name="book" size={15} />Library · automatic additions</span><Icon name="chevron" size={14} /></summary>
+        <div className="settings-detail">
+        <label className="single-key-option">
+          <Checkbox checked={hideAutoAdded} onCheckedChange={onHideAutoAdded} />
+          <span>Hide automatic additions</span>
+        </label>
+        <p className="quiet text-xs">Hide source auto-saves from Library in this browser, including reviewed items. Discover and manual saves stay available.</p>
+        </div>
+      </details>
       <details className="settings-disclosure">
         <summary>
           <span>
@@ -176,6 +203,7 @@ export function Settings({
             Items are private until you mark them public. Visitors can read
             shared items; only you can edit. Notes are always private.
           </p>
+          <p>External previews load from image hosts, which can see your IP address and request time. Private notes are never sent with those requests.</p>
           <div>
             <Button
               variant="secondary"
@@ -205,7 +233,10 @@ export function Settings({
             cannot browse, edit, delete or publish your library.
           </p>
           {configured === undefined ? (
-            <p role="status">Loading integration status…</p>
+            checkingToken ? <p role="status">Loading integration status…</p> : <div>
+              <p role="alert" className="notice error">Submission token status unavailable. {tokenStatusError}</p>
+              <Button variant="ghost" size="sm" onClick={() => void checkTokenStatus()}>Retry submission token status</Button>
+            </div>
           ) : (
             <div className="button-row">
               <Button
@@ -315,7 +346,8 @@ export function Settings({
           </details>
         </div>
       </details>
-      <BrowserCaptureSettings />
+      <BrowserCaptureSettings onBusyChange={setBrowserBusy} />
+      <AgentConnectionSettings onBusyChange={setAgentBusy} />
       <details className="settings-disclosure">
         <summary>
           <span>
@@ -449,7 +481,7 @@ export function Settings({
         <Button
           variant="secondary"
           size="sm"
-          disabled={busy}
+          disabled={busy || browserBusy || agentBusy}
           onClick={onLogout}
         >
           <Icon name="logout" size={14} />

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -13,23 +14,29 @@ import (
 )
 
 type Media struct {
-	MetadataState   string     `json:"metadata_state,omitempty"`
-	MetadataWarning string     `json:"metadata_warning,omitempty"`
-	NeedsReview     bool       `json:"needs_review"`
-	ID              string     `json:"id"`
-	Title           string     `json:"title"`
-	Author          string     `json:"author"`
-	Kind            string     `json:"kind"`
-	Status          string     `json:"status"`
-	URL             string     `json:"url"`
-	CoverURL        string     `json:"cover_url"`
-	Description     string     `json:"description"`
-	Notes           string     `json:"notes"`
-	Tags            []string   `json:"tags"`
-	Visibility      string     `json:"visibility"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	CompletedAt     *time.Time `json:"completed_at,omitempty"`
+	SelectedText          string     `json:"selected_text,omitempty"`
+	SelectedTextSourceURL string     `json:"selected_text_source_url,omitempty"`
+	TitleExplicit         bool       `json:"-"`
+	AuthorExplicit        bool       `json:"-"`
+	AutoAdded             bool       `json:"auto_added"`
+	KindExplicit          bool       `json:"kind_explicit"`
+	MetadataState         string     `json:"metadata_state,omitempty"`
+	MetadataWarning       string     `json:"metadata_warning,omitempty"`
+	NeedsReview           bool       `json:"needs_review"`
+	ID                    string     `json:"id"`
+	Title                 string     `json:"title"`
+	Author                string     `json:"author"`
+	Kind                  string     `json:"kind"`
+	Status                string     `json:"status"`
+	URL                   string     `json:"url"`
+	CoverURL              string     `json:"cover_url"`
+	Description           string     `json:"description"`
+	Notes                 string     `json:"notes"`
+	Tags                  []string   `json:"tags"`
+	Visibility            string     `json:"visibility"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+	CompletedAt           *time.Time `json:"completed_at,omitempty"`
 }
 
 // PublicMedia is an explicit allowlist: owner notes and operational data never serialize.
@@ -54,6 +61,9 @@ func publicMedia(m Media) PublicMedia {
 }
 
 type MediaInput struct {
+	InferKind       bool      `json:"infer_kind,omitempty"`
+	Expected        *Media    `json:"expected,omitempty"`
+	ExpectedURL     *string   `json:"expected_url,omitempty"`
 	FetchMetadata   bool      `json:"fetch_metadata,omitempty"`
 	MetadataWarning *string   `json:"metadata_warning,omitempty"`
 	NeedsReview     *bool     `json:"needs_review"`
@@ -69,11 +79,47 @@ type MediaInput struct {
 	Visibility      *string   `json:"visibility"`
 }
 
+// Compare only submitted fields: unrelated edits can coexist, while a stale
+// edit of the same field must be reconciled rather than silently replacing it.
+func (in MediaInput) checkExpected(current Media) error {
+	if in.ExpectedURL != nil && *in.ExpectedURL != current.URL {
+		return ErrEditConflict
+	}
+	if in.Expected == nil {
+		return nil
+	}
+	e := in.Expected
+	if in.Kind != nil && current.KindExplicit != e.KindExplicit {
+		return ErrEditConflict
+	}
+	for _, field := range []struct {
+		submitted         *string
+		current, expected string
+	}{
+		{in.Title, current.Title, e.Title}, {in.Author, current.Author, e.Author},
+		{in.Kind, current.Kind, e.Kind}, {in.Status, current.Status, e.Status},
+		{in.URL, current.URL, e.URL}, {in.CoverURL, current.CoverURL, e.CoverURL},
+		{in.Description, current.Description, e.Description}, {in.Notes, current.Notes, e.Notes},
+		{in.Visibility, current.Visibility, e.Visibility},
+	} {
+		if field.submitted != nil && field.current != field.expected {
+			return ErrEditConflict
+		}
+	}
+	if in.Tags != nil && !slices.Equal(current.Tags, e.Tags) || in.NeedsReview != nil && current.NeedsReview != e.NeedsReview {
+		return ErrEditConflict
+	}
+	return nil
+}
+
 func NewMedia() Media {
 	return Media{Kind: "other", Status: "pending", Visibility: "private", Tags: []string{}}
 }
 
 func (in MediaInput) Apply(m Media) (Media, error) {
+	if in.Kind != nil {
+		m.KindExplicit = !in.InferKind
+	}
 	if in.MetadataWarning != nil {
 		m.MetadataWarning = clip(strings.TrimSpace(*in.MetadataWarning), 1000)
 		if m.MetadataWarning != "" {
@@ -143,6 +189,8 @@ func (in MediaInput) Apply(m Media) (Media, error) {
 		if err != nil {
 			return m, fmt.Errorf("cover_url: %w", err)
 		}
+	} else if isImagePath(m.CoverURL) {
+		m.CoverURL = strings.ToLower(m.CoverURL)
 	}
 	if m.Status == "done" {
 		if m.CompletedAt == nil {
@@ -153,7 +201,7 @@ func (in MediaInput) Apply(m Media) (Media, error) {
 		m.CompletedAt = nil
 	}
 
-	if m.URL == "" {
+	if m.URL == "" && !(m.Kind == "book" && validISBN(m.Title) != "") {
 		m.MetadataState = ""
 		m.MetadataWarning = ""
 	} else if m.MetadataState == "" {
@@ -238,6 +286,7 @@ func validID(s string) bool {
 }
 
 var ErrNotFound = errors.New("not found")
+var ErrEditConflict = errors.New("This item changed elsewhere. Your draft is still here; reload the latest item before saving these changes.")
 
 type DuplicateError struct{ ExistingID string }
 

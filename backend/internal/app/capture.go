@@ -40,8 +40,9 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		URL          string `json:"url"`
-		Action       string `json:"action"`
+		Selection    *captureSelection `json:"selection,omitempty"`
+		URL          string            `json:"url"`
+		Action       string            `json:"action"`
 		PageMetadata *struct {
 			Title       string `json:"title"`
 			Author      string `json:"author"`
@@ -61,6 +62,11 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 		respond(w, 400, nil, &ValidationError{err.Error()})
 		return
 	}
+	selection, err := validateSelection(in.Selection, canonical)
+	if err != nil {
+		respond(w, 400, nil, err)
+		return
+	}
 	// Resolve duplicates before fetching, so Done works even while a publisher is down.
 	var exists bool
 	err = s.Store.Pool.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM media WHERE NOT is_demo AND url_key=$1)", urlKey(canonical)).Scan(&exists)
@@ -70,7 +76,9 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 	}
 	m := NewMedia()
 	if !exists {
-		m, err = s.prepareMedia(r.Context(), MediaInput{URL: &canonical})
+		// Persist first. Publisher latency must not consume the extension worker's
+		// lifetime before the capture has a durable receipt.
+		m, err = s.prepareMedia(r.Context(), MediaInput{URL: &canonical, FetchMetadata: true})
 		if err != nil {
 			respond(w, 400, nil, err)
 			return
@@ -78,6 +86,9 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 		if in.PageMetadata != nil {
 			hint := in.PageMetadata
 			hint.Title = clip(strings.TrimSpace(hint.Title), 1000)
+			if youtubeID(canonical) != "" && youtubePlaceholder(hint.Title) {
+				hint.Title, hint.Author, hint.CoverURL, hint.Description = "", "", "", ""
+			}
 			hint.Author = clip(strings.TrimSpace(hint.Author), 1000)
 			hint.Description = clip(strings.TrimSpace(hint.Description), 20000)
 			patch := MediaInput{}
@@ -97,12 +108,12 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 			}
 			if enriched, e := patch.Apply(m); e == nil {
 				m = enriched
-				if !generatedTitle(m) && (m.CoverURL != "" || m.Description != "") {
-					m.MetadataWarning = ""
+				if !generatedTitle(m) && m.Author != "" && (m.CoverURL != "" || m.Description != "") {
 					m.MetadataState = "ready"
 				}
 			}
 		}
+		m.SelectedText, m.SelectedTextSourceURL = selection.Text, selection.SourceURL
 		m.NeedsReview = true
 	}
 	tx, err := s.Store.Pool.Begin(r.Context())
@@ -131,7 +142,7 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 	created := false
 	if errors.Is(err, ErrNotFound) {
 		if exists {
-			respond(w, 404, nil, ErrNotFound)
+			writeJSON(w, 409, map[string]string{"error": "This item was removed while capturing. Capture the page again to save a new item."})
 			return
 		}
 		m.URL = canonical
@@ -147,6 +158,9 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		err = tx.Commit(r.Context())
 	}
+	if err == nil && created && current.MetadataState == "pending" && s.Worker != nil {
+		s.Worker.TriggerMetadata()
+	}
 	status := 200
 	if created {
 		status = 201
@@ -155,10 +169,22 @@ func (s *Server) captureItem(w http.ResponseWriter, r *http.Request) {
 	if created && current.MetadataWarning != "" {
 		warning = "Some details are unavailable. Open Margin to retry or edit them."
 	}
+	receiptMetadataState := &current.MetadataState
+	var selectionSaved *bool
+	if in.Selection != nil {
+		saved := created
+		selectionSaved = &saved
+		if !created {
+			warning = selectionNotSavedWarning
+			receiptMetadataState = nil
+		}
+	}
 	respond(w, status, struct {
-		ID      string `json:"id"`
-		Created bool   `json:"created"`
-		Action  string `json:"action"`
-		Warning string `json:"warning,omitempty"`
-	}{current.ID, created, strings.ToLower(in.Action), warning}, err)
+		SelectionSaved *bool   `json:"selection_saved,omitempty"`
+		ID             string  `json:"id"`
+		Created        bool    `json:"created"`
+		Action         string  `json:"action"`
+		Warning        string  `json:"warning,omitempty"`
+		MetadataState  *string `json:"metadata_state,omitempty"`
+	}{selectionSaved, current.ID, created, strings.ToLower(in.Action), warning, receiptMetadataState}, err)
 }

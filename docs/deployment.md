@@ -1,5 +1,7 @@
 # Docker deployment
 
+Current production verification and rollback: [Full capture/retrieval release, 2026-11-02](deployment-2026-11-02-complete.md).
+
 Use `deploy/compose.production.yaml` behind an existing HTTPS Caddy proxy. It publishes no host ports. PostgreSQL runs on a separate internal network; only the application joins the proxy network. The application runs as UID 65532 with a read-only filesystem, no capabilities and bounded CPU/memory/processes. The database is persistent, limited to 256 MiB, and the app uses its own non-superuser database role.
 
 ## First deployment

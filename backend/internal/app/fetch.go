@@ -96,8 +96,6 @@ func CanonicalURL(raw string) (string, error) {
 	if port != "" && !(u.Scheme == "http" && port == "80" || u.Scheme == "https" && port == "443") {
 		u.Host = net.JoinHostPort(host, port)
 	}
-	u.Fragment = ""
-	u.RawFragment = ""
 	if u.Path == "" {
 		u.Path = "/"
 	}
@@ -151,6 +149,11 @@ func urlKey(canonical string) string {
 	u, _ := url.Parse(canonical)
 	u.Scheme = "https"
 	u.Host = strings.TrimPrefix(u.Host, "www.")
+	// Ordinary anchors share document identity; explicit hash routes identify
+	// different pages. The stored navigation URL always retains its fragment.
+	if !strings.HasPrefix(u.Fragment, "/") && !strings.HasPrefix(u.Fragment, "!/") {
+		u.Fragment, u.RawFragment = "", ""
+	}
 	// Preserve the existing duplicate identity without changing fetch/base URLs.
 	// Trim the escaped path so an encoded slash never becomes a path separator.
 	u.RawPath = strings.TrimRight(u.EscapedPath(), "/")
@@ -256,6 +259,8 @@ func (f *Fetcher) Get(ctx context.Context, raw string, maxBytes int64) (FetchRes
 	if err != nil {
 		return FetchResult{}, err
 	}
+	// Fragments belong to browser navigation, never to the remote fetch target.
+	req.URL.Fragment, req.URL.RawFragment = "", ""
 	req.Header.Set("User-Agent", "Margin/1.0 (personal reading inbox; RSS/metadata fetcher)")
 	req.Header.Set("Accept", "application/atom+xml, application/rss+xml, application/xml, text/html, application/pdf;q=0.8, */*;q=0.5")
 	res, err := f.client.Do(req)

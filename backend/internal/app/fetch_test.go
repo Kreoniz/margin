@@ -22,7 +22,7 @@ func fakeResponse(r *http.Request, status int, ct, body string) *http.Response {
 
 func TestCanonicalURL(t *testing.T) {
 	cases := map[string]string{
-		"HTTPS://Example.COM.:443/a/%7euser/?utm_source=test&b=2&a=1#hello": "https://example.com/a/~user/?a=1&b=2",
+		"HTTPS://Example.COM.:443/a/%7euser/?utm_source=test&b=2&a=1#hello": "https://example.com/a/~user/?a=1&b=2#hello",
 		"https://example.com":                        "https://example.com/",
 		"https://example.com/a%2fb?gclid=gone&q=a+b": "https://example.com/a%2Fb?q=a+b",
 		"https://example.com/blog//":                 "https://example.com/blog//",

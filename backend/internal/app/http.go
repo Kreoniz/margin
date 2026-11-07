@@ -31,6 +31,10 @@ type Server struct {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.Handle("/api/mcp", s.agentHandler())
+	mux.HandleFunc("GET /api/integration/agent-grants", s.agentGrantStatus)
+	mux.HandleFunc("POST /api/integration/agent-grants/{scope}", s.agentGrantChange)
+	mux.HandleFunc("DELETE /api/integration/agent-grants/{scope}", s.agentGrantChange)
 	if s.DevMode {
 		mux.HandleFunc("POST /api/dev/fixtures", s.devFixtures)
 		mux.HandleFunc("DELETE /api/dev/fixtures", s.devFixtures)
@@ -80,6 +84,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/integration/browser-token", s.revokeBrowserToken)
 	mux.HandleFunc("POST /api/integrations/capture", s.captureItem)
 	mux.HandleFunc("PATCH /api/inbox/{id}", s.patchInbox)
+	mux.HandleFunc("GET /api/inbox", s.listInbox)
 	mux.HandleFunc("POST /api/inbox/{id}/save", func(w http.ResponseWriter, r *http.Request) {
 		if !requireID(w, r) {
 			return
@@ -133,7 +138,17 @@ func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, nil, err)
 		return
 	}
+	fixtureIDs, err := s.Store.devFixtureIDs(r.Context())
+	if err != nil {
+		respond(w, 500, nil, err)
+		return
+	}
 	fixtureCount := 0
+	counts, err := s.Store.InboxCounts(r.Context())
+	if err != nil {
+		respond(w, 500, nil, err)
+		return
+	}
 	if s.DevMode {
 		fixtureCount, err = s.Store.devFixtureCount(r.Context())
 		if err != nil {
@@ -142,13 +157,15 @@ func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, 200, struct {
-		DevMode           bool        `json:"dev_mode"`
-		DevFixtureCount   int         `json:"dev_fixture_count"`
-		LegacySampleCount int         `json:"legacy_sample_count"`
-		Media             []Media     `json:"media"`
-		Inbox             []InboxItem `json:"inbox"`
-		Sources           []Source    `json:"sources"`
-	}{s.DevMode, fixtureCount, count, media, inbox, sources})
+		DevMode           bool           `json:"dev_mode"`
+		DevFixtureIDs     []string       `json:"dev_fixture_ids"`
+		DevFixtureCount   int            `json:"dev_fixture_count"`
+		LegacySampleCount int            `json:"legacy_sample_count"`
+		Media             []Media        `json:"media"`
+		Inbox             []InboxItem    `json:"inbox"`
+		Sources           []Source       `json:"sources"`
+		InboxCounts       map[string]int `json:"inbox_counts"`
+	}{s.DevMode, fixtureIDs, fixtureCount, count, media, inbox, sources, counts})
 }
 func (s *Server) createMedia(w http.ResponseWriter, r *http.Request) {
 	var in MediaInput
@@ -298,6 +315,8 @@ func respond(w http.ResponseWriter, status int, value any, err error) {
 	var duplicate *DuplicateError
 	var validation *ValidationError
 	switch {
+	case errors.Is(err, ErrEditConflict):
+		writeJSON(w, 409, map[string]string{"error": err.Error(), "code": "edit_conflict"})
 	case errors.As(err, &duplicate):
 		writeJSON(w, 409, map[string]string{"error": err.Error(), "existing_id": duplicate.ExistingID})
 	case errors.As(err, &validation):
@@ -347,7 +366,7 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 			r = r.WithContext(ctx)
 		}
 		path := r.URL.Path
-		publicPath := path == "/api/health" || path == "/api/session" || path == "/api/setup" || path == "/api/login" || path == "/api/logout" || path == "/api/integrations/items" || path == "/api/integrations/capture" || (strings.HasPrefix(path, "/api/images/") && oneOf(r.Method, "GET", "HEAD")) || strings.HasPrefix(path, "/api/public/")
+		publicPath := path == "/api/mcp" || path == "/api/health" || path == "/api/session" || path == "/api/setup" || path == "/api/login" || path == "/api/logout" || path == "/api/integrations/items" || path == "/api/integrations/capture" || (strings.HasPrefix(path, "/api/images/") && oneOf(r.Method, "GET", "HEAD")) || strings.HasPrefix(path, "/api/public/")
 		if strings.HasPrefix(path, "/api/public/") && !oneOf(r.Method, "GET", "HEAD") {
 			writeJSON(w, 405, map[string]string{"error": "Public library is read-only"})
 			return

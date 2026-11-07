@@ -3,12 +3,15 @@ package app
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"image"
 	"image/jpeg"
 	_ "image/png"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -53,9 +56,17 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	_, err = s.Store.Pool.Exec(r.Context(), "INSERT INTO images(id,body) VALUES($1,$2)", id, clean.Bytes())
 	// Abandoned draft uploads expire; images attached to any item are retained.
 	if err == nil {
-		_, err = s.Store.Pool.Exec(r.Context(), "DELETE FROM images WHERE created_at < now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM media WHERE cover_url='/api/images/'||images.id::text)")
+		err = s.Store.cleanupImages(r.Context())
 	}
 	respond(w, 201, map[string]string{"url": "/api/images/" + id}, err)
+}
+
+func (s *Store) cleanupImages(ctx context.Context) error {
+	_, err := s.Pool.Exec(ctx, `DELETE FROM images WHERE id IN (
+ SELECT id FROM images WHERE created_at < now()-interval '1 day'
+ AND NOT EXISTS(SELECT 1 FROM media WHERE cover_image_id=images.id)
+ FOR UPDATE SKIP LOCKED)`)
+	return err
 }
 
 func (s *Server) image(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +162,10 @@ func (s *Server) exportLibrary(w http.ResponseWriter, r *http.Request) {
 		err = tx.Commit(r.Context())
 	}
 	if err != nil {
+		slog.Error("library export failed", "stage", "stream_or_commit", "error_type", fmt.Sprintf("%T", err))
 		return
 	} // Incomplete downloads fail ZIP validation instead of looking complete.
-	_ = archive.Close()
+	if err = archive.Close(); err != nil {
+		slog.Error("library export failed", "stage", "zip_close", "error_type", fmt.Sprintf("%T", err))
+	}
 }

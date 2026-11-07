@@ -43,18 +43,20 @@ GET /api/integration/token -> `{configured:boolean,created_at:string|null}` owne
 POST /api/integration/token -> `{token:string,created_at}` owner-only create/rotate randomsecret shownonceinapp; storedhashed. DELETE ->204 revoke.
 POST /api/integrations/items requires Authorization Bearer submissiontoken, NOT browsercookieauthority. Accept `{title?,url?,author?,kind?,tags?,notes?}` titleORurlrequired. Metadata fills missingfields; explicitfieldswin. FORCE PRIVATE PENDING, reject status/visibility overrides. New201 or duplicate200 idempotent. Every successful submission returns ONLY `{id:string,created:boolean}` (`created:true` for 201, `false` for 200), including manual, URL, concurrent and legacy-sample-copy submissions. Duplicates preserve the existing item and reveal no title, URL, status, notes or other owner-edited metadata. Tokencannotreadprivate/list/notes, edit/delete/share ormanagesources. Boundbodies/rejectrevokedcredentials.
 
+URL submissions persist pending metadata before any publisher request; a successful receipt acknowledges the committed item, not completed enrichment. Only newly created pending items trigger the existing durable metadata worker. Duplicates never fetch the publisher or change stored fields. The worker fills missing/default-derived fields and preserves later owner edits; publisher failures leave an available incomplete item with existing recovery/retry behavior. New submissions require review, and title-only submissions remain valid. Token validity is rechecked under a row lock in the submission transaction; storage failures cannot return success. Owner `POST /api/media` keeps its default synchronous lookup unless `fetch_metadata:true` is supplied.
+
 Document curl/Python/Hermes HTTP submission using environment token placeholders. No live Marvin/Telegram changes authorized. Tests isolated schemas and clearly named testrecords, no fabricated normal screenshots.
 
 
 ## Capture, images, and export (migration 004)
 
 - `needs_review` is owner-only, default false for existing/manual items. New integration and automatic source captures set it true. Owner PATCH `/api/media/{id}` accepts `{needs_review:false}` independently of pending/done. Duplicates preserve existing review state. Public DTOs exclude this field.
-- POST `/api/books/search` `{query,author?}` returns `{items:Metadata[],warning?}`. It uses up to five ranked Open Library results and the first relevant edition for each work, caches bounded results for 15 minutes, and throttles uncached calls to one per second. Provider failures return an empty result with a warning. Book JSON-LD on publisher URLs is preferred; explicit complete editor fields skip redundant metadata fetching on save.
+- POST `/api/books/search` `{query,author?}` returns `{items:Metadata[],warning?}`. It uses up to five ranked Open Library results and the first relevant edition for each work, caches bounded nonempty results for 15 minutes, and throttles uncached calls to one per second. Empty results can be retried, valid bare/path catalogue IDs are accepted, and malformed responses/provider failures return an empty result with a warning. Book JSON-LD on publisher URLs is preferred; explicit complete editor fields skip redundant metadata fetching on save.
 - POST `/api/images` requires an owner session and raw JPEG/PNG bytes, at most 2 MiB and 1600px per edge. The server decodes and re-encodes JPEG, stores bytes in PostgreSQL, and returns 201 `{url:"/api/images/{uuid}"}`. Owner media `cover_url` accepts this exact local path or a validated public HTTP(S) image URL.
 - GET `/api/images/{id}` returns JPEG only to the owner or when a non-demo public media item references that image. Otherwise 404. Responses are private/no-store so changing visibility takes effect on subsequent requests. Unattached images older than a day are cleaned on upload.
 - GET `/api/export` requires the owner session and streams `margin-export.zip` containing versioned `library.json` plus referenced uploads at `images/{uuid}.jpg`. Uploaded cover paths become relative. Export includes private notes and review/completion state, but excludes credentials, sessions, tokens, demo rows, and orphan uploads. External image URLs remain URLs.
 - Owner GET/POST/DELETE `/api/integration/browser-token` reads configuration, creates/rotates a once-shown token, or revokes it. Only the hash is stored. This is independent of `/api/integration/token`.
-- POST `/api/integrations/capture` requires the browser token, never a session or submission token. Input is exactly `{url,action:"save"|"done"}`. New URLs create private items; done also marks them done. Existing canonical URL matches retain all metadata, visibility, and review flags; done changes completion only. Returns 201/200 `{id,created,action}`. Revocation/rotation is rechecked under a token-row lock after metadata fetching. Same-URL capture transactions are serialized. This bearer-only endpoint permits cross-origin extension requests; all cookie-authenticated mutation routes retain same-origin checks.
+- POST `/api/integrations/capture` requires the browser token, never a session or submission token. Input is `{url,action:"save"|"done",page_metadata?:{title?,author?,cover_url?,description?}}`; other fields are rejected. New URLs create private items; done also marks them done. Existing canonical URL matches retain all metadata, visibility, and review flags; done changes completion only. Returns 201/200 `{id,created,action,metadata_state,warning?}`. `pending` means the item is saved but enrichment has not finished, rather than confirmed complete metadata. Known YouTube placeholder-page hints are discarded before enrichment. Revocation/rotation is rechecked under a token-row lock before commit; new captures persist before remote metadata fetching. Same-URL capture transactions are serialized. If an existing item is removed during capture, return 409 with an explicit retry message rather than silently recreating it. This bearer-only endpoint permits cross-origin extension requests; cookie-authenticated mutation routes retain same-origin checks.
 
 See [capture decisions and sources](capture-and-collection.md) and [extension setup](../extension/README.md).
 
@@ -70,3 +72,69 @@ Owner Media adds `metadata_state` (`pending`, `ready`, `partial`, or empty for o
 Known first-party RSS feeds can recover metadata when HTML is blocked. Lookup matches the canonical URL across up to 5,000 body-bounded entries, independently of the inbox’s recent-item retention, and caches known feeds for ten minutes. No third-party mirror or invented author/image is substituted. Article, NewsArticle, BlogPosting, and Book JSON-LD supply structured fallbacks without loading contexts.
 
 Browser capture optionally accepts `page_metadata:{title,author,description,cover_url}` from the page explicitly captured. Hints fill missing fields on new captures only and are bounded/validated like other input. They cannot update existing records. New-capture receipts may include a generic `warning`; duplicate receipts never disclose stored owner warning text. The extension uses activeTab plus scripting to read these metadata fields, verifies the captured URL, and scopes all feedback to the original tab/page.
+
+## Reliability and curation (migration 006)
+
+- Owner Media adds `auto_added:boolean`; public DTOs exclude it. Only automatic source saves set it, while browser/integration/manual captures remain distinct. Hide automatic additions is a persisted browser preference across Library status/review filters. Historical backfill uses linked rows with equal transaction creation/discovery times, rather than labeling every manually saved discovery.
+- Owner GET `/api/inbox` accepts `state` (new/read/saved/dismissed, default new), optional `source` UUID, literal search terms `q` (up to 1,000 bytes), and opaque `cursor`. It returns `{items:InboxItem[],total:number,next_cursor?:string}`. Pages contain at most 40 rows after filtering. Bootstrap adds `inbox_counts` across all states; its legacy recent snapshot is not the dashboard retrieval boundary.
+- Existing-item editor PATCH is sparse. Optional `expected` carries the previous values of submitted fields and is compared under the media row lock. Conflicts return 409 `{error,code:"edit_conflict"}` without changing the record. `expected_url` also prevents old-URL lookup results being applied after a URL change. The UI retains the draft and can explicitly reload the latest item.
+- `kind` is explicit unless `infer_kind:true` authorizes automatic inference. This intent persists across metadata jobs/retries; it is not a public field. A valid unresolved title-only ISBN is saved with `needs_review:true`, partial metadata and a correction hint; ordinary title-only books remain deliberate valid captures.
+- Browser captures persist before publisher requests and trigger deferred work. Valid complete page hints can satisfy lookup immediately; partial hints are supplemented asynchronously. Restricted/deleted/blocked YouTube responses remain editable incomplete captures.
+- Stored URLs retain fragment destinations. Duplicate keys continue to group ordinary anchors with their document, while explicit `#/` and `#!/` routes have distinct keys. Fetch requests strip all fragments. Previously discarded fragments cannot be reconstructed.
+- Uploaded-image references use a generated UUID foreign key, so cleanup and attachment cannot commit a dangling relation. Missing draft images fail validation with a re-upload action; cleanup skips images locked by an in-flight attachment.
+- Direct shared-item pages render full text; compact index cards link to details as well as originals. Empty Discover distinguishes source health and initial/paused states. Source failure recording is best-effort when storage is usable, and metadata worker storage failures are logged.
+- Library Vim keys: `j/k`, `gg/G`, `Ctrl+d/u`, `h/l`, `/`, `a`, `e`, `o`/Enter, Space completion, `u` undo, and `dd` remove confirmation. Discover retains `s/r/x` save/read/dismiss. Modifier shortcuts and disable-able quick keys remain.
+
+- Owner Library filters support multiple types, tags and YouTube channel display names. Values within a group use OR; groups combine with query/status using AND. Channel names are case-insensitive saved creator names, not canonical channel IDs. `v l`/`v g` switch List/Gallery; `f t`/`f g`/`f c` open searchable filter pickers. Layout switching retains selections. Public Collection retains its existing single type filter.
+
+## Durable submission capture (migration 007)
+
+Submission-token URL captures persist before remote enrichment, retaining their existing minimal receipts and authorization boundaries. Internal `title_explicit` / `author_explicit` database flags preserve supplied submission title/author intent through worker reloads and retries, including fallback-looking titles and intentionally empty authors. Owner title/author patches record the same intent. General owner creation and browser hints keep their existing inference behavior, including enrichment of the web Quick Save's generated title. The flags are not request fields and are excluded from owner/public JSON responses. Migration 007 only adds default-false flags; it does not change existing field values or infer historical intent. Owner create metadata-fetch defaults remain unchanged.
+
+## Scoped agent access and private excerpts (migration 008)
+
+Owner `GET /api/integration/agent-grants` reports read/save grant status. Owner
+`POST` or `DELETE /api/integration/agent-grants/{read|save}` issues/replaces or
+revokes only that scope; existing owner-session and same-origin protections
+apply. Secrets appear once and only hashes persist. Submission/browser tokens
+and owner cookies cannot authorize `/api/mcp`.
+
+Stateless Streamable HTTP `/api/mcp` uses the official Go SDK with separate
+bearer read/save catalogs and per-operation transaction-time revocation checks.
+Read grants expose bounded `search_items` summaries without note/excerpt bodies;
+explicit `get_item` can disclose private notes and selected excerpts under the
+disclosed read consent. Save grants expose only `save_item`, reusing durable
+private/Pending/review capture and minimal `{id,created}` duplicate receipts.
+No edit/delete/publish/admin tools exist. First-client support is manually
+configured Authorization headers for verified Marvin/Hermes, without OAuth
+discovery/conformance. See [client contract](../integrations/hermes/mcp.md).
+
+Browser-token capture optionally accepts `selection:{text,source_url}` only on
+explicit user opt-in. Text is nonblank and at most 10,000 UTF-8 bytes; canonical
+source must match the captured URL including its fragment. New captures store
+private `selected_text` / `selected_text_source_url`, distinct from notes and
+publisher text. Duplicate selection captures never append/overwrite: they
+return `selection_saved:false` and a fixed generic warning, without existing
+metadata details. Explicit Done remains intentional. Public DTOs omit both
+fields; later URL corrections retain the original excerpt source. Other create,
+PATCH, submission and MCP-save payloads cannot write excerpts.
+
+Owner bootstrap adds `dev_fixture_ids:string[]` from the recorded fixture
+manifest. Global Quick Find and MCP retrieval exclude these IDs and quarantined
+legacy samples; ordinary Library fixture previews remain available. No title or
+tag heuristic identifies fixtures.
+
+## Editor and retrieval behavior
+
+Global Quick Find searches all real saved items regardless of current list
+filters, including notes and private excerpts, while retaining underlying view
+context. Library and Discover have independent in-memory queries/filters.
+Dismissal keeps one dirty draft in memory with Resume/Discard; saves, explicit
+discard and successful sign-out clear it. Reload/browser close still loses it.
+Duplicate feedback preserves the draft until explicit discard/navigation.
+
+Replacing an existing URL with a different work requires Keep details or an
+explicit metadata fetch, preview and application. Sparse field baselines protect
+concurrent changes; failed/stale lookups preserve text. Same-document fragment
+corrections omit unchanged metadata and preserve pending enrichment. New-item
+Save as Done is secondary; ordinary save remains private/Pending by default.

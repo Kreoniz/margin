@@ -1,6 +1,6 @@
 # Unlikely UI alpha.3 compatibility — 2026-10-31
 
-Margin now pins `unlikely-ui` **0.1.0-alpha.3**, upgraded from **0.1.0-alpha.2**. The manifest and pnpm lockfile change together. This is a separate local change after the checked production rollout; it has not been deployed or published. Runtime pins and the current branch remain unchanged.
+Margin now pins `unlikely-ui` **0.1.0-alpha.3**, upgraded from **0.1.0-alpha.2**. The manifest and pnpm lockfile change together. This was validated separately after the checked production rollout and [published after the owner's request](../deployment-2026-10-31-alpha3.md). Runtime pins and the current branch remain unchanged.
 
 ## App adaptations
 

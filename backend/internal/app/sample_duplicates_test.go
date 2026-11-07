@@ -27,7 +27,7 @@ func sampleStore(t *testing.T) (*Store, []Media) {
 func sampleSnapshot(t *testing.T, s *Store) string {
 	t.Helper()
 	var snapshot string
-	if err := s.Pool.QueryRow(context.Background(), "SELECT jsonb_agg((to_jsonb(m) - 'needs_review' - 'metadata_state' - 'metadata_warning' - 'metadata_lease_token' - 'metadata_lease_until') ORDER BY id)::text FROM media m WHERE is_demo").Scan(&snapshot); err != nil {
+	if err := s.Pool.QueryRow(context.Background(), "SELECT jsonb_agg((to_jsonb(m) - 'needs_review' - 'metadata_state' - 'metadata_warning' - 'metadata_lease_token' - 'metadata_lease_until' - 'kind_explicit' - 'auto_added' - 'cover_image_id' - 'title_explicit' - 'author_explicit' - 'selected_text' - 'selected_text_source_url') ORDER BY id)::text FROM media m WHERE is_demo").Scan(&snapshot); err != nil {
 		t.Fatal(err)
 	}
 	return snapshot
@@ -371,6 +371,7 @@ func TestSampleSubmissionsReturnVisibleRealCopies(t *testing.T) {
 					t.Fatal("duplicate submission returned sample", w.Body.String())
 				}
 			}
+			NewWorker(s, f).enrichPending(context.Background())
 			items, err := s.ListMedia(context.Background())
 			if err != nil || len(items) != 1 {
 				t.Fatalf("invisible submission: %+v %v", items, err)

@@ -13,6 +13,10 @@ export type Kind = (typeof kinds)[number];
 export type Status = "pending" | "done";
 export type Visibility = "private" | "public";
 export interface Media {
+  selected_text?: string;
+  selected_text_source_url?: string;
+  auto_added?: boolean;
+  kind_explicit?: boolean;
   metadata_state?: "pending" | "ready" | "partial";
   metadata_warning?: string;
   needs_review?: boolean;
@@ -33,10 +37,12 @@ export interface Media {
 }
 export type PublicMedia = Omit<
   Media,
-  "notes" | "needs_review" | "metadata_state" | "metadata_warning"
+  "notes" | "selected_text" | "selected_text_source_url" | "needs_review" | "metadata_state" | "metadata_warning" | "auto_added" | "kind_explicit"
 >;
 export type MediaDraft = Omit<
   Media,
+  | "selected_text"
+  | "selected_text_source_url"
   | "id"
   | "created_at"
   | "updated_at"
@@ -44,6 +50,8 @@ export type MediaDraft = Omit<
   | "needs_review"
   | "metadata_state"
   | "metadata_warning"
+  | "auto_added"
+  | "kind_explicit"
 >;
 export interface InboxItem {
   id: string;
@@ -73,12 +81,19 @@ export interface Source {
   item_count: number;
 }
 export interface LibraryData {
+	 inbox_counts: Record<string, number>;
   dev_mode?: boolean;
   dev_fixture_count?: number;
+  dev_fixture_ids?: string[];
   media: Media[];
   inbox: InboxItem[];
   sources: Source[];
   legacy_sample_count: number;
+}
+export interface InboxPage {
+  items: InboxItem[];
+  total: number;
+  next_cursor?: string;
 }
 export interface Session {
   authenticated: boolean;

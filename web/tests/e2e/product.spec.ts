@@ -675,7 +675,7 @@ test("single-key shortcuts can be disabled without disabling modifier shortcuts"
     : "Control";
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const toggle = page.getByRole("checkbox", {
-    name: /Enable single-key shortcuts/,
+    name: /Enable Vim quick keys/,
   });
   await expect(toggle).toBeChecked();
   await toggle.click();
@@ -723,6 +723,7 @@ test("Vim navigation moves through rows, tabs and pages without colliding with g
       json: { ...(await response.json()), inbox: [] },
     });
   });
+  await page.route("**/api/inbox?*", route => route.fulfill({ json: { items: [], total: 0 } }));
   await page.goto("/dashboard");
   const rows = page.locator(".media-row");
   const tabs = page.locator(".list-tabs");
@@ -739,22 +740,22 @@ test("Vim navigation moves through rows, tabs and pages without colliding with g
   await page.keyboard.press("g");
   await page.keyboard.press("g");
   await expect(rows.first()).toBeFocused();
-  await page.keyboard.press("l");
+  await page.keyboard.press("]");
   await expect(
     tabs.getByRole("button", { name: "Done", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(rows).toHaveCount(1);
-  await page.keyboard.press("l");
+  await page.keyboard.press("]");
   await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await page.keyboard.press("l");
+  await page.keyboard.press("]");
   await expect(
     tabs.getByRole("button", { name: "All", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(rows).toHaveCount(4);
-  await page.keyboard.press("h");
+  await page.keyboard.press("[");
   await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -772,16 +773,16 @@ test("Vim navigation moves through rows, tabs and pages without colliding with g
   await expect(
     page.getByRole("heading", { name: "Discover.", exact: true }),
   ).toBeVisible();
-  await page.keyboard.press("l");
+  await page.keyboard.press("]");
   await expect(
     tabs.getByRole("button", { name: "Saved", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".article-row")).toHaveCount(0);
-  await page.keyboard.press("l");
+  await page.keyboard.press("]");
   await expect(
     tabs.getByRole("button", { name: "Read", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await page.keyboard.press("h");
+  await page.keyboard.press("[");
   await expect(
     tabs.getByRole("button", { name: "Saved", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -802,7 +803,7 @@ test("Vim navigation moves through rows, tabs and pages without colliding with g
     tabs.getByRole("button", { name: "Saved", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("g");
-  await page.keyboard.press("l");
+  await page.keyboard.press("]");
   await expect(
     page.getByRole("heading", { name: "Your library.", exact: true }),
   ).toBeVisible();
@@ -848,13 +849,13 @@ test("Vim keys leave typing, widgets and dialogs alone and follow the shortcut p
   await expect(search).toHaveValue("hlggHL");
   await expect(search).toBeFocused();
   await search.fill("");
-  const type = page.getByRole("combobox", {
-    name: "Filter media type",
+  const type = page.getByRole("button", {
+    name: "Filter types",
     exact: true,
   });
   await type.click();
-  await page.keyboard.press("h");
-  await page.keyboard.press("l");
+  await page.keyboard.press("[");
+  await page.keyboard.press("]");
   await page.keyboard.press("Shift+L");
   await expect(
     page.getByRole("heading", { name: "Your library.", exact: true }),
@@ -890,7 +891,7 @@ test("Vim keys leave typing, widgets and dialogs alone and follow the shortcut p
   await expect(dialog(page)).toHaveCount(0);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const quickKeys = dialog(page).getByRole("checkbox", {
-    name: /Enable single-key shortcuts/,
+    name: /Enable Vim quick keys/,
   });
   await quickKeys.click();
   await expect(quickKeys).not.toBeChecked();
@@ -930,10 +931,10 @@ test("Vim keys leave typing, widgets and dialogs alone and follow the shortcut p
     }),
   ).toBeVisible();
   await expect(
-    dialog(page).getByText("Shift+H / Shift+L", { exact: true }),
+    dialog(page).getByText("Shift+h / Shift+l", { exact: true }),
   ).toBeVisible();
   await expect(
-    dialog(page).getByText("g then g / Shift+G", { exact: true }),
+    dialog(page).getByText("g then g / G", { exact: true }),
   ).toBeVisible();
   await checkAccess(page);
 });
@@ -1117,7 +1118,7 @@ test("keyboard-only library navigation supports opening, editing, completion, un
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
   await expect(rows.first()).toBeFocused();
-  await page.keyboard.press("d");
+  await page.keyboard.press("Space");
   await expect(rows).toHaveCount(2);
   await expect(rows.first()).toBeFocused();
   await page.keyboard.press(mod + "+z");
@@ -1198,7 +1199,7 @@ test("keyboard navigation reaches items beyond the first page", async ({
     await page.keyboard.press("Enter");
     await expect(rows).toHaveCount(40);
     await expect(rows.last()).toBeFocused();
-    await page.keyboard.press("d");
+    await page.keyboard.press("Space");
     await expect
       .poll(
         async () =>
@@ -1234,7 +1235,7 @@ test("keyboard navigation reaches items beyond the first page", async ({
   await page.keyboard.press("d");
   await expect(page.getByRole("heading", { name: "Discover." })).toBeVisible();
   await page.keyboard.press("g");
-  await page.keyboard.press("l");
+  await page.keyboard.press("]");
   await expect(
     page.getByRole("heading", { name: "Your library." }),
   ).toBeVisible();
@@ -1841,12 +1842,32 @@ test("action hints share one lazy popup across repeated rows and support hover, 
   await expect(floating).toHaveCount(0);
   if (info.project.name === "desktop") {
     await firstEdit.hover();
+    await page.waitForTimeout(200);
+    expect(await hints.count()).toBe(0);
     await expect(hints).toHaveCount(1);
     await expect(hints).toContainText("Edit item");
-    await expect(hints.locator("kbd")).toHaveText("E");
+    await expect(hints.locator("kbd")).toHaveText("e");
+    const remove = rows.first().getByRole("button", { name: /^Remove / });
+    await remove.hover();
+    await page.waitForTimeout(200);
+    expect(await hints.count()).toBe(0);
+    await expect(hints).toContainText("Remove from library");
+    await page.mouse.move(0, 0);
+    // Re-enter during closing instead of waiting for the floating DOM to leave.
+    await page.waitForTimeout(100);
+    await firstEdit.hover();
+    await page.waitForTimeout(200);
+    expect(await hints.count()).toBe(0);
+    await expect(hints).toContainText("Edit item");
     await hints.hover();
     // Exceed the 100ms close delay to verify the popup itself stays hoverable.
     await page.waitForTimeout(200);
+    await expect(hints).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect(floating).toHaveCount(0);
+    await rows.last().getByRole("button", { name: /^Edit / }).hover();
+    await page.waitForTimeout(200);
+    expect(await hints.count()).toBe(0);
     await expect(hints).toBeVisible();
     await page.mouse.move(0, 0);
     await expect(floating).toHaveCount(0);
@@ -2105,7 +2126,9 @@ test("compact library rows open from covers and whitespace while controls stay i
   expect((await row.boundingBox())!.height).toBeLessThanOrEqual(
     (page.viewportSize()?.width || 1440) < 600 ? 140 : 96,
   );
-  expect((await manual.boundingBox())!.height).toBeLessThanOrEqual(96);
+  expect((await manual.boundingBox())!.height).toBeLessThanOrEqual(
+    (page.viewportSize()?.width || 1440) < 600 ? 120 : 96,
+  );
   await open(() => clickBody(row.locator(".mini-cover")));
   await open(() => clickBody(row.locator(".item-meta > span")));
   await open(() => clickBody(row, 0.65, 0.95));

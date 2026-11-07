@@ -3,10 +3,14 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 type Position = { top: number; left: number };
 
 /** Animate real rows after React commits; never delay mutations or clone content. */
-export function useListMotion(itemsKey: string) {
+export function useListMotion(itemsKey: string, presentationKey?: string, contentKey?: string) {
   const ref = useRef<HTMLDivElement>(null);
   const previous = useRef(new Map<string, Position>());
   const container = useRef<HTMLDivElement | null>(null);
+  const presentation = useRef(presentationKey);
+  const identity = useRef(itemsKey);
+  const content = useRef(contentKey);
+  const geometry = useRef<(Position & { width: number }) | undefined>(undefined);
   const animations = useRef(new Set<Animation>());
 
   useEffect(() => {
@@ -29,7 +33,18 @@ export function useListMotion(itemsKey: string) {
     for (const animation of animations.current) animation.cancel();
     animations.current.clear();
     const list = ref.current;
-    if (container.current !== list) previous.current.clear();
+    const presentationChanged = presentation.current !== presentationKey;
+    const contentOnlyChanged = identity.current === itemsKey && content.current !== contentKey;
+    const rect = list?.getBoundingClientRect();
+    const nextGeometry = rect ? { width: rect.width, top: rect.top + window.scrollY, left: rect.left + window.scrollX } : undefined;
+    const geometryChanged = container.current === list && geometry.current !== undefined &&
+      (!nextGeometry || geometry.current.width !== nextGeometry.width || geometry.current.top !== nextGeometry.top || geometry.current.left !== nextGeometry.left);
+    const rebase = presentationChanged || geometryChanged || contentOnlyChanged;
+    presentation.current = presentationKey;
+    identity.current = itemsKey;
+    content.current = contentKey;
+    geometry.current = nextGeometry;
+    if (container.current !== list || rebase) previous.current.clear();
     container.current = list;
     const rows = Array.from(
       list?.querySelectorAll<HTMLElement>("[data-motion-key]") || [],
@@ -49,7 +64,9 @@ export function useListMotion(itemsKey: string) {
     ).matches;
     for (const [index, position] of positions.entries()) {
       const old = previous.current.get(position.key);
-      if (reduced || !position.element.animate) continue;
+      // Presentation, responsive bounds and content-only reflow invalidate old
+      // geometry. Store fresh positions without translating from stale ones.
+      if (rebase || reduced || !position.element.animate) continue;
       const x = old ? old.left - position.left : 0;
       const y = old ? old.top - position.top : 5;
       if (old && Math.abs(x) < 1 && Math.abs(y) < 1) continue;
@@ -70,7 +87,7 @@ export function useListMotion(itemsKey: string) {
         animations.current.delete(animation);
     }
     previous.current = new Map(positions.map((row) => [row.key, row]));
-  }, [itemsKey]);
+  }, [itemsKey, presentationKey, contentKey]);
 
   return ref;
 }

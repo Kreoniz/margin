@@ -18,6 +18,20 @@ import (
 var isbnPattern = regexp.MustCompile(`(?i)(?:97[89][- ]?)?[0-9][- 0-9]{8,15}[0-9X]`)
 var editionKey = regexp.MustCompile(`^/books/OL[0-9]+M$`)
 var workKey = regexp.MustCompile(`^/works/OL[0-9]+W$`)
+var bareBookKey = regexp.MustCompile(`^OL[0-9]+[WM]$`)
+
+func catalogueBookKey(key string) string {
+	if workKey.MatchString(key) || editionKey.MatchString(key) {
+		return key
+	}
+	if bareBookKey.MatchString(key) {
+		if strings.HasSuffix(key, "W") {
+			return "/works/" + key
+		}
+		return "/books/" + key
+	}
+	return ""
+}
 
 func validISBN(raw string) string {
 	s := strings.NewReplacer("-", "", " ", "").Replace(strings.ToUpper(strings.TrimSpace(raw)))
@@ -101,7 +115,7 @@ func (f *Fetcher) Books(ctx context.Context, query, author string) ([]Metadata, 
 		return nil, err
 	}
 	var data struct {
-		Docs []struct {
+		Docs *[]struct {
 			Key      string   `json:"key"`
 			Title    string   `json:"title"`
 			Authors  []string `json:"author_name"`
@@ -118,13 +132,16 @@ func (f *Fetcher) Books(ctx context.Context, query, author string) ([]Metadata, 
 	if err = json.Unmarshal(result.Body, &data); err != nil {
 		return nil, err
 	}
+	if data.Docs == nil {
+		return nil, errors.New("book catalogue returned no results field")
+	}
 	out := []Metadata{}
-	for _, doc := range data.Docs {
-		key, title, cover := doc.Key, doc.Title, doc.Cover
+	for _, doc := range *data.Docs {
+		key, title, cover := catalogueBookKey(doc.Key), doc.Title, doc.Cover
 		if len(doc.Editions.Docs) > 0 {
 			e := doc.Editions.Docs[0]
-			if editionKey.MatchString(e.Key) {
-				key = e.Key
+			if edition := catalogueBookKey(e.Key); editionKey.MatchString(edition) {
+				key = edition
 				title = first(e.Title, title)
 				if e.Cover > 0 {
 					cover = e.Cover
@@ -142,6 +159,13 @@ func (f *Fetcher) Books(ctx context.Context, query, author string) ([]Metadata, 
 		if len(out) == 5 {
 			break
 		}
+	}
+	if len(*data.Docs) > 0 && len(out) == 0 {
+		return nil, errors.New("book catalogue returned unreadable book records")
+	}
+	// A transient empty search must not make an explicit retry fail for 15 minutes.
+	if len(out) == 0 {
+		return out, nil
 	}
 	if f.books.cache == nil || len(f.books.cache) >= 32 {
 		f.books.cache = map[string]bookCacheEntry{}
