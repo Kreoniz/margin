@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/url"
 	"strings"
 	"sync"
@@ -88,8 +89,11 @@ func (f *Fetcher) publisherMetadata(ctx context.Context, raw string) (Metadata, 
 }
 
 func generatedTitle(m Media) bool {
+	if m.TitleExplicit {
+		return false
+	}
 	parsed, _ := url.Parse(m.URL)
-	return m.Title == fallbackTitle(m.URL) || m.Title == m.URL || parsed != nil && m.Title == parsed.Hostname()
+	return m.Title == fallbackTitle(m.URL) || m.Title == m.URL || parsed != nil && m.Title == parsed.Hostname() || youtubeID(m.URL) != "" && youtubePlaceholder(m.Title)
 }
 
 func (w *Worker) TriggerMetadata() {
@@ -123,6 +127,7 @@ func (w *Worker) enrichPending(ctx context.Context) {
 			return
 		}
 		if err != nil {
+			slog.Error("claim metadata job", "error", err)
 			return
 		}
 		lookup, cancel := context.WithTimeout(ctx, 32*time.Second)
@@ -134,7 +139,9 @@ func (w *Worker) enrichPending(ctx context.Context) {
 		if fetchErr != nil {
 			metadata.Warning = "Details could not be fetched. Retry from the item editor."
 		}
-		_ = w.store.finishMetadata(ctx, before, token, metadata)
+		if err := w.store.finishMetadata(ctx, before, token, metadata); err != nil {
+			slog.Error("persist metadata job", "item_id", before.ID, "error", err)
+		}
 	}
 }
 
@@ -151,11 +158,11 @@ func (s *Store) finishMetadata(ctx context.Context, before Media, token string, 
 	if err != nil {
 		return err
 	}
-	in := MediaInput{}
-	if current.Title == before.Title && generatedTitle(before) && metadata.Title != "" {
+	in := MediaInput{InferKind: true}
+	if !current.TitleExplicit && current.Title == before.Title && generatedTitle(before) && metadata.Title != "" {
 		in.Title = &metadata.Title
 	}
-	if before.Author == "" && current.Author == "" && metadata.Author != "" {
+	if !before.AuthorExplicit && !current.AuthorExplicit && before.Author == "" && current.Author == "" && metadata.Author != "" {
 		in.Author = &metadata.Author
 	}
 	if before.CoverURL == "" && current.CoverURL == "" && metadata.CoverURL != "" {
@@ -164,7 +171,7 @@ func (s *Store) finishMetadata(ctx context.Context, before Media, token string, 
 	if before.Description == "" && current.Description == "" && metadata.Description != "" {
 		in.Description = &metadata.Description
 	}
-	if current.Kind == before.Kind && oneOf(current.Kind, "article", "other") && metadata.Kind != "" {
+	if !current.KindExplicit && current.Kind == before.Kind && metadata.Kind != "" {
 		in.Kind = &metadata.Kind
 	}
 	current, err = in.Apply(current)

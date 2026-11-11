@@ -35,6 +35,7 @@ const paths = {
   external:
     "M15 3h6v6m0-6L10 14M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4",
   close: "m6 6 12 12M6 18 18 6",
+  columns: "M3 3h18v18H3zM15 3v18M3 11h12M18 7h.01M18 12h.01M18 17h.01",
   grid: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z",
   list: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01",
   rss: "M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16M4 20h.01",

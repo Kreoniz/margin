@@ -12,10 +12,12 @@ export function KeyboardHelp({
     {
       name: "Move around",
       rows: [
-        ["↑ / ↓", "Previous / next item"],
-        ["Home / End", "First / last item"],
+        ["← / ↓ / ↑ / →", "Move between items in that direction"],
+        ["Home", "Page top & first item"],
+        ["Ctrl+Home", "Page top (also with an empty list)"],
+        ["End", "Last item"],
         ["Enter", "Open selected item"],
-        [formatForDisplay("Mod+K"), "Search"],
+        [formatForDisplay("Mod+K"), "Quick Find · all saved items"],
         [formatForDisplay("Mod+,"), "Settings"],
         ["F1", "Keyboard help"],
       ],
@@ -28,27 +30,38 @@ export function KeyboardHelp({
         [formatForDisplay("Mod+Shift+D"), "Editor details"],
         [formatForDisplay("Mod+Shift+L"), "Toggle editor visibility"],
         [formatForDisplay("Mod+Z"), "Undo last status change"],
+        ["Tab, then Enter / Space", "Open Up next actions; add, reorder, or remove"],
         ["Tab / Shift+Tab", "Controls, filters & row actions"],
         ["Esc", "Close dialog / leave search"],
       ],
     },
     {
-      name: "Vim navigation & quick keys",
+      name: "Vim navigation" + (singleKeys ? "" : " (off)"),
       rows: [
-        ["h / l", "Previous / next status tab"],
-        ["Shift+H / Shift+L", "Library / Discover page"],
-        ["j / k", "Next / previous item"],
-        ["g then g / Shift+G", "First / last item"],
-        ["[ / ]", "Previous / next status tab (alias)"],
-        ["O", "Open item"],
-        ["S", "Save discovery"],
-        ["R", "Read / unread"],
-        ["X", "Dismiss discovery"],
-        ["D", "Done / to read"],
-        ["E", "Edit library item"],
-        ["/ / N", "Search / add"],
-        ["G then L / D / S", "Library / Discover / Sources"],
-        ["Shift+R", "Check sources"],
+        ["h / j / k / l", "Move left / down / up / right"],
+        ["Shift+h / Shift+l", "Library / Discover page"],
+        ["g then g / G", "Page top & first item / last item"],
+        ["[ / ]", "Previous / next status tab"],
+        ["Ctrl+d / Ctrl+u", "Half page down / up"],
+        ["g then n / l / d / s", "Up next filter / Library / Discover / Sources"],
+        ["v then b / s / l", "Mixed / Shelves / List"],
+        ["f then t / g / c", "Filter types / tags / channels"],
+        ["/", "Search the current view"],
+      ],
+    },
+    {
+      name: "Vim item actions" + (singleKeys ? "" : " (off)"),
+      rows: [
+        ["o", "Open item"],
+        ["s", "Save discovery"],
+        ["r", "Read / unread"],
+        ["x", "Dismiss discovery"],
+        ["Space", "Done / to read"],
+        ["d then d", "Remove library item (confirm)"],
+        ["u", "Undo last status/review change"],
+        ["e", "Edit library item"],
+        ["a / n", "Add item (n is a legacy alias)"],
+        ["Shift+r", "Check sources"],
         ["?", "Keyboard help"],
       ],
     },
@@ -73,7 +86,7 @@ export function KeyboardHelp({
                 >
                   <dt className="text-[var(--u-muted)]">{description}</dt>
                   <dd className="m-0 shrink-0">
-                    <kbd className="rounded border border-[var(--u-line-soft)] bg-[var(--u-well)] px-1 py-0.5 font-sans text-[10px]">
+                    <kbd className="rounded border border-[var(--u-line-soft)] bg-[var(--u-well)] px-1 py-0.5 font-sans text-[11px]">
                       {key}
                     </kbd>
                   </dd>
@@ -84,8 +97,12 @@ export function KeyboardHelp({
         ))}
       </div>
       <p className="mt-4 text-[11px] text-[var(--u-muted)]">
-        Quick keys {singleKeys ? "are on" : "are off"}; change them in Settings.
-        Typing and dialogs keep their own keys.
+        Vim quick keys {singleKeys ? "are on" : "are off"}; change them in Settings.
+        Uppercase G means Shift+g. Typing and dialogs keep their own keys.
+        {" "}In visual views, movement follows item positions; h/l do not wrap across rows.
+        List and Discover use j/k or ↑/↓. The older v then g shortcut also opens Shelves.
+        {" "}Quick Find ignores list filters. ↑/↓ select a result, Enter opens it,
+        and Tab reaches Copy URL and Edit. Esc returns to your view.
       </p>
     </Modal>
   );

@@ -20,6 +20,10 @@ export function Access({
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    if (new TextEncoder().encode(password).length > 1024) {
+      setError("Use a password of at most 1024 bytes.");
+      return;
+    }
     if (setup && password !== confirmation) {
       setError("The passwords don’t match.");
       return;
@@ -66,8 +70,7 @@ export function Access({
               autoFocus
               type="password"
               autoComplete={setup ? "new-password" : "current-password"}
-              minLength={setup ? 12 : undefined}
-              maxLength={128}
+              maxLength={1024}
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}

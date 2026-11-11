@@ -97,6 +97,11 @@ func (w *Worker) sync(ctx context.Context, force bool) {
 		finishCancel()
 		if err != nil {
 			slog.Error("persist source sync", "source", src.Name, "error", err)
+			recovery, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+			if _, recoveryErr := w.store.Pool.Exec(recovery, `UPDATE sources SET last_sync=now(),last_error='Could not store the collected articles. A retry is scheduled.',next_sync=now()+interval '1 minute',lease_token=NULL,lease_until=NULL WHERE id=$1 AND lease_token=$2`, src.ID, token); recoveryErr != nil {
+				slog.Error("record source persistence failure", "source_id", src.ID, "error", recoveryErr)
+			}
+			cancel()
 		} else if collectErr != nil {
 			slog.Warn("source sync failed", "source", src.Name, "error", collectErr)
 		}

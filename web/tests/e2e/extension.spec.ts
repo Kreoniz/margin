@@ -168,6 +168,22 @@ test("extension popup previews the page and supports independent capture, focus 
   expect(await page.evaluate("window.__extensionTest.optionsOpened")).toBe(1);
 });
 
+test("extension selected text is opt-in and duplicate feedback preserves existing records", async ({ page }) => {
+  await extensionPage(page, "popup.html");
+  const selection = page.getByRole("checkbox", { name: /Include selected text/ });
+  await expect(selection).not.toBeChecked();
+  await selection.check();
+  await page.evaluate("window.__extensionTest.reply={result:{id:'existing',created:false,selection_saved:false,warning:'Already saved. The selected text was not added. Open Margin to review the existing item.',editURL:'https://margin.example/dashboard#edit=existing'}}");
+  await page.getByRole("button", { name: /Save for later/ }).click();
+  expect(await page.evaluate("window.__extensionTest.captures[0].includeSelection")).toBe(true);
+  await expect(page.getByRole("status")).toContainText("selected text was not added");
+  await expect(page.getByRole("link", { name: /Open saved item/ })).toBeVisible();
+  await selection.uncheck();
+  await page.getByRole("button", { name: /Save for later/ }).click();
+  expect(await page.evaluate("window.__extensionTest.captures[1].includeSelection")).toBeUndefined();
+  await accessible(page);
+});
+
 test("extension prevents duplicate sends while busy and keeps partial metadata feedback", async ({
   page,
 }) => {

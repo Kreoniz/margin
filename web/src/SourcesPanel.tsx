@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "unlikely-ui/button";
 import { ActionHint } from "./ActionHint";
 import { Checkbox } from "unlikely-ui/checkbox";
@@ -13,12 +13,16 @@ export function SourcesPanel({
   sources,
   onClose,
   onChanged,
+  onSourcesChange,
+  refreshError,
   perform,
   pending,
 }: {
   sources: Source[];
   onClose: () => void;
   onChanged: () => Promise<void>;
+  onSourcesChange: (update: (sources: Source[]) => Source[]) => void;
+  refreshError: string;
   perform: (
     key: string,
     fn: () => Promise<unknown>,
@@ -30,13 +34,33 @@ export function SourcesPanel({
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
   const [removing, setRemoving] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const urlRef = useRef<HTMLInputElement>(null);
+  const removalFocus = useRef<{ target: HTMLElement | null; previous: Element | null } | undefined>(undefined);
+  useLayoutEffect(() => {
+    const pendingFocus = removalFocus.current;
+    if (!pendingFocus || !listRef.current?.isConnected) return;
+    removalFocus.current = undefined;
+    const active = document.activeElement;
+    if (active !== pendingFocus.previous && active !== document.body && active !== listRef.current.closest(".app-modal")) return;
+    const target = pendingFocus.target?.isConnected && !pendingFocus.target.matches(":disabled, [aria-disabled='true']") ? pendingFocus.target : urlRef.current;
+    target?.focus();
+  }, [sources]);
+  function patch(source: Source, values: Partial<Source>) {
+    return perform(source.id, async () => {
+      const updated = await api<Source>("/sources/" + source.id, send("PATCH", values));
+      onSourcesChange(items => items.map(item => item.id === updated.id ? updated : item));
+    });
+  }
   async function add(e: FormEvent) {
     e.preventDefault();
     if (adding) return;
     setAdding(true);
     setError("");
     try {
-      await api("/sources", send("POST", { url }));
+      const added = await api<Source>("/sources", send("POST", { url }));
+      onSourcesChange(items => [...items.filter(item => item.id !== added.id), added]);
       setURL("");
       await onChanged();
     } catch (e) {
@@ -56,6 +80,7 @@ export function SourcesPanel({
       <form className="source-add" onSubmit={add}>
         <FormField label="Follow a website or RSS/Atom feed">
           <Input
+            ref={urlRef}
             type="url"
             required
             disabled={adding}
@@ -74,7 +99,14 @@ export function SourcesPanel({
           {error}
         </p>
       )}
-      <div className="source-list">
+      {refreshError && <div className="notice warning" role="status">
+        <p>Could not refresh sources. Saved changes are retained. {refreshError}</p>
+        <Button variant="ghost" size="sm" loading={refreshing} onClick={async () => {
+          setRefreshing(true);
+          try { await onChanged(); } finally { setRefreshing(false); }
+        }}>Refresh sources</Button>
+      </div>}
+      <div className="source-list" ref={listRef}>
         {sources.map((source) => (
           <section
             className="source-row"
@@ -82,7 +114,7 @@ export function SourcesPanel({
             aria-label={source.name}
           >
             <div className="source-heading">
-              <SourceMark name={source.name} />
+              <SourceMark name={source.name} url={source.site_url || source.feed_url} />
               <div className="min-w-0 flex-1">
                 <h3>{source.name}</h3>
                 <a
@@ -111,12 +143,7 @@ export function SourcesPanel({
                   }
                   disabled={pending.has(source.id)}
                   onClick={() =>
-                    void perform(source.id, () =>
-                      api(
-                        "/sources/" + source.id,
-                        send("PATCH", { enabled: !source.enabled }),
-                      ),
-                    )
+                    void patch(source, { enabled: !source.enabled })
                   }
                 >
                   <Icon name={source.enabled ? "pause" : "sync"} size={15} />
@@ -140,12 +167,7 @@ export function SourcesPanel({
                   checked={source.auto_save}
                   disabled={pending.has(source.id)}
                   onCheckedChange={(value) =>
-                    void perform(source.id, () =>
-                      api(
-                        "/sources/" + source.id,
-                        send("PATCH", { auto_save: Boolean(value) }),
-                      ),
-                    )
+                    void patch(source, { auto_save: Boolean(value) })
                   }
                 />
                 <span className="min-w-0">Auto-save new articles</span>
@@ -155,12 +177,7 @@ export function SourcesPanel({
                 disabled={pending.has(source.id)}
                 value={String(source.interval_minutes)}
                 onChange={(value) =>
-                  void perform(source.id, () =>
-                    api(
-                      "/sources/" + source.id,
-                      send("PATCH", { interval_minutes: Number(value) }),
-                    ),
-                  )
+                  void patch(source, { interval_minutes: Number(value) })
                 }
                 options={[
                   ...new Set([15, 60, 360, 1440, source.interval_minutes]),
@@ -184,9 +201,6 @@ export function SourcesPanel({
               {source.enabled
                 ? relativeDate(source.last_sync)
                 : "Collection paused"}
-              {source.auto_save && (
-                <span> · Future articles save privately</span>
-              )}
             </p>
             {source.last_error && (
               <p className="notice warning source-error" role="status">
@@ -199,10 +213,12 @@ export function SourcesPanel({
                 <p>
                   Unfollow {source.name}? Its discoveries will be removed; saved
                   library items stay.
+                  Following it again starts a fresh discovery inbox.
                 </p>
                 <Button
                   variant="ghost"
                   size="sm"
+                  disabled={pending.has(source.id)}
                   onClick={() => setRemoving("")}
                 >
                   Keep following
@@ -210,12 +226,18 @@ export function SourcesPanel({
                 <Button
                   variant="danger"
                   size="sm"
-                  disabled={pending.has(source.id)}
-                  onClick={async () => {
+                  loading={pending.has(source.id)}
+                  onClick={async (event) => {
+                    const row = event.currentTarget.closest(".source-row");
+                    const neighbor = row?.nextElementSibling || row?.previousElementSibling;
+                    const target = neighbor?.querySelector<HTMLElement>(".source-heading button") || urlRef.current;
                     if (
-                      await perform(source.id, () =>
-                        api("/sources/" + source.id, send("DELETE")),
-                      )
+                      await perform(source.id, async () => {
+                        await api("/sources/" + source.id, send("DELETE"));
+                        if (listRef.current?.isConnected && row?.contains(document.activeElement))
+                          removalFocus.current = { target, previous: document.activeElement };
+                        onSourcesChange(items => items.filter(item => item.id !== source.id));
+                      })
                     )
                       setRemoving("");
                   }}
@@ -228,7 +250,8 @@ export function SourcesPanel({
         ))}
       </div>
       <p className="panel-footnote">
-        Existing discoveries stay where you left them.
+        Pausing keeps existing discoveries. Auto-save applies to future articles;
+        dates without a time may need manual saving on the day it is enabled.
       </p>
     </Modal>
   );

@@ -33,18 +33,30 @@ func (f *Fetcher) Metadata(ctx context.Context, raw string) (m Metadata, err err
 		return Metadata{}, &ValidationError{err.Error()}
 	}
 	parsed, _ := url.Parse(u)
-	m = Metadata{Title: fallbackTitle(u), Kind: "article", URL: u}
-	if isBookHost(parsed.Hostname()) {
-		m.Kind = "book"
-	}
-	if parsed.Hostname() == "youtube.com" || strings.HasSuffix(parsed.Hostname(), ".youtube.com") || parsed.Hostname() == "youtu.be" || parsed.Hostname() == "vimeo.com" {
-		m.Kind = "video"
+	m = Metadata{Title: fallbackTitle(u), Kind: kindForURL(u), URL: u}
+	if id := youtubeID(u); id != "" {
+		if video, ok := f.youtubeMetadata(ctx, u, id); ok {
+			return video, nil
+		}
+		defer func() {
+			if youtubePlaceholder(m.Title) || m.Title == fallbackTitle(u) || m.Warning != "" {
+				m.Title = fallbackTitle(u)
+				m.Kind = "video"
+				m.Warning = "YouTube could not share this video's details. It may be private, restricted, unavailable, or blocking server requests. Retry or enter the details manually."
+			}
+		}()
 	}
 	if strings.EqualFold(path.Ext(parsed.Path), ".pdf") {
 		m.Kind = "paper"
 	}
 	bookISBN := ""
 	structuredBook := false
+	titleFound, parsedHTML := false, false
+	defer func() {
+		if parsedHTML && !titleFound && m.Warning == "" {
+			m.Warning = "This page did not share a title. Retry or enter the details manually."
+		}
+	}()
 	defer func() {
 		if m.Kind != "book" || (m.Author != "" && m.CoverURL != "") {
 			return
@@ -66,6 +78,7 @@ func (f *Fetcher) Metadata(ctx context.Context, raw string) (m Metadata, err err
 			best := matches[0]
 			if !structuredBook {
 				m.Title = best.Title
+				titleFound = titleFound || best.Title != ""
 			}
 			m.Author = first(m.Author, best.Author)
 			m.CoverURL = first(m.CoverURL, best.CoverURL)
@@ -94,6 +107,7 @@ func (f *Fetcher) Metadata(ctx context.Context, raw string) (m Metadata, err err
 		m.Warning = "Could not read the page. Edit the details manually."
 		return m, nil
 	}
+	parsedHTML = true
 	values := map[string]string{}
 	var titleText, canonical string
 	walk(doc, func(n *html.Node) {
@@ -121,6 +135,7 @@ func (f *Fetcher) Metadata(ctx context.Context, raw string) (m Metadata, err err
 	})
 	if title := first(values["og:title"], values["twitter:title"], titleText); title != "" {
 		m.Title = clip(title, 1000)
+		titleFound = true
 	}
 	m.Author = clip(first(values["author"], values["article:author"], values["dc.creator"], values["dcterms.creator"]), 1000)
 	m.Description = clip(first(values["og:description"], values["description"], values["twitter:description"]), 20000)
@@ -143,6 +158,7 @@ func (f *Fetcher) Metadata(ctx context.Context, raw string) (m Metadata, err err
 	if book, isbn, ok := structuredMetadata(doc, result.URL); ok {
 		bookISBN = isbn
 		structuredBook = book.Title != ""
+		titleFound = titleFound || structuredBook
 		m.Kind = book.Kind
 		m.Title = first(book.Title, m.Title)
 		m.Author = first(book.Author, m.Author)
@@ -169,6 +185,23 @@ func fallbackTitle(raw string) string {
 		title = strings.NewReplacer("-", " ", "_", " ").Replace(title)
 	}
 	return clip(title, 1000)
+}
+
+func kindForURL(raw string) string {
+	u, _ := url.Parse(raw)
+	if u == nil {
+		return "article"
+	}
+	if strings.EqualFold(path.Ext(u.Path), ".pdf") {
+		return "paper"
+	}
+	if isBookHost(u.Hostname()) {
+		return "book"
+	}
+	if youtubeID(raw) != "" || u.Hostname() == "vimeo.com" || strings.HasSuffix(u.Hostname(), ".youtube.com") || u.Hostname() == "youtube.com" || u.Hostname() == "youtu.be" {
+		return "video"
+	}
+	return "article"
 }
 
 func isBookHost(host string) bool {

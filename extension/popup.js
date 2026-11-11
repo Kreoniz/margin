@@ -9,11 +9,13 @@ const buttons = [...document.querySelectorAll("[data-action]")];
 const status = document.querySelector("#status");
 const edit = document.querySelector("#edit");
 const reconnect = document.querySelector("#reconnect");
+const includeSelection = document.querySelector("#include-selection");
 let tab;
 let ready = false;
 let busy = false;
 
 async function loadPage() {
+  includeSelection.checked = false;
   [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   let url;
   try {
@@ -58,6 +60,7 @@ async function initialize() {
     buttons.forEach((button) => {
       button.disabled = !ready;
     });
+    includeSelection.disabled = !ready;
     setStatus(
       status,
       ready
@@ -99,6 +102,7 @@ async function send(action) {
   buttons.forEach((button) => {
     button.disabled = true;
   });
+  includeSelection.disabled = true;
   edit.hidden = true;
   reconnect.hidden = true;
   setStatus(
@@ -111,6 +115,7 @@ async function send(action) {
       type: "capture",
       action,
       tab: { id: tab.id, url: tab.url },
+      ...(includeSelection.checked ? { includeSelection: true } : {}),
     });
     if (!reply || reply.error) {
       if (reply?.code === "connection") reconnect.hidden = false;
@@ -128,8 +133,8 @@ async function send(action) {
           : "Already in your library.";
     setStatus(
       status,
-      message + (result.warning ? " " + result.warning : ""),
-      result.warning ? "warning" : "success",
+      message + (result.warning ? " " + result.warning : result.metadata_state === "pending" ? " Details are still loading in Margin; open it to check or retry." : ""),
+      result.warning ? "warning" : result.metadata_state === "pending" ? "neutral" : "success",
     );
     edit.href = result.editURL;
     edit.textContent = result.created
@@ -147,6 +152,7 @@ async function send(action) {
     buttons.forEach((button) => {
       button.disabled = !ready;
     });
+    includeSelection.disabled = !ready;
     document.querySelector(".actions").removeAttribute("aria-busy");
   }
 }

@@ -29,6 +29,33 @@ func (s *Store) devFixtureCount(ctx context.Context) (int, error) {
 	return count, err
 }
 
+// The manifest is the sole fixture identity. Titles/tags may coincide with real
+// items or be edited; neither is evidence that an item is a generated fixture.
+func (s *Store) devFixtureIDs(ctx context.Context) ([]string, error) {
+	rows, err := s.Pool.Query(ctx, `SELECT id::text FROM media WHERE EXISTS (
+ SELECT 1 FROM jsonb_array_elements(COALESCE(
+ (SELECT value::jsonb FROM app_settings WHERE key=$1),'[]'::jsonb)) entry
+ WHERE entry->>'media_id'=media.id::text) ORDER BY id`, devFixtureKey)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+const realSavedMediaWhere = `NOT is_demo AND NOT EXISTS (
+ SELECT 1 FROM jsonb_array_elements(COALESCE(
+ (SELECT value::jsonb FROM app_settings WHERE key='` + devFixtureKey + `'),'[]'::jsonb)) entry
+ WHERE entry->>'media_id'=media.id::text)`
+
 func (s *Server) devFixtures(w http.ResponseWriter, r *http.Request) {
 	count, err := s.Store.updateDevFixtures(r.Context(), r.Method == http.MethodDelete)
 	respond(w, 200, map[string]int{"count": count}, err)
@@ -56,9 +83,15 @@ func (s *Store) updateDevFixtures(ctx context.Context, remove bool) (int, error)
 		}
 	}
 	if remove {
+		if _, err = lockUpNext(ctx, tx); err != nil {
+			return 0, err
+		}
 		ids := []string{}
 		for _, fixture := range fixtures {
 			ids = append(ids, fixture.MediaID)
+			if err = removeUpNext(ctx, tx, fixture.MediaID); err != nil {
+				return 0, err
+			}
 		}
 		if _, err = tx.Exec(ctx, "UPDATE inbox SET state='read',media_id=NULL WHERE media_id::text=ANY($1)", ids); err != nil {
 			return 0, err
@@ -105,20 +138,23 @@ func (s *Store) updateDevFixtures(ctx context.Context, remove bool) (int, error)
 			return 0, err
 		}
 		var created bool
-		m, created, err = insertMedia(ctx, tx, m)
-		if err != nil {
-			return 0, err
-		}
-		// A coincidentally matching real item is never adopted as a fixture.
-		if !created {
-			continue
-		}
 		body, err := devCover(example.kind, i)
 		if err != nil {
 			return 0, err
 		}
 		if _, err = tx.Exec(ctx, "INSERT INTO images(id,body) VALUES($1,$2)", imageID, body); err != nil {
 			return 0, err
+		}
+		m, created, err = insertMedia(ctx, tx, m)
+		if err != nil {
+			return 0, err
+		}
+		// A coincidentally matching real item is never adopted as a fixture.
+		if !created {
+			if _, err = tx.Exec(ctx, "DELETE FROM images WHERE id=$1", imageID); err != nil {
+				return 0, err
+			}
+			continue
 		}
 		fixtures = append(fixtures, devFixture{m.ID, imageID})
 	}

@@ -121,15 +121,24 @@ func (s *Store) validSubmissionToken(ctx context.Context, token string) (bool, e
 	return ok, err
 }
 func (s *Store) submit(ctx context.Context, token string, m Media) (Media, bool, error) {
+	return s.persistCapture(ctx, token, "", m)
+}
+
+// persistCapture is the shared durable operation for submission and MCP saves.
+func (s *Store) persistCapture(ctx context.Context, token, scope string, m Media) (Media, bool, error) {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return m, false, err
 	}
 	defer tx.Rollback(ctx)
-	// Recheck under a lock after metadata fetching: rotation/revocation takes effect
-	// before any subsequent submission transaction can create an item.
+	// Recheck under a lock: a rotation/revocation that commits first prevents
+	// this submission from creating an item.
 	var encoded string
-	err = tx.QueryRow(ctx, "SELECT token_hash FROM integration_token WHERE token_hash=$1 FOR SHARE", hash(token)).Scan(&encoded)
+	if scope == "" {
+		err = tx.QueryRow(ctx, "SELECT token_hash FROM integration_token WHERE token_hash=$1 FOR SHARE", hash(token)).Scan(&encoded)
+	} else {
+		err = tx.QueryRow(ctx, "SELECT token_hash FROM agent_grants WHERE token_hash=$1 AND scope=$2 FOR SHARE", hash(token), scope).Scan(&encoded)
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return m, false, errCredentials
 	}
@@ -151,7 +160,7 @@ func (s *Server) prepareMedia(ctx context.Context, in MediaInput) (Media, error)
 		}
 		m.URL = canonical
 		m.Title = fallbackTitle(canonical)
-		m.Kind = "article"
+		m.Kind = kindForURL(canonical)
 		return in.Apply(m)
 	}
 	if in.URL != nil && strings.TrimSpace(*in.URL) != "" && !(in.Title != nil && in.Author != nil && in.Kind != nil && in.CoverURL != nil && in.Description != nil) {
@@ -177,6 +186,11 @@ func (s *Server) prepareMedia(ctx context.Context, in MediaInput) (Media, error)
 	if err != nil {
 		return m, &ValidationError{err.Error()}
 	}
+	if m.URL == "" && m.Kind == "book" && validISBN(m.Title) != "" {
+		m.MetadataState = "partial"
+		m.MetadataWarning = "Book lookup is unfinished. Use Correct book match to find the title and author, or enter them manually."
+		m.NeedsReview = true
+	}
 	return m, nil
 }
 func (s *Server) submitItem(w http.ResponseWriter, r *http.Request) {
@@ -190,27 +204,22 @@ func (s *Server) submitItem(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 401, map[string]string{"error": "Submission token required"})
 		return
 	}
-	var in struct {
-		Title  *string   `json:"title"`
-		URL    *string   `json:"url"`
-		Author *string   `json:"author"`
-		Kind   *string   `json:"kind"`
-		Tags   *[]string `json:"tags"`
-		Notes  *string   `json:"notes"`
-	}
+	var in submissionInput
 	if !decode(w, r, &in) {
 		return
 	}
-	m, err := s.prepareMedia(r.Context(), MediaInput{Title: in.Title, URL: in.URL, Author: in.Author, Kind: in.Kind, Tags: in.Tags, Notes: in.Notes})
+	m, err := s.prepareSubmission(r.Context(), in)
 	if err != nil {
-		respond(w, 201, nil, err)
+		respond(w, 400, nil, err)
 		return
 	}
-	m.NeedsReview = true
 	m, created, err := s.Store.submit(r.Context(), token, m)
 	if errors.Is(err, errCredentials) {
 		writeJSON(w, 401, map[string]string{"error": "Submission token required"})
 		return
+	}
+	if err == nil && created && m.MetadataState == "pending" && s.Worker != nil {
+		s.Worker.TriggerMetadata()
 	}
 	status := 200
 	if created {
@@ -220,4 +229,25 @@ func (s *Server) submitItem(w http.ResponseWriter, r *http.Request) {
 		ID      string `json:"id"`
 		Created bool   `json:"created"`
 	}{m.ID, created}, err)
+}
+
+// Only these fields are accepted by add-only integrations. Excerpts are captured
+// explicitly by the browser route, never smuggled into notes or MCP saves.
+type submissionInput struct {
+	Title  *string   `json:"title,omitempty"`
+	URL    *string   `json:"url,omitempty"`
+	Author *string   `json:"author,omitempty"`
+	Kind   *string   `json:"kind,omitempty"`
+	Tags   *[]string `json:"tags,omitempty"`
+	Notes  *string   `json:"notes,omitempty"`
+}
+
+func (s *Server) prepareSubmission(ctx context.Context, in submissionInput) (Media, error) {
+	fetchMetadata := in.URL != nil && strings.TrimSpace(*in.URL) != ""
+	m, err := s.prepareMedia(ctx, MediaInput{Title: in.Title, URL: in.URL, Author: in.Author, Kind: in.Kind, Tags: in.Tags, Notes: in.Notes, FetchMetadata: fetchMetadata})
+	if err != nil {
+		return m, &ValidationError{err.Error()}
+	}
+	m.TitleExplicit, m.AuthorExplicit = in.Title != nil, in.Author != nil
+	return m, nil
 }

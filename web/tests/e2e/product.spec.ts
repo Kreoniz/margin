@@ -96,7 +96,7 @@ test("access: first-run setup or login, private empty list and logout", async ({
   request,
 }, info) => {
   const session = await (await request.get("/api/session")).json();
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   if (session.setup_required) {
     await expect(
       page.getByRole("heading", { name: "Make it yours." }),
@@ -147,7 +147,7 @@ test("compact library supports title-only adding, two-state toggles, editing, se
   const name = title("reading list");
   const edited = name + " edited";
   ownedTitles.add(edited);
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page).getByRole("textbox", { name: "Title or URL" }).fill(name);
   await dialog(page)
@@ -171,7 +171,7 @@ test("compact library supports title-only adding, two-state toggles, editing, se
     .click();
   await page
     .locator(".list-tabs")
-    .getByRole("button", { name: "To read/watch", exact: true })
+    .getByRole("button", { name: "Unfinished", exact: true })
     .click();
   await page.getByRole("button", { name: "Edit " + name, exact: true }).click();
   await dialog(page)
@@ -243,7 +243,7 @@ test("URL capture extracts editable metadata and preserves chosen type", async (
       },
     });
   });
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page)
     .getByRole("textbox", { name: "Title or URL" })
@@ -285,7 +285,7 @@ test("switching URL capture to a manual title clears fetched details and preserv
       },
     }),
   );
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page)
     .getByRole("textbox", { name: "Title or URL" })
@@ -378,7 +378,7 @@ test("private and public items have owner-only edits and notes never leak", asyn
     );
     await checkAccess(publicPage);
     await context.close();
-    await page.goto("/dashboard");
+    await page.goto(`/dashboard?test=${Date.now()}#library`);
     await page
       .getByRole("button", { name: "Edit " + publicTitle, exact: true })
       .click();
@@ -586,7 +586,7 @@ test("empty library, real discoveries, keyboard navigation and two-state UI rema
 }, info) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await expect(
     page.getByText("Something worth keeping?", { exact: true }),
   ).toBeVisible();
@@ -621,7 +621,7 @@ test("empty library, real discoveries, keyboard navigation and two-state UI rema
 test("TanStack shortcuts respect typing and dialogs and submit the editor once", async ({
   page,
 }) => {
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   const search = page.getByRole("searchbox", { name: "Search library" });
   await expect(search).toBeVisible();
   const mod = (await page.locator(".search-box kbd").innerText()).includes("⌘")
@@ -668,14 +668,14 @@ test("TanStack shortcuts respect typing and dialogs and submit the editor once",
 test("single-key shortcuts can be disabled without disabling modifier shortcuts", async ({
   page,
 }) => {
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await expect(page.getByRole("searchbox")).toBeVisible();
   const mod = (await page.locator(".search-box kbd").innerText()).includes("⌘")
     ? "Meta"
     : "Control";
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const toggle = page.getByRole("checkbox", {
-    name: /Enable single-key shortcuts/,
+    name: /Enable Vim quick keys/,
   });
   await expect(toggle).toBeChecked();
   await toggle.click();
@@ -723,7 +723,8 @@ test("Vim navigation moves through rows, tabs and pages without colliding with g
       json: { ...(await response.json()), inbox: [] },
     });
   });
-  await page.goto("/dashboard");
+  await page.route("**/api/inbox?*", route => route.fulfill({ json: { items: [], total: 0 } }));
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   const rows = page.locator(".media-row");
   const tabs = page.locator(".list-tabs");
   await expect(rows).toHaveCount(3);
@@ -739,32 +740,38 @@ test("Vim navigation moves through rows, tabs and pages without colliding with g
   await page.keyboard.press("g");
   await page.keyboard.press("g");
   await expect(rows.first()).toBeFocused();
-  await page.keyboard.press("l");
+  await page.keyboard.press("]");
   await expect(
     tabs.getByRole("button", { name: "Done", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(rows).toHaveCount(1);
-  await page.keyboard.press("l");
-  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+  await page.keyboard.press("]");
+  await expect(tabs.getByRole("button", { name: "Up next", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("]");
+  await expect(tabs.getByRole("button", { name: /Needs attention/ })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await page.keyboard.press("l");
+  await page.keyboard.press("]");
   await expect(
     tabs.getByRole("button", { name: "All", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(rows).toHaveCount(4);
-  await page.keyboard.press("h");
-  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+  await page.keyboard.press("[");
+  await expect(tabs.getByRole("button", { name: /Needs attention/ })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
+  await page.keyboard.press("[");
+  await expect(tabs.getByRole("button", { name: "Up next", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("[");
   await expect(
     tabs.getByRole("button", { name: "Done", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("]");
-  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+  await expect(tabs.getByRole("button", { name: "Up next", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("]");
+  await expect(tabs.getByRole("button", { name: /Needs attention/ })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
@@ -772,16 +779,16 @@ test("Vim navigation moves through rows, tabs and pages without colliding with g
   await expect(
     page.getByRole("heading", { name: "Discover.", exact: true }),
   ).toBeVisible();
-  await page.keyboard.press("l");
+  await page.keyboard.press("]");
   await expect(
     tabs.getByRole("button", { name: "Saved", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".article-row")).toHaveCount(0);
-  await page.keyboard.press("l");
+  await page.keyboard.press("]");
   await expect(
     tabs.getByRole("button", { name: "Read", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await page.keyboard.press("h");
+  await page.keyboard.press("[");
   await expect(
     tabs.getByRole("button", { name: "Saved", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -789,7 +796,7 @@ test("Vim navigation moves through rows, tabs and pages without colliding with g
   await expect(
     page.getByRole("heading", { name: "Your library.", exact: true }),
   ).toBeVisible();
-  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+  await expect(tabs.getByRole("button", { name: /Needs attention/ })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
@@ -806,7 +813,7 @@ test("Vim navigation moves through rows, tabs and pages without colliding with g
   await expect(
     page.getByRole("heading", { name: "Your library.", exact: true }),
   ).toBeVisible();
-  await expect(tabs.getByRole("button", { name: /To review/ })).toHaveAttribute(
+  await expect(tabs.getByRole("button", { name: /Needs attention/ })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
@@ -836,7 +843,7 @@ test("Vim keys leave typing, widgets and dialogs alone and follow the shortcut p
       })
     ).status(),
   ).toBe(201);
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   const search = page.getByRole("searchbox", {
     name: "Search library",
     exact: true,
@@ -848,13 +855,10 @@ test("Vim keys leave typing, widgets and dialogs alone and follow the shortcut p
   await expect(search).toHaveValue("hlggHL");
   await expect(search).toBeFocused();
   await search.fill("");
-  const type = page.getByRole("combobox", {
-    name: "Filter media type",
-    exact: true,
-  });
+  const type = page.locator("#library-filter-types");
   await type.click();
-  await page.keyboard.press("h");
-  await page.keyboard.press("l");
+  await page.keyboard.press("[");
+  await page.keyboard.press("]");
   await page.keyboard.press("Shift+L");
   await expect(
     page.getByRole("heading", { name: "Your library.", exact: true }),
@@ -862,7 +866,7 @@ test("Vim keys leave typing, widgets and dialogs alone and follow the shortcut p
   await expect(
     page
       .locator(".list-tabs")
-      .getByRole("button", { name: "To read/watch", exact: true }),
+      .getByRole("button", { name: "Unfinished", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("Escape");
   await page.locator("main").focus();
@@ -890,7 +894,7 @@ test("Vim keys leave typing, widgets and dialogs alone and follow the shortcut p
   await expect(dialog(page)).toHaveCount(0);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const quickKeys = dialog(page).getByRole("checkbox", {
-    name: /Enable single-key shortcuts/,
+    name: /Enable Vim quick keys/,
   });
   await quickKeys.click();
   await expect(quickKeys).not.toBeChecked();
@@ -917,7 +921,7 @@ test("Vim keys leave typing, widgets and dialogs alone and follow the shortcut p
   await expect(
     page
       .locator(".list-tabs")
-      .getByRole("button", { name: "To read/watch", exact: true }),
+      .getByRole("button", { name: "Unfinished", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page).not.toHaveURL(/#discover$/);
   await page.keyboard.press((await modifier(page)) + "+k");
@@ -930,10 +934,10 @@ test("Vim keys leave typing, widgets and dialogs alone and follow the shortcut p
     }),
   ).toBeVisible();
   await expect(
-    dialog(page).getByText("Shift+H / Shift+L", { exact: true }),
+    dialog(page).getByText("Shift+h / Shift+l", { exact: true }),
   ).toBeVisible();
   await expect(
-    dialog(page).getByText("g then g / Shift+G", { exact: true }),
+    dialog(page).getByText("g then g / G", { exact: true }),
   ).toBeVisible();
   await checkAccess(page);
 });
@@ -952,7 +956,7 @@ test("rows move smoothly and reduced motion removes movement and dialog transiti
     ids.push((await response.json()).id);
   }
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   const rows = page.locator(".media-row");
   await expect(rows).toHaveCount(2);
   const moving = rows.filter({ hasText: names[0] });
@@ -987,7 +991,7 @@ test("compact navigation exposes sources and source controls persist without ove
   page,
   request,
 }, info) => {
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await expect(
     page.getByRole("heading", { name: "Your library." }),
   ).toBeVisible();
@@ -1093,7 +1097,7 @@ test("keyboard-only library navigation supports opening, editing, completion, un
       ).status(),
     ).toBe(201);
   }
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   const rows = page.locator(".media-row");
   await expect(rows).toHaveCount(3);
   const mod = await modifier(page);
@@ -1117,7 +1121,7 @@ test("keyboard-only library navigation supports opening, editing, completion, un
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
   await expect(rows.first()).toBeFocused();
-  await page.keyboard.press("d");
+  await page.keyboard.press("Space");
   await expect(rows).toHaveCount(2);
   await expect(rows.first()).toBeFocused();
   await page.keyboard.press(mod + "+z");
@@ -1178,7 +1182,7 @@ test("keyboard navigation reaches items beyond the first page", async ({
       ).status(),
     ).toBe(201);
   }
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   const rows = page.locator(".media-row");
   await expect(rows).toHaveCount(40);
   await page.keyboard.press("Shift+G");
@@ -1198,7 +1202,7 @@ test("keyboard navigation reaches items beyond the first page", async ({
     await page.keyboard.press("Enter");
     await expect(rows).toHaveCount(40);
     await expect(rows.last()).toBeFocused();
-    await page.keyboard.press("d");
+    await page.keyboard.press("Space");
     await expect
       .poll(
         async () =>
@@ -1234,7 +1238,7 @@ test("keyboard navigation reaches items beyond the first page", async ({
   await page.keyboard.press("d");
   await expect(page.getByRole("heading", { name: "Discover." })).toBeVisible();
   await page.keyboard.press("g");
-  await page.keyboard.press("l");
+  await page.keyboard.press("]");
   await expect(
     page.getByRole("heading", { name: "Your library." }),
   ).toBeVisible();
@@ -1342,7 +1346,7 @@ test("dark is the default, settings has a full hit area, and theme persists thro
   await page.addInitScript(() =>
     localStorage.setItem("margin-appearance", "light"),
   );
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".app-theme")).toHaveAttribute(
     "data-appearance",
     "dark",
@@ -1462,7 +1466,7 @@ test("metadata lookup never blocks saving", async ({ page, request }) => {
       })
       .catch(() => {});
   });
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page)
     .getByRole("textbox", { name: "Title or URL" })
@@ -1513,7 +1517,7 @@ test("book ISBN resolves automatically with an optional keyboard correction", as
       },
     }),
   );
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page)
     .getByRole("textbox", { name: "Title or URL" })
@@ -1544,7 +1548,7 @@ test("book ISBN resolves automatically with an optional keyboard correction", as
   });
 });
 
-test("external captures are reviewed explicitly without changing completion", async ({
+test("deliberate captures need no review while unresolved book identities can be reviewed", async ({
   page,
   request,
 }) => {
@@ -1556,20 +1560,31 @@ test("external captures are reviewed explicitly without changing completion", as
     data: { title: name },
   });
   expect(receipt.status()).toBe(201);
-  await page.goto("/dashboard");
-  await page.getByRole("button", { name: /To review/ }).click();
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   const row = page.locator(".media-row").filter({ hasText: name });
   await expect(row).toBeVisible();
   await expect(row.getByRole("checkbox")).not.toBeChecked();
-  await page.reload();
-  await page.getByRole("button", { name: /To review/ }).click();
-  await expect(row).toBeVisible();
-  await row.getByRole("button", { name: "Mark reviewed: " + name }).click();
+  await expect(row.getByRole("button", { name: "Mark reviewed: " + name })).toHaveCount(0);
+  await page.getByRole("button", { name: /Needs attention/ }).click();
   await expect(row).toHaveCount(0);
-  const item = (await (await request.get("/api/media")).json()).find(
-    (m: { title: string }) => m.title === name,
-  );
-  expect(item).toMatchObject({ needs_review: false, status: "pending" });
+
+  // A valid but unresolved ISBN still represents a concrete identity problem.
+  const isbn = "9780140328721";
+  ownedTitles.add(isbn);
+  const unresolved = await request.post("/api/media", { data: { title: isbn, kind: "book" } });
+  expect(unresolved.status()).toBe(201);
+  expect(await unresolved.json()).toMatchObject({ needs_review: true, status: "pending" });
+  await page.reload();
+  await page.getByRole("button", { name: /Needs attention/ }).click();
+  const book = page.locator(".media-row").filter({ hasText: isbn });
+  await expect(book).toBeVisible();
+  await expect(row).toHaveCount(0);
+  await book.getByRole("button", { name: "Mark reviewed: " + isbn }).click();
+  await expect(book).toHaveCount(0);
+  const items = await (await request.get("/api/media")).json();
+  for (const savedTitle of [name, isbn]) {
+    expect(items.find((m: { title: string }) => m.title === savedTitle)).toMatchObject({ needs_review: false, status: "pending" });
+  }
 });
 
 test("local image uploads resize before sending and preserve private access", async ({
@@ -1578,7 +1593,7 @@ test("local image uploads resize before sending and preserve private access", as
   playwright,
 }) => {
   const name = title("Custom image");
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page).getByRole("textbox", { name: "Title or URL" }).fill(name);
   await page.keyboard.press((await modifier(page)) + "+Shift+d");
@@ -1652,7 +1667,7 @@ test("late metadata preserves manual title and custom image edits", async ({
       },
     });
   });
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await dialog(page)
     .getByRole("textbox", { name: "Title or URL" })
@@ -1699,7 +1714,7 @@ test("development shortcut loads all kinds once and clears only its fixtures", a
   ).json();
   await request.delete("/api/dev/fixtures");
   try {
-    await page.goto("/dashboard");
+    await page.goto(`/dashboard?test=${Date.now()}#library`);
     await expect(
       page.getByRole("region", { name: "Development tools", exact: true }),
     ).toBeVisible();
@@ -1832,7 +1847,7 @@ test("action hints share one lazy popup across repeated rows and support hover, 
       ).status(),
     ).toBe(201);
   }
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   const rows = page.locator(".media-row");
   await expect(rows).toHaveCount(9);
   const hints = page.getByRole("tooltip");
@@ -1841,12 +1856,32 @@ test("action hints share one lazy popup across repeated rows and support hover, 
   await expect(floating).toHaveCount(0);
   if (info.project.name === "desktop") {
     await firstEdit.hover();
+    await page.waitForTimeout(200);
+    expect(await hints.count()).toBe(0);
     await expect(hints).toHaveCount(1);
     await expect(hints).toContainText("Edit item");
-    await expect(hints.locator("kbd")).toHaveText("E");
+    await expect(hints.locator("kbd")).toHaveText("e");
+    const completion = rows.first().getByRole("checkbox", { name: /^Mark done:/ });
+    await completion.hover();
+    await page.waitForTimeout(200);
+    expect(await hints.count()).toBe(0);
+    await expect(hints).toContainText("Mark done");
+    await page.mouse.move(0, 0);
+    // Re-enter during closing instead of waiting for the floating DOM to leave.
+    await page.waitForTimeout(100);
+    await firstEdit.hover();
+    await page.waitForTimeout(200);
+    expect(await hints.count()).toBe(0);
+    await expect(hints).toContainText("Edit item");
     await hints.hover();
     // Exceed the 100ms close delay to verify the popup itself stays hoverable.
     await page.waitForTimeout(200);
+    await expect(hints).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect(floating).toHaveCount(0);
+    await rows.last().getByRole("button", { name: /^Edit / }).hover();
+    await page.waitForTimeout(200);
+    expect(await hints.count()).toBe(0);
     await expect(hints).toBeVisible();
     await page.mouse.move(0, 0);
     await expect(floating).toHaveCount(0);
@@ -1915,7 +1950,7 @@ test("action hints omit disabled quick keys and keep modifier shortcuts", async 
       })
     ).status(),
   ).toBe(201);
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   const row = page.locator(".media-row");
   await row.focus();
   const edit = row.getByRole("button", { name: /^Edit / });
@@ -1957,7 +1992,7 @@ test("secondary control hints explain review, filtering and editor details witho
       })
     ).status(),
   ).toBe(201);
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   const row = page.locator(".media-row").filter({ hasText: name });
   await expect(row).toBeVisible();
   const hint = page.getByRole("tooltip");
@@ -1976,11 +2011,11 @@ test("secondary control hints explain review, filtering and editor details witho
   await expect(row.getByRole("checkbox")).not.toBeChecked();
   const reviewFilter = page
     .locator(".list-tabs")
-    .getByRole("button", { name: /To review/ });
+    .getByRole("button", { name: /Needs attention/ });
   await page.keyboard.press("Tab");
   await reviewFilter.focus();
-  await expect(hint).toContainText("Captured items waiting for your review");
-  await expect(hint.locator("kbd")).toHaveText("h / l");
+  await expect(hint).toContainText("Items with details to check");
+  await expect(hint.locator("kbd")).toHaveText("[ / ]");
   await page.keyboard.press("Escape");
   await row.getByRole("button", { name: "Edit " + name, exact: true }).click();
   const details = dialog(page)
@@ -2078,7 +2113,7 @@ test("compact library rows open from covers and whitespace while controls stay i
   ]) {
     expect((await request.post("/api/media", { data })).status()).toBe(201);
   }
-  await page.goto("/dashboard");
+  await page.goto(`/dashboard?test=${Date.now()}#library`);
   await page
     .locator(".list-tabs")
     .getByRole("button", { name: "All", exact: true })
@@ -2105,7 +2140,9 @@ test("compact library rows open from covers and whitespace while controls stay i
   expect((await row.boundingBox())!.height).toBeLessThanOrEqual(
     (page.viewportSize()?.width || 1440) < 600 ? 140 : 96,
   );
-  expect((await manual.boundingBox())!.height).toBeLessThanOrEqual(96);
+  expect((await manual.boundingBox())!.height).toBeLessThanOrEqual(
+    (page.viewportSize()?.width || 1440) < 600 ? 120 : 96,
+  );
   await open(() => clickBody(row.locator(".mini-cover")));
   await open(() => clickBody(row.locator(".item-meta > span")));
   await open(() => clickBody(row, 0.65, 0.95));
@@ -2269,8 +2306,8 @@ test("retry recovers an existing capture and saving preserves review context", a
         },
       }),
     );
-    await page.goto("/dashboard");
-    await page.getByRole("button", { name: /To review/ }).click();
+    await page.goto(`/dashboard?test=${Date.now()}#library`);
+    await page.getByRole("button", { name: /Needs attention/ }).click();
     await page
       .getByRole("searchbox", { name: "Search library" })
       .fill("publisher.example");
@@ -2296,7 +2333,7 @@ test("retry recovers an existing capture and saving preserves review context", a
       .click();
     await expect(dialog(page)).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: /To review/ }),
+      page.getByRole("button", { name: /Needs attention/ }),
     ).toHaveAttribute("aria-pressed", "true");
     await expect(
       page.getByRole("searchbox", { name: "Search library" }),
@@ -2329,8 +2366,8 @@ test("review actions undo cleanly and mobile row actions stay aligned", async ({
     })
   ).json();
   try {
-    await page.goto("/dashboard");
-    await page.getByRole("button", { name: /To review/ }).click();
+    await page.goto(`/dashboard?test=${Date.now()}#library`);
+    await page.getByRole("button", { name: /Needs attention/ }).click();
     const row = page.locator(".media-row").filter({ hasText: name });
     await expect(row).toBeVisible();
     if ((page.viewportSize()?.width || 1440) < 600) {
@@ -2399,7 +2436,7 @@ test("changing a URL ignores late background details from its previous page", as
     await route.fulfill({ json: data });
   });
   try {
-    await page.goto("/dashboard");
+    await page.goto(`/dashboard?test=${Date.now()}#library`);
     await page
       .getByRole("button", { name: "Edit " + name, exact: true })
       .click();
@@ -2481,7 +2518,7 @@ test("a duplicate quick save stops its spinner and allows metadata retry", async
       .catch(() => {});
   });
   try {
-    await page.goto("/dashboard");
+    await page.goto(`/dashboard?test=${Date.now()}#library`);
     await page.getByRole("button", { name: "Add item", exact: true }).click();
     await dialog(page).getByRole("textbox", { name: "Title or URL" }).fill(url);
     await expect(

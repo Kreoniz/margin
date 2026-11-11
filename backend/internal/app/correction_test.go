@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -463,7 +464,7 @@ func TestCorrectionSubmissionTokenPermissionsAndIdempotency(t *testing.T) {
 		requireCode(t, submitter.request(tc.method, tc.path, tc.body), 401)
 	}
 	requireCode(t, owner.request("POST", "/api/integrations/items", `{"title":"Cookie-only submission"}`), 401)
-	for _, body := range []string{`{"title":"Override","status":"done"}`, `{"title":"Override","visibility":"public"}`, `{"title":"Override","progress":10}`, `{}`, `{"url":"http://127.0.0.1/private"}`} {
+	for _, body := range []string{`{"title":"Override","status":"done"}`, `{"title":"Override","visibility":"public"}`, `{"title":"Override","progress":10}`, `{"url":"https://publisher.example/override","fetch_metadata":true}`, `{}`, `{"url":"http://127.0.0.1/private"}`} {
 		requireCode(t, submitter.request("POST", "/api/integrations/items", body), 400)
 	}
 	w = submitter.request("POST", "/api/integrations/items", `{"url":"https://example.com/submission","title":"Explicit title","author":"Explicit author","kind":"paper","tags":["test"],"notes":"private token note"}`)
@@ -473,6 +474,7 @@ func TestCorrectionSubmissionTokenPermissionsAndIdempotency(t *testing.T) {
 		t.Fatalf("bad minimal receipt %s", w.Body.String())
 	}
 	id := receipt["id"].(string)
+	NewWorker(s, f).enrichPending(ctx)
 	items, err := s.ListMedia(ctx)
 	if err != nil || len(items) != 1 {
 		t.Fatal(items, err)
@@ -743,35 +745,42 @@ func TestCorrectionFirstRunAndConfiguredStartup(t *testing.T) {
 	c.cookie = w.Result().Cookies()[0]
 	requireCode(t, c.request("GET", "/api/bootstrap", ""), 200)
 }
-func TestCorrectionRevocationWhileFetchingMetadata(t *testing.T) {
+func TestCorrectionRevocationBeforeSubmissionCommit(t *testing.T) {
 	s := integrationStore(t)
-	owner, f := ownerClient(t, s)
+	owner, _ := ownerClient(t, s)
 	w := owner.request("POST", "/api/integration/token", "")
 	requireCode(t, w, 200)
 	token := responseMap(t, w)["token"].(string)
-	submitter := &apiTestClient{t: t, handler: owner.handler, bearer: token}
-	started := make(chan struct{})
-	release := make(chan struct{})
-	f.client.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		close(started)
-		select {
-		case <-release:
-		case <-r.Context().Done():
-			return nil, r.Context().Err()
-		}
-		return fakeResponse(r, 200, "text/html", "<title>Revocation test</title>"), nil
-	})
+	// Decoding starts only after initial token validation. Hold an incomplete
+	// body there so revocation can commit before the transaction's token recheck.
+	body, input := io.Pipe()
+	r := httptest.NewRequest("POST", "/api/integrations/items", body)
+	r.Header.Set("Authorization", "Bearer "+token)
 	result := make(chan *httptest.ResponseRecorder, 1)
+	done := make(chan struct{})
 	go func() {
-		result <- submitter.request("POST", "/api/integrations/items", `{"url":"https://example.com/revoked-during-fetch"}`)
+		defer close(done)
+		defer body.Close()
+		w := httptest.NewRecorder()
+		owner.handler.ServeHTTP(w, r)
+		result <- w
 	}()
+	defer func() { input.Close(); <-done }()
+	started := make(chan error, 1)
+	go func() { _, err := io.WriteString(input, "{"); started <- err }()
 	select {
-	case <-started:
+	case err := <-started:
+		if err != nil {
+			t.Fatal(err)
+		}
 	case <-time.After(5 * time.Second):
-		t.Fatal("metadata did not start")
+		t.Fatal("submission did not start decoding after token validation")
 	}
 	requireCode(t, owner.request("DELETE", "/api/integration/token", ""), 204)
-	close(release)
+	if _, err := io.WriteString(input, `"title":"Revoked before commit"}`); err != nil {
+		t.Fatal(err)
+	}
+	input.Close()
 	select {
 	case w = <-result:
 		requireCode(t, w, 401)

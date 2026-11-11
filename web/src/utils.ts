@@ -1,4 +1,25 @@
-import type { Kind, Media } from "./types";
+import type { Kind, Media, Source } from "./types";
+
+export function compareUpdatedAt(left: string, right: string): number {
+  const leftTime = Date.parse(left), rightTime = Date.parse(right);
+  if (!Number.isFinite(leftTime) || !Number.isFinite(rightTime)) return 0;
+  if (leftTime !== rightTime) return leftTime - rightTime;
+  // Date.parse truncates PostgreSQL's sub-millisecond precision. Compare that
+  // remainder too; the parsed milliseconds already account for UTC offsets.
+  const remainder = (value: string) => (value.match(/\.(\d+)(?:Z|[+-]\d{2}:\d{2})$/)?.[1] || "").padEnd(9, "0").slice(3, 9);
+  const a = remainder(left), b = remainder(right);
+  return a === b ? 0 : a > b ? 1 : -1;
+}
+
+export function discoveryEmptyState(sources: Source[], state: string) {
+  if (state !== "new") return { heading: `No ${state} articles.`, description: "Your discoveries will appear here when you change their status." };
+  if (!sources.length) return { heading: "Follow something worth reading.", description: "Add a source to start collecting articles in Discover." };
+  const enabled = sources.filter(s => s.enabled);
+  if (!enabled.length) return { heading: "Collection is paused.", description: "Resume a source to collect new articles." };
+  if (enabled.some(s => s.last_error)) return { heading: "Sources need attention.", description: "Some sources could not be checked. Open Sources for details and retry." };
+  if (enabled.some(s => !s.last_sync)) return { heading: "Checking your sources…", description: "The first articles will appear after collection finishes." };
+  return { heading: "You’re all caught up.", description: "Your sources keep collecting in the background. Save the articles you want to come back to." };
+}
 
 export function safeURL(value: string): string | undefined {
   try {
@@ -41,7 +62,8 @@ export function selectMedia<
   T extends Omit<Media, "notes"> & { notes?: string },
 >(
   media: T[],
-  filters: { query: string; status: string; kind: Kind | "all"; tag: string },
+  filters: { query: string; status: string; kinds: readonly Kind[]; tags: readonly string[]; channels?: readonly string[] },
+  preserveOrder = false,
 ) {
   const terms = filters.query
     .toLocaleLowerCase()
@@ -52,8 +74,9 @@ export function selectMedia<
     .filter(
       (item) =>
         (filters.status === "all" || item.status === filters.status) &&
-        (filters.kind === "all" || item.kind === filters.kind) &&
-        (!filters.tag || item.tags.includes(filters.tag)) &&
+        (!filters.kinds.length || filters.kinds.includes(item.kind)) &&
+        (!filters.tags.length || item.tags.some(tag => filters.tags.includes(tag))) &&
+        (!filters.channels?.length || filters.channels.includes(youtubeChannelName(item)?.toLocaleLowerCase() || "")) &&
         terms.every((term) =>
           [
             item.title,
@@ -61,6 +84,8 @@ export function selectMedia<
             item.url,
             item.description,
             item.notes || "",
+            item.selected_text || "",
+            item.selected_text_source_url || "",
             ...item.tags,
           ]
             .join(" ")
@@ -68,7 +93,11 @@ export function selectMedia<
             .includes(term),
         ),
     )
-    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    .sort((a, b) => preserveOrder ? 0 : Date.parse(b.created_at) - Date.parse(a.created_at));
+}
+export function youtubeChannelName(item: Pick<Media, "kind" | "url" | "author">): string | undefined {
+  if (item.kind !== "video" || !item.author.trim()) return undefined;
+  return ["youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be", "youtube-nocookie.com"].includes(hostname(item.url)) ? item.author.trim() : undefined;
 }
 export const publicPath = (id?: string) =>
   window.location.origin + (id ? "/shared" : "") + (id ? "/" + id : "");
@@ -77,9 +106,29 @@ export function imageURL(value: string): string | undefined {
   return /^\/api\/images\/[0-9a-f-]{36}$/i.test(value) ? value : safeURL(value);
 }
 
+export function publisherImage(raw: string): string | undefined {
+  if (!safeURL(raw)) return undefined;
+  const url = new URL(raw);
+  const host = url.hostname.replace(/^www\./, "");
+  if (host === "openai.com") return "/brands/openai.svg";
+  if (host === "anthropic.com") return "/brands/anthropic.svg";
+  if (host === "thinkingmachines.ai") return "/brands/thinkingmachines.png";
+  if (host === "deepmind.google" || host === "deepmind.com") return "/brands/deepmind.svg";
+  if (host === "huggingface.co") return "/brands/huggingface.svg";
+  return new URL("/favicon.ico", url.origin).href;
+}
+
 export function isFallbackTitle(title: string, raw: string): boolean {
   try {
     const url = new URL(raw);
+    const host = url.hostname.replace(/^www\./, "");
+    const parts = url.pathname.split("/").filter(Boolean);
+    const youtubeHost = ["youtube.com", "m.youtube.com", "music.youtube.com", "youtube-nocookie.com"].includes(host);
+    const video = host === "youtu.be" && parts.length === 1 ? parts[0]
+      : youtubeHost && url.pathname === "/watch" ? url.searchParams.get("v")
+        : youtubeHost && parts.length === 2 && ["shorts", "embed", "live"].includes(parts[0]) ? parts[1] : "";
+    if (video && /^[A-Za-z0-9_-]{11}$/.test(video) &&
+      (/^(?:youtube|- youtube|watch)?$/i.test(title.trim()) || /before you continue|consent\.youtube|sign in to confirm/i.test(title))) return true;
     const name = decodeURIComponent(
       url.pathname.split("/").filter(Boolean).at(-1) || "",
     )
@@ -89,4 +138,10 @@ export function isFallbackTitle(title: string, raw: string): boolean {
   } catch {
     return false;
   }
+}
+
+// Resolve IDs before filtering; never group kinds or sort a deliberate queue.
+export function selectUpNext(media: Media[], ids: readonly string[], filters: Parameters<typeof selectMedia>[1]) {
+  const byID = new Map(media.map(item => [item.id, item]));
+  return selectMedia(ids.flatMap(id => { const item = byID.get(id); return item?.status === "pending" ? [item] : []; }), filters, true);
 }

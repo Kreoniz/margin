@@ -1,23 +1,36 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "unlikely-ui/button";
 import { Input } from "unlikely-ui/input";
 import { api, send } from "./api";
 import { Icon } from "./Icon";
 
-export function BrowserCaptureSettings() {
-  const [configured, setConfigured] = useState(false);
+export function BrowserCaptureSettings({ onBusyChange }: { onBusyChange: (busy: boolean) => void }) {
+  const [configured, setConfigured] = useState<boolean>();
+  const [checking, setChecking] = useState(true);
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
   const [confirm, setConfirm] = useState<"replace" | "revoke">();
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    void api<{ configured: boolean }>("/integration/browser-token")
-      .then((v) => setConfigured(v.configured))
-      .catch((e) => setError(e.message));
-  }, []);
+  async function checkStatus() {
+    setChecking(true);
+    setError("");
+    try {
+      const value = await api<{ configured: boolean }>("/integration/browser-token");
+      setConfigured(value.configured);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not check browser token status.");
+    } finally {
+      setChecking(false);
+    }
+  }
+  useEffect(() => { void checkStatus(); }, []);
   async function update(revoke = false) {
+    if (pending.current || configured === undefined) return;
+    pending.current = true;
     setBusy(true);
+    onBusyChange(true);
     setError("");
     try {
       if (revoke) {
@@ -39,7 +52,9 @@ export function BrowserCaptureSettings() {
         e instanceof Error ? e.message : "Could not update browser token.",
       );
     } finally {
+      pending.current = false;
       setBusy(false);
+      onBusyChange(false);
     }
   }
   return (
@@ -61,10 +76,10 @@ export function BrowserCaptureSettings() {
           <Button
             variant="secondary"
             size="sm"
-            disabled={busy}
+            disabled={busy || configured === undefined}
             onClick={() => (configured ? setConfirm("replace") : void update())}
           >
-            {configured ? "Replace browser token" : "Create browser token"}
+            {configured === undefined ? checking ? "Checking browser token…" : "Browser token status unavailable" : configured ? "Replace browser token" : "Create browser token"}
           </Button>
           {configured && (
             <Button
@@ -77,6 +92,9 @@ export function BrowserCaptureSettings() {
             </Button>
           )}
         </div>
+        {configured === undefined && !checking && error && (
+          <Button variant="ghost" size="sm" onClick={() => void checkStatus()}>Retry token status</Button>
+        )}
         {confirm && (
           <div className="delete-confirm">
             <p>
@@ -87,6 +105,7 @@ export function BrowserCaptureSettings() {
             <Button
               size="sm"
               variant="ghost"
+              disabled={busy}
               onClick={() => setConfirm(undefined)}
             >
               Cancel
@@ -130,7 +149,7 @@ export function BrowserCaptureSettings() {
           in its Settings. Open capture from the toolbar or its browser
           shortcut, then press S to save or D to mark done. Its Shortcuts button
           shows your browser assignments, including optional direct Save and
-          Done commands. New captures appear under To review.
+          Done commands. New captures appear in Library. Choose unfinished items for Up next in Margin.
         </p>
         {error && (
           <p role="alert" className="notice error">
