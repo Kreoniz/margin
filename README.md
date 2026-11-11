@@ -26,7 +26,7 @@ docker compose up -d --build
 
 The project bridge defaults to MTU 1376, verified for this laptop's VPN path. `DOCKER_MTU` can adjust it for another host; keep it at or below the outbound path's MTU. If changed, recreate Margin's network with `docker compose down` **without `-v`**, then `docker compose up -d`. No Docker daemon or host VPN change is needed.
 
-For remote Docker hosting, secrets, HTTPS, backups and domain changes, see the [production deployment runbook](docs/deployment.md) and [current deployment verification](docs/deployment-2026-11-02-complete.md).
+Production uses `deploy/compose.production.yaml` behind the existing HTTPS proxy. Back up with `scripts/backup-production.sh` before replacing the application image. Deployment records, design decisions, review findings and verification belong in [pull requests](https://github.com/Kreoniz/margin/pulls); local `docs/` notes are ignored by Git.
 
 ## Use
 
@@ -55,7 +55,7 @@ One dirty editor draft is retained in memory after Cancel, Escape, Close or outs
 
 ## Telegram / Hermes capture
 
-For the short browser and Marvin setup walkthrough, see [Capture setup](docs/capture-setup.md). A portable Hermes skill is included in `integrations/hermes/margin-save`; it was [installed and configured for Marvin on 2026-10-31](docs/deployment-marvin-capture-2026-10-31.md). Send `/reload-skills` once in Telegram before using the new command.
+Browser installation is described in the [extension guide](extension/README.md). A portable Hermes skill/helper is included in `integrations/hermes/margin-save`; the [MCP client guide](integrations/hermes/mcp.md) covers the optional read/save connection.
 
 The authenticated HTTP interface is usable by a Telegram bot or Hermes tool. Marvin's installed skill uses its profile secret environment; other installations can use the same interface. Keep its token in the integration's secret storage:
 
@@ -78,7 +78,7 @@ Extension 1.2.0 adds an unchecked **Include selected text** option for deliberat
 
 ## Collection
 
-RSS/Atom is preferred. Verified endpoints and parser notes are in [docs/research.md](docs/research.md). Anthropic uses a named first-party HTML adapter; unsupported arbitrary HTML sites need a valid feed. Publisher outages/markup changes appear in Sources, preserving existing content.
+RSS/Atom is preferred. Anthropic uses a named first-party HTML adapter; unsupported arbitrary HTML sites need a valid feed. Publisher outages/markup changes appear in Sources, preserving existing content.
 
 The worker runs while the server is up, with per-source intervals, persistent leases, coalesced manual checks and durable duplicate/seen keys. Each sync collects up to 100 recent articles per source. Discover filters and searches on the server, with accurate totals and cursor pages of 40; older unread articles remain accessible even behind newer saved or dismissed history. Bootstrap retains a bounded recent-inbox snapshot for compatibility. The personal library is uncapped. Metadata is best-effort; blocked publishers and PDF links receive editable fallbacks. Remote HTML is converted to plain text. Fetching rejects private/loopback/special-use destinations, unsafe schemes, credential-bearing URLs, rebinding and redirects into private networks; requests and bodies are bounded.
 
@@ -127,9 +127,9 @@ TEST_DATABASE_URL='<disposable PostgreSQL URL>' go test -race -count=1 ./...
 
 Backend tests use isolated schemas, require explicit TEST_DATABASE_URL and never fall back to the application database. They cover fresh/upgrade migrations, legacy sample precision, auth/CSRF/limiting, sharing, token scope/concurrency/revocation, auto-save cutoffs/seen history, metadata/parsers and existing worker/storage behavior. See the backend guide for optional live-source checks.
 
-[Corrected product audit](docs/product-correction.md) · [Design research](docs/product-correction-research.md) · [API contract](docs/api-contract.md). Inter is self-hosted with its SIL Open Font License; Unlikely UI, TanStack and Tailwind license notices are retained under web/public/licenses.
+Inter is self-hosted with its SIL Open Font License; Unlikely UI, TanStack and Tailwind license notices are retained under web/public/licenses.
 
-See [capture, book matching, images, export, and Collection changes](docs/capture-and-collection.md) and the [Helium extension setup](extension/README.md).
+See the [extension setup](extension/README.md) for browser capture.
 
 ### Development demo data
 
@@ -137,4 +137,4 @@ See [capture, book matching, images, export, and Collection changes](docs/captur
 
 Other local server runs can opt in with `MARGIN_DEV_MODE=1`. It is off by default, and the fixture API is absent without it. Loading is idempotent. Cleanup removes only the recorded fixture IDs and unused fixture images, preserving real items even if they have the same title or `demo` tag. Owner login is still required. Clear fixtures before reusing that database outside development.
 
-Current reliability changes and verification are recorded in [the council remediation log](docs/council/2026-10-30/remediation.md). YouTube video metadata uses its first-party oEmbed endpoint with a page fallback and explicit incomplete state for restricted/blocked/unavailable responses. Browser capture persists before remote enrichment.
+YouTube video metadata uses its first-party oEmbed endpoint with a page fallback and explicit incomplete state for restricted/blocked/unavailable responses. Browser capture persists before remote enrichment.

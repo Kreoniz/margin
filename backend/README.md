@@ -35,7 +35,7 @@ Migration 002 converts later/active to pending and completed to done, preserving
 
 ## Collection and limits
 
-RSS and Atom share the safe HTTP fetcher. Anthropic uses only its first-party dated listing rows, including linked articles outside `/news/`. Sources and verified endpoints are described in `../docs/research.md`. Publisher outages, rate limits, and markup changes appear in each source's `last_error`, with the next retry scheduled normally. There is no third-party feed dependency.
+RSS and Atom share the safe HTTP fetcher. Anthropic uses only its first-party dated listing rows, including linked articles outside `/news/`. Publisher outages, rate limits, and markup changes appear in each source's `last_error`, with the next retry scheduled normally. There is no third-party feed dependency.
 
 The worker checks due sources on startup and every 30 seconds. Manual sync immediately requests an enabled-source pass, bypasses their intervals, and coalesces overlapping requests. Two-minute database leases prevent simultaneous collection across processes and recover after crashes. Collection outcomes persist `last_sync`, `next_sync`, and `last_error`. Failed persistence is logged and followed by a bounded best-effort status write and retry; a total database outage can only be reported in logs. Metadata claim/finish failures are logged too. Source deletion retains saved library records. Existing inbox URLs and read/dismissed/saved state survive repeat collection.
 
@@ -49,7 +49,7 @@ Stored navigation URLs preserve fragments; remote fetches omit them. Duplicate k
 
 ## HTTP submission integration
 
-The [capture setup guide](../docs/capture-setup.md) includes browser setup and a portable Hermes skill/helper in `integrations/hermes/margin-save`. No running gateway is modified by adding these files.
+The [extension guide](../extension/README.md) covers browser setup; the portable Hermes skill/helper is in `integrations/hermes/margin-save`. Adding these files does not modify a running gateway.
 
 The owner creates/rotates a submission token in Settings (`POST /api/integration/token`). Only its hash is stored; the secret appears in that response once. `GET` returns only configured/creation status and `DELETE` revokes it. Keep the token in your integration's secret environment. It can submit to `POST /api/integrations/items` and has no owner read/edit/share/source-management authority. A browser session alone cannot call submission. Requests accept only title, URL, author, kind, tags, and notes. Status/visibility overrides are rejected; new items always start private and pending. Duplicate canonical URLs or matching manual identities return the existing ID without changing its fields. The receipt contains only `{id,created}`, with 201/true for creation and 200/false for duplicates; no existing metadata is returned.
 
@@ -91,9 +91,8 @@ A Hermes HTTP tool can use the same endpoint, JSON body and bearer header popula
 ## Scoped MCP and selected text
 
 The independently scoped owner-issued read/save credentials, stateless MCP route,
-private excerpt schema and duplicate rules are documented in the
-[API contract](../docs/api-contract.md#scoped-agent-access-and-private-excerpts-migration-008)
-and [verified Marvin/Hermes client guide](../integrations/hermes/mcp.md).
+private excerpt schema and duplicate rules are described below and in the
+[verified Marvin/Hermes client guide](../integrations/hermes/mcp.md).
 Migration 008 adds the grant table and default-empty private excerpt/source
 columns without rewriting existing media fields. Existing credentials retain
 only their previous authority. No live agent registration is performed by startup.
@@ -122,13 +121,13 @@ mkdir -p .local/go-cache .local/go-tmp
 GOCACHE="$PWD/.local/go-cache" GOTMPDIR="$PWD/.local/go-tmp" go test ./...
 ```
 
-`.local/` is ignored. There is no Redis, browser automation, or frontend-only library persistence. The API follows `../docs/api-contract.md`.
+`.local/` is ignored. There is no Redis, browser automation, or frontend-only library persistence. Release-specific API decisions and verification are recorded in pull requests.
 
 `TRUSTED_PROXIES` optionally accepts comma-separated exact `/32` or `/128` proxy peers. Forwarded client addresses are ignored for other peers; the global login budget remains. Verify Caddy peer addresses after recreation.
 
 ## Browser capture, images, and export
 
-Migration 004 adds the owner-only `needs_review` flag, uploaded-image bytes, and an independently revocable browser token. Existing records are already reviewed. Browser capture can create private items and complete an existing URL; add-only bot tokens retain their existing permissions. `/api/images/{id}` checks owner authentication or a public item reference on every request. The owner’s `/api/export` includes library JSON, notes, and attached uploads, with relative image paths; it excludes all credentials. See [the API contract](../docs/api-contract.md#capture-images-and-export-migration-004) for endpoints and limits.
+Migration 004 adds the owner-only `needs_review` flag, uploaded-image bytes, and an independently revocable browser token. Existing records are already reviewed. Browser capture can create private items and complete an existing URL; add-only bot tokens retain their existing permissions. `/api/images/{id}` checks owner authentication or a public item reference on every request. The owner’s `/api/export` includes library JSON, notes, and attached uploads, with relative image paths; it excludes all credentials.
 
 `MARGIN_DEV_MODE=1` explicitly enables owner-only POST/DELETE `/api/dev/fixtures` for loading/removing nine labeled media fixtures with generated images. Bootstrap reports `dev_mode` and `dev_fixture_count`. Production defaults leave these endpoints unregistered. Fixtures are tracked by their generated IDs in `app_settings`; no migration or broad title/tag deletion is used. The local `mise run dev` task opts in automatically.
 

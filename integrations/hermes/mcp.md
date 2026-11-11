@@ -1,8 +1,7 @@
 # Margin MCP for Marvin / Hermes — 2026-11-02
 
-Implemented against the existing A capture baseline (`7dd0ec2` plus the
-working tree documented in `docs/deployment-2026-11-02-capture.md`). This document
-does not register a connection in Marvin or authorize a gateway restart.
+This client guide covers the independently scoped MCP connection. Registering
+a live Marvin connection or restarting its gateway is a separate operation.
 
 ## Verified client and transport
 
@@ -174,5 +173,4 @@ installed Hermes database fixture also passed against the real Margin handler,
 including search/get and save/duplicate workflows. The full backend race suite
 and vet passed. These checks used synthetic records and fixture credentials;
 Marvin's live configuration, gateway, private library and messaging were not
-changed or exercised. Release evidence is in
-[the B–F deployment record](../../docs/deployment-2026-11-02-complete.md).
+changed or exercised. Release evidence is recorded in the repository pull requests.
