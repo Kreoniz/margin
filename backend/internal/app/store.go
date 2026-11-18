@@ -284,12 +284,29 @@ func (s *Store) ListInbox(ctx context.Context, all bool) ([]InboxItem, error) {
 	}
 	return items, rows.Err()
 }
-func (s *Store) PatchInbox(ctx context.Context, id, state string) (InboxItem, error) {
+
+var errInboxStateConflict = errors.New("This article changed in another tab. Its latest state is shown.")
+
+func (s *Store) PatchInbox(ctx context.Context, id, state string, expected *string) (InboxItem, error) {
 	if !oneOf(state, "new", "read", "dismissed") {
 		return InboxItem{}, &ValidationError{"state must be new, read, or dismissed"}
 	}
-	// A saved record can only be marked saved by the atomic save operation.
-	return scanInbox(s.Pool.QueryRow(ctx, `UPDATE inbox i SET state=$2 FROM sources s WHERE i.id=$1 AND s.id=i.source_id RETURNING `+inboxColumns, id, state))
+	if expected != nil && !oneOf(*expected, "new", "read", "dismissed", "saved") {
+		return InboxItem{}, &ValidationError{"Invalid expected discovery state"}
+	}
+	// Older clients omit expected_state. Their read/dismiss requests may
+	// update an unsaved discovery, but cannot undo another tab's save.
+	item, err := scanInbox(s.Pool.QueryRow(ctx, `UPDATE inbox i SET state=$2 FROM sources s
+		WHERE i.id=$1 AND s.id=i.source_id AND (i.state=$3 OR ($3::text IS NULL AND i.state<>'saved'))
+		RETURNING `+inboxColumns, id, state, expected))
+	if !errors.Is(err, ErrNotFound) {
+		return item, err
+	}
+	item, err = scanInbox(s.Pool.QueryRow(ctx, "SELECT "+inboxColumns+" FROM inbox i JOIN sources s ON s.id=i.source_id WHERE i.id=$1", id))
+	if err != nil {
+		return item, err
+	}
+	return item, errInboxStateConflict
 }
 func (s *Store) SaveInbox(ctx context.Context, id string) (Media, bool, error) {
 	tx, err := s.Pool.Begin(ctx)

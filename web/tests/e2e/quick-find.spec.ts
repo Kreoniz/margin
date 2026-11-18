@@ -53,11 +53,11 @@ test("Quick Find ignores scoped Pending/type/tag/hide-auto filters and retains t
   await scoped.press(await primaryKey(page, "k"));
   await expect(query(page)).toBeFocused();
   await query(page).fill("uniquenoteterm");
-  await expect(quickFind(page).getByRole("option")).toHaveCount(2);
-  await expect(quickFind(page).getByRole("option").first()).toContainText("A finished source");
+  await expect(quickFind(page).getByRole("row")).toHaveCount(2);
+  await expect(quickFind(page).getByRole("row").first()).toContainText("A finished source");
   await expect(quickFind(page)).not.toContainText("private body");
   await query(page).press("ArrowDown");
-  await expect(quickFind(page).getByRole("option").nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(quickFind(page).getByRole("row").nth(1)).toHaveAttribute("aria-selected", "true");
   await query(page).press("ArrowUp");
   await query(page).press("Enter");
   await expect(quickFind(page)).toHaveCount(0);
@@ -87,9 +87,9 @@ test("Library and Discover keep independent working contexts through Quick Find,
   await scoped.fill("useful article 5");
   await page.getByRole("button", { name: "Quick Find", exact: true }).click();
   await query(page).fill("uniquenoteterm");
-  await expect(quickFind(page).getByRole("option")).toHaveCount(2);
+  await expect(quickFind(page).getByRole("row")).toHaveCount(2);
   await query(page).fill("A useful article");
-  await expect(quickFind(page).getByRole("option")).toHaveCount(0);
+  await expect(quickFind(page).getByRole("row")).toHaveCount(0);
   await query(page).press("Escape");
   await expect(page.getByRole("button", { name: "Quick Find", exact: true })).toBeFocused();
   await expect(scoped).toHaveValue("useful article 5");
@@ -126,7 +126,7 @@ test("title-only fallback, copy and edit are accessible and empty results cannot
   await expect(quickFind(page).getByRole("status").last()).toHaveText("Original URL copied.");
   expect(await page.evaluate(() => (window as Window & { copied: string[] }).copied)).toEqual(["https://example.com/paper.pdf#page=12"]);
   await query(page).fill("no such saved item");
-  await expect(quickFind(page).getByRole("option")).toHaveCount(0);
+  await expect(quickFind(page).getByRole("row")).toHaveCount(0);
   await expect(query(page)).not.toHaveAttribute("aria-activedescendant");
   await query(page).press("Enter");
   await expect(quickFind(page)).toBeVisible();
@@ -155,8 +155,8 @@ test("Quick Find reuses saved-field matching and scoped slash search stays separ
   await page.getByRole("button", { name: "Quick Find", exact: true }).click();
   for (const term of ["finished", "Synthetic writer Research", "example.com", "summaryterm", "uniquenoteterm Research", "excerptterm"]) {
     await query(page).fill(term);
-    await expect(quickFind(page).getByRole("option")).toHaveCount(1);
-    await expect(quickFind(page).getByRole("option")).toContainText("A finished source");
+    await expect(quickFind(page).getByRole("row")).toHaveCount(1);
+    await expect(quickFind(page).getByRole("row")).toContainText("A finished source");
   }
   await expect(quickFind(page)).not.toContainText("Private excerptterm");
   await quickFind(page).getByRole("button", { name: "Close dialog", exact: true }).click();
@@ -169,12 +169,12 @@ test("bounded results expose further matches and the overlay fits a narrow viewp
   await page.setViewportSize({ width: 320, height: 812 });
   await page.getByRole("button", { name: "Quick Find", exact: true }).click();
   await expect(query(page)).toBeFocused();
-  await expect(quickFind(page).getByRole("option")).toHaveCount(20);
+  await expect(quickFind(page).getByRole("row")).toHaveCount(20);
   await quickFind(page).getByRole("button", { name: "Show more", exact: true }).click();
-  await expect(quickFind(page).getByRole("option")).toHaveCount(40);
+  await expect(quickFind(page).getByRole("row")).toHaveCount(40);
   await expect(query(page)).toBeFocused();
   await quickFind(page).getByRole("button", { name: "Show more", exact: true }).click();
-  await expect(quickFind(page).getByRole("option")).toHaveCount(43);
+  await expect(quickFind(page).getByRole("row")).toHaveCount(43);
   await expect(quickFind(page).getByRole("button", { name: "Show more", exact: true })).toHaveCount(0);
   await expect(query(page)).toBeFocused();
   const bounds = await quickFind(page).boundingBox();
@@ -197,7 +197,7 @@ test("Quick Find excludes recorded fixtures without hiding same-named real items
   await expect(page.getByRole("button", { name: "Edit Shared title", exact: true })).toHaveCount(2);
   await page.getByRole("button", { name: "Quick Find", exact: true }).click();
   await query(page).fill("Shared title");
-  await expect(quickFind(page).getByRole("option")).toHaveCount(1);
+  await expect(quickFind(page).getByRole("row")).toHaveCount(1);
 });
 
 test("dismissed drafts remain explicit and never restore into another item's editor", async ({ page }) => {
@@ -248,4 +248,21 @@ test("new drafts can resume after navigation; save and explicit discard clear th
   await expect(draft(page)).toHaveCount(0);
   await page.getByRole("button", { name: "Add item", exact: true }).click();
   await expect(editor(page).getByRole("textbox", { name: "Title or URL", exact: true })).toHaveValue("");
+});
+
+test("a result’s Actions button copies and edits that result without opening its source", async ({ page, isMobile }) => {
+  await setup(page);
+  await page.getByRole("button", { name: "Quick Find", exact: true }).click();
+  await query(page).fill("uniquenoteterm");
+  const second = quickFind(page).getByRole("row").nth(1);
+  const actions = second.getByRole("button", { name: "Actions for Hidden automatic source" });
+  if (isMobile) await actions.tap();
+  else await actions.click();
+  await expect(second).toHaveAttribute("aria-selected", "true");
+  const group = quickFind(page).getByRole("group", { name: "Actions for Hidden automatic source" });
+  await group.getByRole("button", { name: "Copy original URL" }).click();
+  expect(await page.evaluate(() => (window as Window & { copied: string[] }).copied)).toEqual(["https://example.org/automatic#section"]);
+  await group.getByRole("button", { name: "Edit item" }).click();
+  await expect(editor(page).getByRole("textbox", { name: "Title", exact: true })).toHaveValue("Hidden automatic source");
+  expect(await page.evaluate(() => (window as Window & { opened: unknown[] }).opened)).toHaveLength(0);
 });

@@ -316,3 +316,21 @@ test("conflicts retain the expected baseline through dismissal until explicit re
   await editor(page).getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByRole("button", { name: "Resume draft", exact: true })).toHaveCount(0);
 });
+
+test("correcting a manual title preserves the separately entered link through save", async ({ page }) => {
+  const controls = await fixture(page);
+  await page.goto("http://margin.test/dashboard");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  const modal = editor(page);
+  const title = modal.getByRole("textbox", { name: "Title or URL", exact: true });
+  await title.fill("Evening reading");
+  await modal.getByText("Details, image & note", { exact: true }).click();
+  const url = modal.getByRole("textbox", { name: "URL (optional)", exact: true });
+  await url.fill("https://example.com/evening#page=4");
+  await title.fill("Evening reading list");
+  await expect(url).toHaveValue("https://example.com/evening#page=4");
+  await modal.getByRole("button", { name: "Add to library", exact: true }).click();
+  await expect(modal).toHaveCount(0);
+  expect(controls.requests.mediaWrites).toHaveLength(1);
+  expect(controls.requests.mediaWrites[0]).toMatchObject({ title: "Evening reading list", url: "https://example.com/evening#page=4" });
+});

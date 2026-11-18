@@ -84,7 +84,7 @@ test("illustrated Library has meaningful contained art and usable controls in bo
       for (const marker of item.public) { expect(marker.width).toBeGreaterThan(30); expect(marker.right).toBeLessThanOrEqual(item.row.right); }
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
-    expect(await page.locator(".page-heading h1").evaluate(element => getComputedStyle(element).fontSize)).toBe("26px");
+    expect(await page.locator(".page-heading h1").evaluate(element => getComputedStyle(element).fontSize)).toBe("30px");
     await expect(page.locator(".page-heading p")).toHaveCount(0);
     const visible = geometry.filter(item => item.row.bottom <= 900 && item.row.y >= 0).length;
     metrics.push({ width, theme, firstRowY: geometry[0].row.y, fullyVisibleRows: visible, geometry });

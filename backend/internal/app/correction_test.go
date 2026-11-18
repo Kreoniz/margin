@@ -586,12 +586,12 @@ func TestCorrectionAutoSaveCutoffsAndSeenRecords(t *testing.T) {
 	}
 	for _, i := range inbox {
 		if strings.HasSuffix(i.URL, "read") {
-			if _, err = s.PatchInbox(ctx, i.ID, "read"); err != nil {
+			if _, err = s.PatchInbox(ctx, i.ID, "read", nil); err != nil {
 				t.Fatal(err)
 			}
 		}
 		if strings.HasSuffix(i.URL, "dismissed") {
-			if _, err = s.PatchInbox(ctx, i.ID, "dismissed"); err != nil {
+			if _, err = s.PatchInbox(ctx, i.ID, "dismissed", nil); err != nil {
 				t.Fatal(err)
 			}
 		}

@@ -215,12 +215,17 @@ func (s *Server) patchInbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		State string `json:"state"`
+		State         string  `json:"state"`
+		ExpectedState *string `json:"expected_state"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	i, err := s.Store.PatchInbox(r.Context(), r.PathValue("id"), in.State)
+	i, err := s.Store.PatchInbox(r.Context(), r.PathValue("id"), in.State, in.ExpectedState)
+	if errors.Is(err, errInboxStateConflict) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "inbox_state_conflict", "inbox_item": i})
+		return
+	}
 	respond(w, 200, i, err)
 }
 func (s *Server) createSource(w http.ResponseWriter, r *http.Request) {

@@ -649,7 +649,7 @@ test("failed Unfollow preserves confirmation focus and removing the last row cho
   const unfollow = row.getByRole("button", { name: "Unfollow", exact: true });
   await unfollow.focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByText("Synthetic source removal unavailable", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Synthetic source removal unavailable", exact: true })).toBeVisible();
   await expect(unfollow).toBeFocused();
   await expect(unfollow).toBeEnabled();
   controls.failSourceDelete(false);
@@ -710,6 +710,7 @@ test("narrow Library titles omit the orphan external icon while preserving their
 
 test("Vim row focus clears outside the list and shortcut dialogs keep semantic heading focus without an outline", async ({ page }) => {
   await fixture(page);
+  await page.addInitScript(() => localStorage.setItem("margin-library-layout", "list"));
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(`http://margin.test/dashboard?test=${Date.now()}#library`);
   await expect(page.locator(".media-row")).toHaveCount(4);
@@ -838,4 +839,48 @@ test("mixed-type Library routine controls stay centered with visible metadata an
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
   await page.keyboard.press("j");
   await page.screenshot({ path: `test-results/rethink-controls-${info.project.name}.png`, animations: "disabled" });
+});
+
+test("a slow pending-metadata refresh survives polling and focus events", async ({ page }) => {
+  const controls = await fixture(page);
+  controls.enrichMedia("video-1", { metadata_state: "pending" });
+  let requests = 0;
+  let release = () => {};
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/api/bootstrap", async route => {
+    if (++requests > 1) await gate;
+    await route.fallback();
+  });
+  await page.clock.install();
+  await page.goto("http://margin.test/dashboard");
+  await expect(page.getByRole("button", { name: "Edit A landscape video", exact: true })).toBeVisible();
+  await expect.poll(() => requests).toBe(2);
+  try {
+    controls.enrichMedia("video-1", { metadata_state: "ready", title: "Enriched title" });
+    await page.clock.fastForward(6500);
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    // Flush any fetch started by the synthetic focus event before releasing the read.
+    await page.evaluate(() => fetch("/api/session"));
+    expect(requests).toBe(2);
+  } finally { release(); }
+  await expect(page.getByRole("button", { name: "Edit Enriched title", exact: true })).toBeVisible();
+});
+
+test("Discover reconciles a stale read with another tab’s save", async ({ page }) => {
+  const controls = await fixture(page);
+  await page.goto("http://margin.test/dashboard#discover");
+  const article = page.locator('[data-row-id="inbox-0"]');
+  await expect(article.getByRole("button", { name: "Save", exact: true })).toBeVisible();
+  // Commit the other tab’s save without refreshing the stale tab.
+  expect(await page.evaluate(async () => (await fetch("/api/inbox/inbox-0/save", { method: "POST" })).status)).toBe(201);
+  const write = page.waitForRequest(request => request.method() === "PATCH");
+  controls.failBootstrap();
+  await article.focus();
+  await page.keyboard.press("r");
+  expect((await write).postDataJSON()).toEqual({ state: "read", expected_state: "new" });
+  await expect(article).toHaveCount(0);
+  await expect(page.getByText("This article changed in another tab. Its latest state is shown.", { exact: true }).first()).toBeVisible();
+  await page.locator(".list-tabs").getByRole("button", { name: "Saved", exact: true }).click();
+  await expect(article).toContainText("Saved to library");
+  expect(controls.requests.inboxCommits).toBe(1);
 });

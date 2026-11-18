@@ -1,15 +1,17 @@
-import type { UpNext } from "./types";
+import type { InboxItem, UpNext } from "./types";
 export class ApiError extends Error {
   status: number;
   existingId?: string;
   code?: string;
   upNext?: UpNext;
-  constructor(message: string, status: number, existingId?: string, code?: string, upNext?: UpNext) {
+  inboxItem?: InboxItem;
+  constructor(message: string, status: number, existingId?: string, code?: string, upNext?: UpNext, inboxItem?: InboxItem) {
     super(message);
     this.status = status;
     this.existingId = existingId;
     this.code = code;
     this.upNext = upNext;
+    this.inboxItem = inboxItem;
   }
 }
 export async function api<T>(
@@ -48,6 +50,7 @@ export async function api<T>(
       body.existing_id,
       body.code,
       body.up_next,
+      body.inbox_item,
     );
   }
   return response.status === 204 ? (undefined as T) : response.json();

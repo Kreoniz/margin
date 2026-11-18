@@ -142,7 +142,10 @@ export async function fixture(page: Page, customMedia?: Media[]) {
       requests.inboxPatches++;
       await inboxWriteGate;
       const item = inbox.find(item => url.pathname.endsWith(item.id))!;
-      item.state = route.request().postDataJSON().state;
+      const { state, expected_state } = route.request().postDataJSON();
+      if (expected_state === undefined ? item.state === "saved" : item.state !== expected_state)
+        return route.fulfill({ status: 409, json: { code: "inbox_state_conflict", error: "This article changed in another tab. Its latest state is shown.", inbox_item: item } });
+      item.state = state;
       requests.inboxCommits++;
       await inboxAckGate;
       return route.fulfill({ json: item });

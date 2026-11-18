@@ -166,7 +166,6 @@ function Owner({
     try { localStorage.setItem("margin-library-layout", libraryLayout); }
     catch { /* The layout remains usable when browser storage is unavailable. */ }
   }, [libraryLayout]);
-  const layout = libraryLayout;
   const [announcement, setAnnouncement] = useState("");
   const [libraryQuery, setLibraryQuery] = useState("");
   const [discoveryQuery, setDiscoveryQuery] = useState("");
@@ -177,6 +176,9 @@ function Owner({
   const [channelFilters, setChannelFilters] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState<LibraryFilter>();
   const [status, setStatus] = useState(() => window.location.hash === "#next" ? "next" : "pending");
+  const [queueLayout, setQueueLayout] = useState<LibraryLayout>("list");
+  const layout = status === "next" ? queueLayout : libraryLayout;
+  const setLayout = status === "next" ? setQueueLayout : setLibraryLayout;
   const [queueOpen, setQueueOpen] = useState<string>();
   const [inboxState, setInboxState] = useState("new");
   const [source, setSource] = useState("all");
@@ -215,8 +217,13 @@ function Owner({
   const queueCleanupGeneration = useRef(0);
   const activeMutations = useRef(new Set<string>());
   const toast = Toast.useToastManager();
-  const refresh = useCallback(async () => {
+  const activeRefresh = useRef<number | undefined>(undefined);
+  const refresh = useCallback(async (background = false) => {
+    // Polls and focus events share the in-flight read. An explicit refresh
+    // after a write must still be able to supersede a pre-write snapshot.
+    if (background && activeRefresh.current !== undefined) return;
     const id = ++version.current;
+    activeRefresh.current = id;
     try {
       const response = await api<LibraryData>("/bootstrap");
       if (version.current === id && (response.up_next?.version ?? 0) >= latestQueueVersion.current) {
@@ -228,15 +235,17 @@ function Owner({
     } catch (e) {
       if (version.current === id)
         setError(e instanceof Error ? e.message : "Could not load your list.");
+    } finally {
+      if (activeRefresh.current === id) activeRefresh.current = undefined;
     }
   }, []);
   const hasPendingMetadata = Boolean(
     data?.media.some((item) => item.metadata_state === "pending"),
   );
   useEffect(() => {
-    void refresh();
+    void refresh(true);
     const focus = () => {
-      if (!document.hidden) void refresh();
+      if (!document.hidden) void refresh(true);
     };
     window.addEventListener("focus", focus);
     const timer = setInterval(
@@ -313,9 +322,9 @@ function Owner({
           enabled: shortcutsEnabled && singleKeys && Boolean(data?.dev_mode),
         },
       },
-      { hotkey: ["V", "L"], callback: () => { getHotkeyManager().resetSequenceProgress(); setLibraryLayout("list"); }, options: { enabled: shortcutsEnabled && singleKeys && view === "library" } },
-      { hotkey: ["V", "B"], callback: () => { getHotkeyManager().resetSequenceProgress(); setLibraryLayout("split"); }, options: { enabled: shortcutsEnabled && singleKeys && view === "library" } },
-      ...(["S", "G"] as const).map(key => ({ hotkey: ["V", key] as const, callback: () => { getHotkeyManager().resetSequenceProgress(); setLibraryLayout("shelves"); }, options: { enabled: shortcutsEnabled && singleKeys && view === "library" } })),
+      { hotkey: ["V", "L"], callback: () => { getHotkeyManager().resetSequenceProgress(); setLayout("list"); }, options: { enabled: shortcutsEnabled && singleKeys && view === "library" } },
+      { hotkey: ["V", "B"], callback: () => { getHotkeyManager().resetSequenceProgress(); setLayout("split"); }, options: { enabled: shortcutsEnabled && singleKeys && view === "library" } },
+      ...(["S", "G"] as const).map(key => ({ hotkey: ["V", key] as const, callback: () => { getHotkeyManager().resetSequenceProgress(); setLayout("shelves"); }, options: { enabled: shortcutsEnabled && singleKeys && view === "library" } })),
       ...([ ["T", "types"], ["G", "tags"], ["C", "channels"] ] as const).map(([key, id]) => ({ hotkey: ["F", key] as const, callback: () => { getHotkeyManager().resetSequenceProgress(); const trigger = document.getElementById("library-filter-" + id); if (trigger) { trigger.focus({ preventScroll: true }); setFilterOpen(id); } }, options: { enabled: shortcutsEnabled && singleKeys && view !== "discover" } })),
       { hotkey: "Mod+,", callback: () => setSettings(true) },
       { hotkey: "Control+Home", callback: () => navigation.focusFirst(), options: { ignoreInputs: true } },
@@ -549,6 +558,8 @@ function Owner({
       if (e instanceof ApiError && e.code === "up_next_conflict") {
         if (e.upNext) acknowledgeQueue(e.upNext, cleanupGeneration);
         await refresh();
+      } else if (e instanceof ApiError && e.code === "inbox_state_conflict") {
+        await refresh();
       }
       setAnnouncement(e instanceof Error ? e.message : "Please try again.");
       toast.add({
@@ -655,9 +666,15 @@ function Owner({
   }
   async function patchInbox(before: InboxItem, state: InboxItem["state"]) {
     const countsBefore = inboxCounts.current;
-    const item = await api<InboxItem>("/inbox/" + before.id, send("PATCH", { state }));
-    acknowledgeInbox(item, before, countsBefore);
-    return item;
+    try {
+      const item = await api<InboxItem>("/inbox/" + before.id, send("PATCH", { state, expected_state: before.state }));
+      acknowledgeInbox(item, before, countsBefore);
+      return item;
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "inbox_state_conflict" && error.inboxItem)
+        acknowledgeInbox(error.inboxItem, before, countsBefore);
+      throw error;
+    }
   }
   function setUndo(run: () => Promise<boolean>) {
     const action = () => {
@@ -1092,7 +1109,7 @@ function Owner({
           </div>
         </div>
       </header>
-      <main id="content" className={"content" + (view !== "discover" && media.length ? " library-populated" : "")} data-library-layout={view !== "discover" ? layout : undefined} tabIndex={-1}>
+      <main id="content" className={"content" + (view !== "discover" && media.length ? " library-populated" : "")} data-library-layout={view !== "discover" ? libraryLayout : undefined} tabIndex={-1}>
         {draftPending && !editor && <div className="notice flex flex-wrap items-center gap-2" role="region" aria-label="Unfinished draft">
           <span className="mr-auto">Unfinished draft{editorMemory.current?.item ? ": " + editorMemory.current.item.title : ""}</span>
           <Button variant="secondary" size="sm" onClick={resumeDraft}>Resume draft</Button>
@@ -1124,10 +1141,10 @@ function Owner({
           </div>
           {view === "library" && (
             <div className="library-layout-switch" role="group" aria-label="Library view">
-              {libraryViews.map(layout => (
-                <ActionHint key={layout.value} label={layout.label + " view"} shortcut={singleKeys ? layout.shortcut : undefined}>
-                  <button type="button" aria-label={layout.label + " view"} aria-pressed={libraryLayout === layout.value} onClick={() => setLibraryLayout(layout.value)}>
-                    <Icon name={layout.icon} size={15} />{layout.label}
+              {libraryViews.map(option => (
+                <ActionHint key={option.value} label={option.label + " view"} shortcut={singleKeys ? option.shortcut : undefined}>
+                  <button type="button" aria-label={option.label + " view"} aria-pressed={layout === option.value} onClick={() => setLayout(option.value)}>
+                    <Icon name={option.icon} size={15} />{option.label}
                   </button>
                 </ActionHint>
               ))}

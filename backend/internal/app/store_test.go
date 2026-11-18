@@ -106,7 +106,11 @@ func TestIntegrationDeleteMediaResetsOnlyLinkedInbox(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, state := range map[string]string{"second": "dismissed", "read": "read", "dismissed": "dismissed"} {
-		if _, err = s.PatchInbox(ctx, ids[name], state); err != nil {
+		expected := "new"
+		if name == "second" {
+			expected = "saved"
+		}
+		if _, err = s.PatchInbox(ctx, ids[name], state, &expected); err != nil {
 			t.Fatal(err)
 		}
 	}

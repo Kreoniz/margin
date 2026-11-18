@@ -12,6 +12,24 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: Charter;
+  src: url("/fonts/charter_regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Charter;
+  src: url("/fonts/charter_bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+@theme {
+  --font-serif: Charter, Georgia, serif;
+}
+
 @theme inline {
   --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
   /* Preserve Margin's corners when the DS adapter defines semantic radii. */
@@ -191,13 +209,13 @@
     @apply mb-6 flex animate-margin-reveal items-center justify-between gap-5;
   }
   .page-heading h1 {
-    @apply text-[31px] leading-tight font-[570] tracking-[-1.2px];
+    @apply font-serif text-[34px] leading-tight font-bold;
   }
   .page-heading h1 > span {
     @apply text-u-accent-text;
   }
   .page-heading p {
-    @apply mt-2 text-xs leading-relaxed text-u-muted;
+    @apply mt-2 max-w-[70ch] font-serif text-base leading-[1.4] text-u-muted;
   }
   .discovery-controls {
     @apply flex items-center gap-1.5;
@@ -344,7 +362,7 @@
     @apply min-w-0 flex-1;
   }
   .item-title {
-    @apply border-0 bg-transparent p-0 text-left text-sm leading-relaxed font-[550] tracking-[-0.2px] wrap-anywhere text-u-ink no-underline hover:underline hover:decoration-u-line;
+    @apply border-0 bg-transparent p-0 text-left font-serif text-base leading-[1.375] font-bold wrap-anywhere text-u-ink no-underline hover:underline hover:decoration-u-line;
   }
   .item-title > svg {
     @apply ml-1.5 text-u-muted opacity-55;
@@ -480,10 +498,10 @@
     @apply font-medium text-u-ink;
   }
   .article-row .item-title {
-    @apply max-w-full text-[15px] leading-relaxed font-[550];
+    @apply max-w-full text-lg leading-[1.35];
   }
   .article-description {
-    @apply mt-1.5 line-clamp-2 max-w-[740px] text-xs leading-relaxed wrap-anywhere text-u-muted;
+    @apply mt-1.5 line-clamp-2 max-w-[70ch] font-serif text-base leading-[1.4] wrap-anywhere text-u-muted;
   }
   .article-actions {
     @apply mt-3 flex items-center gap-1.5;
@@ -548,13 +566,13 @@
     @apply mb-4 flex items-start justify-between gap-3;
   }
   .modal-header .u-overlay-title {
-    @apply text-xl leading-tight font-semibold tracking-tight;
+    @apply font-serif text-2xl leading-tight font-bold;
   }
   .modal-header .u-overlay-title:focus {
     outline: none;
   }
   .modal-header .u-overlay-description {
-    @apply mt-1 mb-0 text-xs leading-relaxed text-u-muted;
+    @apply mt-1 mb-0 max-w-[70ch] text-[15px] leading-[1.4] text-u-muted;
   }
   .modal-header > .u-button {
     @apply -mt-1 -mr-1 size-8 min-h-8 min-w-8 shrink-0 text-u-muted;
@@ -834,10 +852,10 @@
     @apply mb-5 grid size-13 -rotate-4 place-items-center rounded-xl border border-solid border-u-accent-border/25 bg-u-accent-soft text-u-accent-text;
   }
   .access-card h1 {
-    @apply text-3xl leading-tight font-[550] tracking-tight;
+    @apply font-serif text-[34px] leading-tight font-bold;
   }
   .access-card > p {
-    @apply mt-3 mb-6 text-xs leading-loose text-u-muted;
+    @apply mt-3 mb-6 font-serif text-[17px] leading-[1.4] text-u-muted;
   }
   .access-card form {
     @apply grid gap-4;
@@ -861,7 +879,7 @@
     @apply mt-1 min-w-20 text-right text-[10px] whitespace-nowrap text-u-muted;
   }
   .shared-description {
-    @apply mt-2 text-xs leading-relaxed wrap-anywhere whitespace-pre-wrap text-u-muted;
+    @apply mt-2 max-w-[70ch] font-serif text-base leading-[1.4] wrap-anywhere whitespace-pre-wrap text-u-muted;
   }
   .shared-tags {
     @apply mt-1.5 text-[10px] leading-relaxed text-u-muted;
@@ -891,9 +909,6 @@
     }
     .media-row {
       @apply gap-3;
-    }
-    .item-title {
-      @apply text-[13px];
     }
     .item-meta {
       @apply text-[10px];
@@ -1018,12 +1033,6 @@
     }
     .article-row > .source-mark {
       @apply mt-1 size-[25px] min-w-[25px] text-[13px];
-    }
-    .article-row .item-title {
-      @apply text-sm;
-    }
-    .article-description {
-      @apply text-xs;
     }
     .article-actions {
       @apply mt-2 gap-1;
@@ -1217,11 +1226,11 @@
     @apply m-0;
   }
   .collection-copy h2 {
-    @apply m-0 text-sm leading-snug;
+    @apply m-0 text-base leading-snug;
     min-block-size: 2.75em;
   }
   .collection-copy .item-title {
-    @apply line-clamp-2 text-sm leading-snug;
+    @apply line-clamp-2 text-base leading-snug;
   }
   .collection-copy .item-meta {
     @apply m-0 block truncate text-[11px] leading-snug;
@@ -1257,13 +1266,13 @@
     @apply block line-clamp-none whitespace-pre-wrap break-words;
   }
   .shared-detail .collection-copy .shared-description {
-    @apply text-sm leading-relaxed;
+    @apply text-lg leading-[1.4];
   }
   .shared-detail .collection-copy h1 {
     @apply m-0;
   }
   .shared-detail .collection-copy .item-title {
-    @apply text-xl leading-snug;
+    @apply text-2xl leading-tight;
   }
   .shared-detail .collection-copy .item-title:hover {
     text-decoration: none;
@@ -1464,7 +1473,7 @@
     @apply mb-3.5;
   }
   .owner-shell .library-heading-populated h1 {
-    @apply text-[26px] tracking-[-0.8px];
+    @apply text-[30px];
   }
   .owner-shell .library-populated .list-toolbar {
     @apply mb-3;
@@ -1497,7 +1506,7 @@
     @apply col-start-2 row-start-1;
   }
   .owner-shell .media-row .row-primary-action {
-    @apply static block text-[15px] leading-[22px];
+    @apply static block text-[17px] leading-[1.375];
   }
   .owner-shell .media-row .row-primary-action:focus-visible {
     outline: none;
@@ -1621,7 +1630,7 @@
     @apply col-start-3 row-span-2 row-start-1 ml-auto w-auto shrink-0 self-center;
   }
   .owner-shell .library-reading-list .row-primary-action {
-    @apply text-sm leading-[22px];
+    @apply text-base leading-[1.375];
   }
   @media (min-width: 1000px) {
     .library-mixed[data-layout="split"]:not([data-single-section]) {
@@ -1737,7 +1746,7 @@
     grid-area: auto;
   }
   .owner-shell .library-gallery .row-primary-action {
-    @apply text-sm leading-5;
+    @apply text-base leading-[1.375];
   }
   .owner-shell .library-gallery .row-actions > .review-button {
     @apply text-u-accent-text;
@@ -1749,7 +1758,7 @@
     @apply rounded-xl;
   }
   .owner-shell .library-gallery .gallery-description {
-    @apply mt-3 line-clamp-4 text-sm leading-[22px] wrap-anywhere text-u-muted;
+    @apply mt-3 line-clamp-4 max-w-[70ch] font-serif text-base leading-[1.4] wrap-anywhere text-u-muted;
   }
   .owner-shell .library-gallery .item-meta {
     @apply mt-1 gap-y-1 text-xs leading-[18px];
@@ -1826,7 +1835,7 @@
       @apply col-start-2 row-start-1;
     }
     .owner-shell .media-list[data-layout="list"] .media-row .row-primary-action {
-      @apply text-sm leading-5;
+      @apply text-base leading-[1.375];
     }
     .owner-shell .row-controls {
       @apply col-start-2 row-start-2 justify-self-end;

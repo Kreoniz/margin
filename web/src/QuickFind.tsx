@@ -22,6 +22,7 @@ export function QuickFind({ media, loading, onClose, onEdit, fallbackFocus }: {
   const [feedback, setFeedback] = useState("");
   const [copyError, setCopyError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const editButton = useRef<HTMLButtonElement>(null);
   const afterClose = useRef<(() => void) | undefined>(undefined);
   const id = useId();
   const results = useMemo(() => selectMedia(media, {
@@ -34,7 +35,7 @@ export function QuickFind({ media, loading, onClose, onEdit, fallbackFocus }: {
   const selectedIndex = selected ? visible.indexOf(selected) : -1;
   const optionId = (index: number) => `${id}-result-${index}`;
   useEffect(() => {
-    if (selectedIndex >= 0)
+    if (selectedIndex >= 0 && document.activeElement === inputRef.current)
       document.getElementById(optionId(selectedIndex))?.scrollIntoView({ block: "nearest" });
   }, [selected?.id, selectedIndex]);
   function edit(item: Media) {
@@ -63,7 +64,7 @@ export function QuickFind({ media, loading, onClose, onEdit, fallbackFocus }: {
     <label htmlFor={`${id}-query`} className="quick-find-label">Search all saved items</label>
     <Input ref={inputRef} id={`${id}-query`} autoFocus value={query}
       placeholder="Title, creator, URL, note or tag…" role="combobox" aria-autocomplete="list"
-      aria-expanded={true} aria-controls={`${id}-results`} aria-describedby={`${id}-count`}
+      aria-expanded={true} aria-haspopup="grid" aria-controls={`${id}-results`} aria-describedby={`${id}-count`}
       aria-activedescendant={selectedIndex >= 0 ? optionId(selectedIndex) : undefined}
       onChange={event => {
         setQuery(event.target.value); setSelectedId(undefined); setLimit(pageSize); setFeedback("");
@@ -82,27 +83,40 @@ export function QuickFind({ media, loading, onClose, onEdit, fallbackFocus }: {
     <p id={`${id}-count`} className="quick-find-count" role="status">
       {loading ? "Loading saved items…" : results.length ? `Showing ${visible.length} of ${results.length} saved items` : query.trim() ? "No saved items match your search." : "No saved items yet."}
     </p>
-    <div id={`${id}-results`} role="listbox" tabIndex={-1} aria-label="Saved items" className="quick-find-results">
-      {visible.map((item, index) => <button type="button" role="option" key={item.id} id={optionId(index)}
-        tabIndex={-1} aria-selected={selected?.id === item.id} className="quick-find-result"
-        onMouseDown={event => event.preventDefault()} onClick={() => activate(item)}>
-        <span className="quick-find-title">{item.title}</span>
-        <span className="quick-find-meta">
-          <TypeLabel kind={item.kind} />
-          {item.author && <span>{item.author}</span>}
-          {hostname(item.url) && <span>{hostname(item.url)}</span>}
-        </span>
-      </button>)}
+    <div id={`${id}-results`} role="grid" tabIndex={-1} aria-label="Saved items" className="quick-find-results">
+      {visible.map((item, index) => <div role="row" key={item.id} id={optionId(index)}
+        aria-selected={selected?.id === item.id} className="quick-find-row">
+        <div role="gridcell">
+          <button type="button" className="quick-find-result" tabIndex={-1}
+            onMouseDown={event => event.preventDefault()} onClick={() => activate(item)}>
+            <span className="quick-find-title">{item.title}</span>
+            <span className="quick-find-meta">
+              <TypeLabel kind={item.kind} />
+              {item.author && <span>{item.author}</span>}
+              {hostname(item.url) && <span>{hostname(item.url)}</span>}
+            </span>
+          </button>
+        </div>
+        <div role="gridcell">
+          <Button type="button" variant="ghost" size="sm" tabIndex={-1}
+            aria-label={`Actions for ${item.title}`} aria-controls={`${id}-actions`}
+            onClick={() => {
+              setSelectedId(item.id);
+              setFeedback("");
+              editButton.current?.focus();
+            }}>Actions</Button>
+        </div>
+      </div>)}
     </div>
     {visible.length < results.length && <Button variant="secondary" size="sm" className="quick-find-more" onClick={() => {
       setLimit(value => value + pageSize);
       setSelectedId(results[limit].id);
       inputRef.current?.focus({ preventScroll: true });
     }}>Show more</Button>}
-    {selected && <div className="quick-find-actions" role="group" aria-label={`Actions for ${selected.title}`}>
-      <span>↑/↓ select · Enter {safeURL(selected.url) ? "opens source" : "edits item"}</span>
+    {selected && <div id={`${id}-actions`} className="quick-find-actions" role="group" aria-label={`Actions for ${selected.title}`}>
+      <span><strong>{selected.title}</strong>↑/↓ select · Enter {safeURL(selected.url) ? "opens source" : "edits item"}</span>
       {safeURL(selected.url) && <Button variant="secondary" size="sm" onClick={() => void copy(selected)}>Copy original URL</Button>}
-      <Button variant="secondary" size="sm" onClick={() => edit(selected)}>Edit item</Button>
+      <Button ref={editButton} variant="secondary" size="sm" onClick={() => edit(selected)}>Edit item</Button>
     </div>}
     {feedback && <p className="quick-find-count" role={copyError ? "alert" : "status"}>{feedback}</p>}
   </Modal>;

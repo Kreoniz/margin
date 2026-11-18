@@ -35,6 +35,7 @@ test("default Library keeps compact layouts; Up next is a secondary empty filter
     await expect(row(page, id).locator(".priority-membership")).toContainText("Up next · #");
   }
   await tab(page).click();
+  await expect(rows(page).locator(".item-title")).toHaveText(["Chosen game", "Chosen book", "Chosen video"]);
   for (const label of ["Mixed", "Shelves", "List"]) {
     await page.getByRole("button", { name: label + " view", exact: true }).click();
     await expect(rows(page)).toHaveCount(3);
@@ -54,7 +55,7 @@ test("default Library keeps compact layouts; Up next is a secondary empty filter
   for (const hash of ["", "#unknown"]) {
     await page.goto("http://margin.test/app?fresh=" + Date.now() + hash);
     await expect(page.locator(".list-tabs").getByRole("button", { name: "Unfinished", exact: true })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("button", { name: "List view", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Mixed view", exact: true })).toHaveAttribute("aria-pressed", "true");
   }
   await page.keyboard.press("g"); await page.keyboard.press("n"); await expect(tab(page)).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Margin library", exact: true }).click();
@@ -89,6 +90,7 @@ test("native keyboard moves retain row focus; Escape restores trigger and remova
 test("grouped layouts keep truthful global ranks and move across types; filters disable ambiguous moves", async ({ page }) => {
   const f = await fixture(page, media); f.queue(["game", "book", "video"]);
   await page.goto("http://margin.test/app#next");
+  await page.getByRole("button", { name: "Shelves view", exact: true }).click();
   let panel = await actions(page, "book");
   await expect(panel).toContainText("Position 2 of 3 across your library");
   await panel.getByRole("button", { name: "Move earlier", exact: true }).click();
@@ -201,7 +203,7 @@ test("Quick Find reaches unqueued items and returns to the priority filter", asy
   await page.getByRole("button", { name: "Quick Find", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Quick Find", exact: true });
   await dialog.getByRole("combobox", { name: "Search all saved items", exact: true }).fill("Chosen game");
-  await expect(dialog.getByRole("option")).toContainText("Chosen game");
+  await expect(dialog.getByRole("row")).toContainText("Chosen game");
   await page.keyboard.press("Escape");
   await expect(tab(page)).toHaveAttribute("aria-pressed", "true"); await expect(rows(page)).toHaveCount(1);
 });
@@ -276,4 +278,21 @@ for (const newerTime of ["2026-11-07T10:02:00Z", "2026-11-07T10:01:00.000002Z"])
   await expect(row(page, "book").locator(".priority-membership")).toHaveText("Up next · #3");
   await expect(row(page, "book").getByRole("checkbox")).not.toBeChecked();
   await expect(page.getByText("Marked done. Undo returns to unfinished without restoring Up next.", { exact: true })).toHaveCount(0);
+});
+
+test("Up next opens in global priority order and keeps the Library view preference", async ({ page }) => {
+  const f = await fixture(page, media);
+  f.queue(["game", "book", "video"]);
+  await page.goto("http://margin.test/dashboard");
+  await page.getByRole("button", { name: "Shelves view", exact: true }).click();
+  await tab(page).click();
+  await expect(page.getByRole("button", { name: "List view", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(rows(page).locator(".item-title")).toHaveText(["Chosen game", "Chosen book", "Chosen video"]);
+  await (await actions(page, "book")).getByRole("button", { name: "Move earlier", exact: true }).click();
+  await expect(rows(page).locator(".item-title")).toHaveText(["Chosen book", "Chosen game", "Chosen video"]);
+  await page.getByRole("button", { name: "Mixed view", exact: true }).click();
+  await page.locator(".list-tabs").getByRole("button", { name: "Unfinished", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Shelves view", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Shelves view", exact: true })).toHaveAttribute("aria-pressed", "true");
 });

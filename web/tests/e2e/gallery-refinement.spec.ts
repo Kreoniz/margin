@@ -84,8 +84,8 @@ test("complete similar-prefix and unbroken titles wrap in both views and phone S
         expect(item.endRight).toBeLessThanOrEqual(item.right + 1);
       }
       if (layout === "Shelves") {
-        expect(metrics[0].fontSize).toBe("14px"); expect(metrics[0].lineHeight).toBe("20px");
-        expect(metrics[3].fontSize).toBe("14px"); expect(metrics[3].lineHeight).toBe("22px");
+        expect(metrics[0].fontSize).toBe("16px"); expect(metrics[0].lineHeight).toBe("22px");
+        expect(metrics[3].fontSize).toBe("16px"); expect(metrics[3].lineHeight).toBe("22px");
       }
       await expect(page.locator('.media-row[data-row-id="refined-0"] .row-primary-action')).toHaveAttribute("href", "https://example.com/item-0");
       expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);

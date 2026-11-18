@@ -523,3 +523,40 @@ func TestFragmentNavigationAndRouteIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDiscoverStaleStateCannotOverwriteSave(t *testing.T) {
+	s := integrationStore(t)
+	c, _ := ownerClient(t, s)
+	ctx := context.Background()
+	src, err := s.CreateSource(ctx, Source{Name: "Test feed", SiteURL: "https://example.com", FeedURL: "https://example.com/feed", Parser: "rss", IntervalMinutes: 60})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := newID()
+	_, err = s.Pool.Exec(ctx, `INSERT INTO inbox(id,source_id,title,url,url_key,published_at)
+		VALUES($1,$2,'Saved elsewhere','https://example.com/story','story',now())`, id, src.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "/api/inbox/" + id
+	requireCode(t, c.request("PATCH", path, `{"expected_state":"new","state":"read"}`), 200)
+	requireCode(t, c.request("PATCH", path, `{"expected_state":"new","state":"dismissed"}`), 409)
+	saved := c.request("POST", path+"/save", "")
+	requireCode(t, saved, 201)
+	for _, body := range []string{`{"expected_state":"read","state":"new"}`, `{"state":"read"}`} {
+		response := c.request("PATCH", path, body)
+		requireCode(t, response, 409)
+		var conflict struct {
+			Code string    `json:"code"`
+			Item InboxItem `json:"inbox_item"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &conflict); err != nil || conflict.Code != "inbox_state_conflict" || conflict.Item.ID != id || conflict.Item.State != "saved" {
+			t.Fatalf("conflict response: %s", response.Body)
+		}
+	}
+	var state, linkedID string
+	if err := s.Pool.QueryRow(ctx, "SELECT state,media_id::text FROM inbox WHERE id=$1", id).Scan(&state, &linkedID); err != nil || state != "saved" || linkedID != responseMap(t, saved)["id"] {
+		t.Fatalf("save changed: state=%s media=%s err=%v", state, linkedID, err)
+	}
+	requireCode(t, c.request("PATCH", "/api/inbox/"+newID(), `{"state":"read","expected_state":"new"}`), 404)
+}

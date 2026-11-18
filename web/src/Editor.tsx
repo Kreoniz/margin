@@ -472,6 +472,10 @@ export function Editor({
                 if (draftLockedRef.current) return;
                 const value = e.target.value;
                 const link = safeURL(value);
+                // A pasted link replaces the capture. A title correction keeps a
+                // URL entered separately in Details, including an explicit clear.
+                if (link) dirty.current.delete("url");
+                const keepURL = !link && dirty.current.has("url");
                 setCapture(value);
                 setWarning("");
                 setLookupComplete(false);
@@ -482,7 +486,7 @@ export function Editor({
                 setDraft((d) => ({
                   ...d,
                   title: link ? "" : value,
-                  url: link ? value : "",
+                  url: link ? value : keepURL ? d.url : "",
                   kind: /^\s*(?:97[89][- ]?)?[\dXx][- \dXx]{8,16}\s*$/.test(
                     value,
                   )
